@@ -1,4 +1,3 @@
-
 <?php
 
 /**
@@ -50,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
  * @copyright Copyright © 2003-4, Martin Lucas-Smith, University of Cambridge 2003-4
- * @version 0.96
+ * @version >0.96
  */
 class form
 {
@@ -95,6 +94,9 @@ class form
 	{
 		# Load the application support library which itself requires the pureContent framework file, pureContent.php; this will clean up $_SERVER
 		require_once ('application.php');
+		
+		# Load the date processing library
+		require_once ('datetime.php');
 		
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentsSpecification = array (
@@ -487,7 +489,7 @@ class form
 		if (!$this->formPosted) {$this->form[$elementName] = $initialValue;}
 		
 		# Define the widget's core HTML
-		$widgetHtml = '<textarea name="' . $this->formName . "[$elementName]\" cols=\"$columns\" rows=\"$rows\">" . htmlentities ($this->form[$elementName]) . '</textarea>';
+		$widgetHtml = '<textarea name="' . $this->formName . "[$elementName]\" id=\"" . $this->formName . "[$elementName]\" cols=\"$columns\" rows=\"$rows\">" . htmlentities ($this->form[$elementName]) . '</textarea>';
 		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$elementName] = array (
@@ -588,7 +590,7 @@ class form
 		$restriction = 'Must have one numeric item per line';
 		
 		# Define the widget's core HTML
-		$widgetHtml = '<textarea name="' . $this->formName . "[$elementName]\" cols=\"$columns\" rows=\"$rows\">" . htmlentities ($this->form[$elementName]) . '</textarea>';
+		$widgetHtml = '<textarea name="' . $this->formName . "[$elementName]\" id=\"" . $this->formName . "[$elementName]\" cols=\"$columns\" rows=\"$rows\">" . htmlentities ($this->form[$elementName]) . '</textarea>';
 		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$elementName] = array (
@@ -687,7 +689,7 @@ class form
 		$restriction = 'Must have two numeric items (x,y) per line';
 		
 		# Define the widget's core HTML
-		$widgetHtml = '<textarea name="' . $this->formName . "[$elementName]\" cols=\"$columns\" rows=\"$rows\">" . htmlentities ($this->form[$elementName]) . '</textarea>';
+		$widgetHtml = '<textarea name="' . $this->formName . "[$elementName]\" id=\"" . $this->formName . "[$elementName]\" cols=\"$columns\" rows=\"$rows\">" . htmlentities ($this->form[$elementName]) . '</textarea>';
 		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$elementName] = array (
@@ -814,8 +816,8 @@ class form
 		# Define the widget's core HTML
 		$widgetHtml = "\n\t\t\t<select name=\"" . $this->formName . "[$elementName][]\"" . (($multiple) ? ' multiple="multiple"' : '') . " size=\"$visibleSize\">";
 		$widgetHtml .= "\n\t\t\t\t<option>" . $this->nullText . '</option>';
-		for ($i = 0; $i < count ($valuesArray); $i++) {
-			$widgetHtml .= "\n\t\t\t\t<option" . (in_array ($valuesArray[$i], $this->form[$elementName]) ? ' selected="selected"' : '') . '>' . htmlentities ($valuesArray[$i]) . '</option>';
+		foreach ($valuesArray as $key => $value) {
+			$widgetHtml .= "\n\t\t\t\t<option" . (application::isAssociativeArray ($valuesArray) ? " value=\"$key\"" : '') . (in_array ((application::isAssociativeArray ($valuesArray) ? $key : $value), $this->form[$elementName]) ? ' selected="selected"' : '') . '>' . htmlentities ($value) . '</option>';
 		}
 		$widgetHtml .= "\n\t\t\t</select>\n\t\t";
 		
@@ -934,6 +936,8 @@ class form
 				'elementDescription'	=> '',		# Description text
 				'outputFormat'			=> array (),# Presentation format (CURRENTLY UNDOCUMENTED)
 				'minimumRequired'		=> 0,		# The minimum number which must be selected (defaults to 0)
+#!# Hack!
+				'maximumRequired'		=> 999,		# The maximum number which must be selected (defaults to 0)
 				'initialValues'			=> array (),# Pre-selected item(s)
 		));
 		
@@ -1009,6 +1013,12 @@ class form
 			$elementProblems['insufficientSelected'] = "A minimum of $minimumRequired checkboxes are required to be selected.";
 		}
 		
+		# Make sure the number of checkboxes given is above the $maximumRequired
+		#!# Hacked in quickly on 041103 - needs regression testing
+		if ($checkedTally > $maximumRequired) {
+			$elementProblems['tooManySelected'] = "A maximum of $maximumRequired checkboxes are required to be selected.";
+		}
+		
 		# Describe restrictions on the widget
 		if ($minimumRequired > 1) {$restriction = "Minimum $minimumRequired items required";}
 		
@@ -1073,7 +1083,7 @@ class form
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 		if (!$this->formPosted) {
-			$this->form[$elementName] = application::getDateTimeArray ($initialValue);
+			$this->form[$elementName] = datetime::getDateTimeArray ($initialValue);
 		} else {
  			
 			# Check whether all fields are empty, starting with assuming all fields are not incomplete
@@ -1150,7 +1160,7 @@ class form
 					if (!empty ($this->form[$elementName]['time'])) {
 						
 						# If the time parsing passes, substitute the submitted version with the parsed and corrected version
-						if ($time = application::parseTime ($this->form[$elementName]['time'])) {
+						if ($time = datetime::parseTime ($this->form[$elementName]['time'])) {
 							$this->form[$elementName]['time'] = $time;
 						
 						# If, instead, the time parsing fails, leave the original submitted version and add the problem to the errors array
@@ -1222,6 +1232,7 @@ class form
 				'disallowedExtensions'	=> array (),# Simple array of disallowed file extensions (Single-item string also acceptable)
 				'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required)
 				'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
+				'forcedFileName'		=> false,	# Force to a specific filename
 		));
 		
 		# Ensure that arguments with a non-null default value are set (throwing an error if not), or assign the default value if none is specified
@@ -1368,6 +1379,7 @@ class form
 			'subfields' => $subfields,
 			'outputFormat' => $outputFormat,
 			'enableVersionControl' => $enableVersionControl,
+			'forcedFileName' => $forcedFileName,
 		);
 	}
 	
@@ -1448,11 +1460,12 @@ class form
 	{
 		# Add the headings as text
 		switch ($level) {
-			case 0:
+			case '0':
 			case 'p':
 				$widgetHtml = "<p>$title</p>";
 				break;
 			case 'text':
+			case '':
 				$widgetHtml = $title;
 				break;
 			default:
@@ -1688,6 +1701,14 @@ class form
 	}
 	
 	
+	# Function to return the specification
+	function getSpecification ()
+	{
+		# Return the elements array
+		return $this->elements;
+	}
+	
+	
 	## Main processing ##
 	
 	/**
@@ -1718,12 +1739,15 @@ class form
 		$this->outputData = $this->prepareData ();
 		
 		# If required, display a summary confirmation of the result
-		if ($this->showFormCompleteText) {echo "\n" . '<p class="completion">' . $this->formCompleteText . ' <a href="' . $_SERVER['REQUEST_URI'] . '">Click here to reset the page.</a></strong></p>';}
+		if ($this->showFormCompleteText) {echo "\n" . '<p class="completion">' . $this->formCompleteText . ' </p>';}
 		
 		# Loop through each of the processing methods and output it based on the requested method
 		foreach ($this->outputMethods as $outputType => $required) {
 			$this->outputData ($outputType);
 		}
+		
+		# If required, display a link to reset the page
+		if ($this->showFormCompleteText) {echo "\n" . '<p><a href="' . $_SERVER['REQUEST_URI'] . '">Click here to reset the page.</a></p>';}
 		
 		# Return the data
 		return $this->outputData ('processing');
@@ -1903,8 +1927,11 @@ class form
 	 */
 	function constructFormHtml ($elements, $problems)
 	{
-		# Start the HTML with any list of problems
-		$html = $this->problemsList ($problems);
+		# Open an enclosing <div> for stylesheet hooking
+		$html  = "\n" . '<div class="ultimateform">';
+		
+		# Start with any list of problems
+		$html .= "\n" . $this->problemsList ($problems);
 		
 		# Start the constructed form HTML
 		$html .= "\n" . '<form method="post" action="' . $this->submitTo . '" enctype="' . ($this->uploadElementPresent ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '">';
@@ -2007,6 +2034,9 @@ class form
 		# Continue the HTML
 		$html .= "\n\n" . '</form>';
 		
+		# Close the enclosing </div>
+		$html .= "\n\n</div>";
+		
 		# Return the HTML
 		return $html;
 	}
@@ -2057,7 +2087,7 @@ class form
 		$html = '';
 		$totalProblems = count ($problemsList);
 		if (($this->formPosted) && ($totalProblems > 0)) {
-			$html = application::showUserErrors ($problemsList, $parentTabLevel = 0, ($totalProblems > 1 ? 'Various problems were' : 'A problem was') . ' found with the form information you submitted:');
+			$html = application::showUserErrors ($problemsList, $parentTabLevel = 0, ($totalProblems > 1 ? 'Various problems were' : 'A problem was') . ' found with the form information you submitted, as detailed below; please make the necessary corrections and re-submit the form:');
 		}
 		
 		# Return the problems HTML (which may be an empty string)
@@ -2398,7 +2428,7 @@ class form
 				'processing'		=> array ('presented'), #, 'rawcomponents', 'compiled'
 			),
 			
-			# heading
+			# heading:
 			# Never any output for headings
 			
 			'hidden' => array (
@@ -2453,7 +2483,7 @@ class form
 					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean',
 					'presented'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 				),
-				'file'				=> array ('rawcomponents', 'presented'),
+				'file'				=> array ('presented', 'rawcomponents'),
 				'email'				=> array ('presented', 'rawcomponents'),
 				'confirmationEmail'	=> array ('presented'),
 				'screen'			=> array ('presented'),
@@ -2630,8 +2660,11 @@ class form
 			return $html = "\n\n" . '<p class="success">No information' . ($this->hiddenElementPresent ? ', other than any hidden data, ' : '') . ' was submitted.</p>';
 		}
 		
+		# Open an enclosing <div> for stylesheet hooking
+		$html  = "\n" . '<div class="ultimateform">';
+		
 		# Introduce the table
-		$html = "\n\n" . '<p class="success">The information submitted is confirmed as:</p>';
+		$html .= "\n\n" . '<p class="success">The information submitted is confirmed as:</p>';
 		$html .= "\n" . '<table class="results" summary="Table of results">';
 		
 		# Assemble the HTML, convert newlines to breaks (without a newline in the HTML), tabs to four spaces, and convert HTML entities
@@ -2640,16 +2673,27 @@ class form
 			# Remove empty elements from display
 			if (empty ($data)) {continue;}
 			
+			# For associative select types, substitute the submitted value with the the visible value
+			#!# PATCHED IN 041201; This needs to be applied to other select types and to dealt with generically in the processing stage; also, should this be made configurable, or is it assumed that the visible version is always wanted for the confirmation screen?
+			if ($this->elements[$elementName]['type'] == 'select') {
+				if (application::isAssociativeArray ($this->elements[$elementName]['valuesArray'])) {
+					$data = $this->elements[$elementName]['valuesArray'][$data];
+				}
+			}
+			
 			# If the data is an array, convert the data to a printable representation of the array
-			if (is_array ($presentedData[$elementName])) {$presentedData[$elementName] = application::printArray ($presentedData[$elementName]);}
+			if (is_array ($data)) {$data = application::printArray ($data);}
 			
 			# Compile the HTML
 			$html .= "\n\t<tr>";
 			$html .= "\n\t\t" . '<td class="key">' . (isSet ($this->elements[$elementName]['title']) ? $this->elements[$elementName]['title'] : $elementName) . ':</td>';
-			$html .= "\n\t\t" . '<td class="value">' . str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($presentedData[$elementName])) . '</td>';
+			$html .= "\n\t\t" . '<td class="value">' . str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data)) . '</td>';
 			$html .= "\n\t</tr>";
 		}
 		$html .= "\n" . '</table>';
+		
+		# Close the enclosing </div>
+		$html .= "\n\n</div>";
 		
 		# Return the constructed HTML
 		return $html;
@@ -2748,6 +2792,13 @@ class form
 			
 			# Loop through each apparently uploaded file; if a file is included
 			foreach ($this->form[$elementName] as $key => $attributes) {
+				
+				# Assign the eventual name (overwriting the uploaded name if the name is being forced)
+				#!# How can we deal with multiple files?
+				if ($this->elements[$elementName]['forcedFileName']) {
+					#!# This is very hacky
+					$attributes['name'] = $_FILES[$this->formName]['name'][$elementName][$key] = $this->elements[$elementName]['forcedFileName'];
+				}
 				
 				# Check whether a file already exists
 				if (file_exists ($existingFileName = ($uploadDirectory . $_FILES[$this->formName]['name'][$elementName][$key]))) {

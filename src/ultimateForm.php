@@ -541,6 +541,23 @@ class form
 	 * Create a rich text editor field based on FCKeditor v.2 RC3 - www.fckeditor.net
 	 * @param array $arguments Supplied arguments - see template
 	 */
+	 
+	/*
+	
+	The following source code alterations must be made to FCKeditor 2.0 FC (released 10/5/05)
+	
+	1. Customised configurations which cannot go in the PHP at present
+	Add the supplied file /_fckeditor/fckconfig-customised.js
+	
+	2. Customisations to the file manager connector configuration file
+	Add the supplied file /_fckeditor/editor/filemanager/browser/mcpuk/connectors/php/config.php
+	
+	3. Search&replace: Remove all instances of the resource type location
+	a. Remove /$test/   (which is in Commands/*.php)
+	b. Remove /$resType (which is in FileUpload.php)
+	
+	*/
+	
 	function richtext ($arguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
@@ -591,6 +608,10 @@ class form
 #							[/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-']
 #						];",
 
+/*
+					'LinkBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/mcpuk/browser.html?Connector=connectors/php/connector.php',
+					'ImageBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/mcpuk/browser.html?Type=Image&Connector=connectors/php/connector.php',
+*/
 					'LinkBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Connector=connectors/php/connector.php',
 					'ImageBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Type=Image&Connector=connectors/php/connector.php',
 				),
@@ -693,7 +714,7 @@ class form
 			'logical-emphasis' => true,
 			'merge-divs'	=> true,
 			'word-2000'	=> true,
-			#'indent'	=> true,
+			'indent'	=> false,
 			'indent-spaces'	=> 4,
 			'wrap'	=> 0,
 			'fix-backslash'	=> false,
@@ -731,10 +752,6 @@ class form
 			'</h4>'	=> "</h4>\n",
 			'</h5>'	=> "</h5>\n",
 			'</h6>'	=> "</h6>\n",
-			
-			# Windows characters
-			"\n    " => "\n\t",
-			"\t    " => "\t\t",
 			
 			# WordHTML characters
 			'<o:p> </o:p>'	=> '',
@@ -966,6 +983,7 @@ class form
 				'minimumRequired'		=> 0,		# The minimum number which must be selected (defaults to 0)
 				'visibleSize'			=> 1,		# Number of rows (optional; defaults to 1)
 				'initialValues'			=> array (),# Pre-selected item(s)
+				'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 		));
 		
 		# Ensure that arguments with a non-null default value are set (throwing an error if not), or assign the default value if none is specified
@@ -1008,7 +1026,7 @@ class form
 		}
 		
 		# Check whether the array is an associative array
-		$valuesAreAssociativeArray = application::isAssociativeArray ($valuesArray);
+		$valuesAreAssociativeArray = (application::isAssociativeArray ($valuesArray) || $forceAssociative);
 		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($valuesArray) : array_values ($valuesArray));
 		
 		# Special syntax to set the value of a URL-supplied GET value as the initial value; if the supplied item is not present, ignore it; otherwise replace the initialValues array with the single selected item
@@ -1945,7 +1963,7 @@ class form
 	 * Output the result as an e-mail
 	 */
 	#!# Not fully tested yet
-	function setOutputEmail ($recipient, $administrator = '', $subjectTitle = 'Form submission results', $chosenElementSuffix = NULL)
+	function setOutputEmail ($recipient, $administrator = '', $subjectTitle = 'Form submission results', $chosenElementSuffix = NULL, $replyToField = NULL)
 	{
 		# Flag that this method is required
 		$this->outputMethods['email'] = true;
@@ -2029,6 +2047,20 @@ class form
 			}
 		}
 		
+		# Set the reply-to field if applicable
+		$this->configureResultEmailReplyTo = $replyToField;
+		if ($replyToField) {
+			if (!isSet ($this->elements[$replyToField])) {
+				$this->formSetupErrors['setOutputEmailReplyToFieldInvalid'] = "The chosen e-mail reply-to address (<strong>$replyToField</strong>) is a non-existent field name.";
+				$this->configureResultEmailReplyTo = NULL;
+			} else {
+				if (($this->elements[$replyToField]['type'] != 'email') && ($this->elements[$replyToField]['type'] != 'input')) {
+					$this->formSetupErrors['setOutputEmailReplyToFieldInvalidType'] = "The chosen e-mail reply-to address (<strong>$replyToField</strong>) is not an e-mail/input type field name.";
+					$this->configureResultEmailReplyTo = NULL;
+				}
+			}
+		}
+		
 		# Assign the subject title
 		$this->configureResultEmailedSubjectTitle['email'] = $subjectTitle;
 	}
@@ -2083,7 +2115,7 @@ class form
 		#!# Need to add a timestamp-writing option
 		
 		# Attempt to create the file (as an empty file) if it doesn't exist
-		#!# This section doesn't appear to be working
+		#!# Replace with an is_writable () check, as writeDataToFile returns bytes (which will be 0) if success
 		if (!file_exists ($filename)) {
 			if (!application::writeDataToFile ('', $filename)) {
 				$this->formSetupErrors['resultsFileNotCreatable'] = 'The specified results file cannot be created; please check the permissions for the containing directory.';
@@ -2684,15 +2716,16 @@ class form
 					# Map the components directly and assemble the elements into a string
 					$outputData[$elementName]['rawcomponents'] = $this->form[$elementName];
 					
-					# Ensure there is a presented version
+					# Ensure there is a presented and a compiled version
 					$outputData[$elementName]['presented'] = '';
+					$outputData[$elementName]['compiled'] = '';
 					
 					# If all items are not empty then produce compiled and presented versions
 					#!# This needs to be ALWAYS assigned in case $outputData[$elementName]['compiled'] and $outputData[$elementName]['presented'] are referred to later
 					if (!application::allArrayElementsEmpty ($this->form[$elementName])) {
 						
 						# Make the compiled version be in SQL DATETIME format, i.e. YYYY-MM-DD HH:MM:SS
-						$outputData[$elementName]['compiled'] = $this->form[$elementName]['year'] . '-' . $this->form[$elementName]['month'] . '-' . $this->form[$elementName]['day'] . ' ' . (($this->elements[$elementName]['level'] == 'datetime') ? $this->form[$elementName]['time'] : '');
+						$outputData[$elementName]['compiled'] = $this->form[$elementName]['year'] . '-' . $this->form[$elementName]['month'] . '-' . $this->form[$elementName]['day'] . (($this->elements[$elementName]['level'] == 'datetime') ? ' ' . $this->form[$elementName]['time'] : '');
 						
 						# Make the presented version in english text
 						$outputData[$elementName]['presented'] = (($this->elements[$elementName]['level'] == 'datetime') ? $this->form[$elementName]['time'] . ', ': '') . date ('jS F, Y', mktime (0, 0, 0, $this->form[$elementName]['month'], $this->form[$elementName]['day'], $this->form[$elementName]['year']));
@@ -3347,9 +3380,17 @@ class form
 		}
 		
 		# Define the additional headers
-		$additionalHeaders = 'From: Website feedback <' . ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator) . ">\r\n";
+		$additionalHeaders  = 'From: Website feedback <' . ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator) . ">\r\n";
 		if (isSet ($this->configureResultEmailCc)) {$additionalHeaders .= 'Cc: ' . implode (', ', $this->configureResultEmailCc) . "\r\n";}
 		
+		# Add the reply-to if it is set and is not empty and that it has been completed (e.g. in the case of a non-required field)
+		if (isSet ($this->configureResultEmailReplyTo)) {
+			if ($this->configureResultEmailReplyTo) {
+				if (application::validEmail ($this->outputData[$this->configureResultEmailReplyTo]['presented'])) {
+					$additionalHeaders .= 'Reply-To: ' . $this->outputData[$this->configureResultEmailReplyTo]['presented'] . "\r\n";
+				}
+			}
+		}
 		
 		# Send the e-mail
 		#!# Add an @ and a message if sending fails (marking whether the info has been logged in other ways)
@@ -3475,6 +3516,7 @@ class form
 #!# Apache setup needs to be carefully tested, in conjunction with php.net/ini-set and php.net/configuration.changes
 #!# Add links to the id="$elementName" form elements in cases of USER errors
 #!# Need to prevent the form code itself being overwritable by uploads... (is that possible to ensure?)
+#!# Add POST security for hidden fields
 
 
 # Version 2 feature proposals

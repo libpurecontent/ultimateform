@@ -38,18 +38,17 @@
  * php_admin_flag magic_quotes_gpc 0
  * php_admin_value error_reporting 2047
  * 
- * # If using file uploads also include the following and
- * # set a suitable amount in MB; upload_max_filesize must not be more than post_max_size
+ * # If using file uploads also include the following and set a suitable amount in MB; upload_max_filesize must not be more than post_max_size
  * php_admin_flag file_uploads 1
  * php_admin_value upload_max_filesize 10M // Only way of setting the maximum size
  * php_admin_value post_max_size 10M
  * </code>
  * 
- * @package FormClass
+ * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
- * @copyright Copyright © 2003-4, Martin Lucas-Smith, University of Cambridge 2003-4
- * @version >0.96
+ * @copyright Copyright © 2003-5, Martin Lucas-Smith, University of Cambridge
+ * @version 0.98
  */
 class form
 {
@@ -78,6 +77,7 @@ class form
 	
 	# Output configuration
 	var $configureResultEmailRecipient;							// The recipient of an e-mail
+	var $configureResultEmailRecipientSuffix;					// The suffix used when a select field is used as the e-mail receipient but the selectable items are only the prefix to the address
 	var $configureResultEmailAdministrator;						// The from field of an e-mail
 	var $configureResultFileFilename;							// The file name where results are written
 	var $configureResultConfirmationEmailRecipient = '';		// The recipient of any confirmation e-mail
@@ -232,6 +232,7 @@ class form
 			'problems' => (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -324,6 +325,7 @@ class form
 			'problems' => (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -407,6 +409,7 @@ class form
 			'problems' => (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
+			'suitableAsEmailTarget' => true,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -501,6 +504,7 @@ class form
 			'problems' => (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -602,6 +606,7 @@ class form
 			'problems' => (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -701,6 +706,7 @@ class form
 			'problems' => (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -748,9 +754,6 @@ class form
 		# Make sure the element is not empty
 		if (!isSet ($this->form[$elementName])) {$this->form[$elementName] = array ();}
 		
-		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
-		$initialValues = application::ensureArray ($initialValues);
-		
 		# Check that valuesArray is not empty
 		#!# Only run other checks below if this error isn't thrown
 		if (empty ($valuesArray)) {$this->formSetupErrors['selectNoValues'] = 'No values have been set as selection items.';}
@@ -759,31 +762,51 @@ class form
 		$totalSubItems = count ($valuesArray);
 		if ($minimumRequired > $totalSubItems) {$this->formSetupErrors['selectMinimumMismatch'] = "The required minimum number of items which must be selected (<strong>$minimumRequired</strong>) specified is above the number of select items actually available (<strong>$totalSubItems</strong>).";}
 		
+		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
+		$initialValues = application::ensureArray ($initialValues);
+		
 		# Ensure that there cannot be multiple initial values set if the multiple flag is off
 		$totalInitialValues = count ($initialValues);
 		if ((!$multiple) && ($totalInitialValues > 1)) {
 			$this->formSetupErrors['initialValuesTooMany'] = "In the <strong>$elementName</strong> element, $totalInitialValues total initial values were assigned but the form has been set up to allow only one item to be selected by the user.";
 		}
 		
-		# Ensure that all initial values are in the valuesArray
-		foreach ($initialValues as $initialValue) {
-			if (!in_array ($initialValue, $valuesArray)) {
-				$missingValues[] = $initialValue;
+		# Check whether the array is an associative array
+		$valuesAreAssociativeArray = application::isAssociativeArray ($valuesArray);
+		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($valuesArray) : array_values ($valuesArray));
+		
+		# Special syntax to set the value of a URL-supplied GET value as the initial value; if the supplied item is not present, ignore it; otherwise replace the initialValues array with the single selected item
+		#!# Way of applying more than one item?
+		#!# Apply this to checkboxes and radio buttons also
+		#!# Need to make 'url:$' in the values array not allowable as a genuine option
+		$identifier = 'url:$';
+		if (substr ($initialValues[0], 0, strlen ($identifier)) == $identifier) {
+			$urlArgumentKey = substr ($initialValues[0], strlen ($identifier));
+			$initialValues = array (application::urlSuppliedValue ($urlArgumentKey, $submittableValues));
+		} else {
+			
+			# Ensure that all initial values are in the valuesArray
+			foreach ($initialValues as $initialValue) {
+				if (!in_array ($initialValue, $submittableValues)) {
+					$missingValues[] = $initialValue;
+				}
 			}
-		}
-		if (isSet ($missingValues)) {
-			$totalMissingValues = count ($missingValues);
-			$this->formSetupErrors['initialValuesMissingFromValuesArray'] = "In the <strong>$elementName</strong> element, the initial " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+			if (isSet ($missingValues)) {
+				$totalMissingValues = count ($missingValues);
+				$this->formSetupErrors['initialValuesMissingFromValuesArray'] = "In the <strong>$elementName</strong> element, the initial " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+			}
 		}
 		
 		# Ensure that the 'null' text does not clash with any items in the valuesArray
-		if (in_array ($this->nullText, $valuesArray)) {
+		if (in_array ($this->nullText, $submittableValues)) {
 			$this->formSetupErrors['initialValuesNullClash'] = "In the <strong>$elementName</strong> element, the null text ('" . $this->nullText . "') clashes with one of list of available items for selection by the user. One or the other must be changed.";
 		}
 		
-		# Define the 'null' text and clear it if it exists
+		# Clear the null text if it appears, or empty submissions
+		#!# Need to modify this as the null text should never be a submitted value now
 		foreach ($this->form[$elementName] as $key => $value) {
-			if ($this->form[$elementName][$key] == $this->nullText) {
+			#!# Is the empty ($value) check being done for other similar elements to prevent empty submissions?
+			if (($this->form[$elementName][$key] == $this->nullText) || (empty ($value))) {
 				unset ($this->form[$elementName][$key]);
 				break;
 			}
@@ -806,18 +829,23 @@ class form
 		
 		# Describe restrictions on the widget
 		if ($multiple) {
-			if ($minimumRequired > 1) {
-				$restriction = "Minimum $minimumRequired required; use Control/Shift";
-			} else {
-				$restriction = 'Use Control/Shift for multiple';
-			}
+			$restriction = (($minimumRequired > 1) ? "Minimum $minimumRequired required; use Control/Shift" : 'Use Control/Shift for multiple');
+		}
+		
+		# Determine whether this field is suitable as the target for an e-mail and, if so, whether a suffix is required
+		#R# This can become ternary, or make $multiple / $minimumRequired as arguments to suitableAsEmailTarget
+		$suitableAsEmailTarget = false;
+		#!# Apply this to checkboxes
+		if ((!$multiple) && ($minimumRequired == 1)) {
+			$suitableAsEmailTarget = $this->suitableAsEmailTarget ($submittableValues);
 		}
 		
 		# Define the widget's core HTML
 		$widgetHtml = "\n\t\t\t<select name=\"" . $this->formName . "[$elementName][]\"" . (($multiple) ? ' multiple="multiple"' : '') . " size=\"$visibleSize\">";
-		$widgetHtml .= "\n\t\t\t\t<option>" . $this->nullText . '</option>';
+		#!# Does this now mean that a check for submissions of $this->nullText is no longer required, as the value will be "" ?
+		$widgetHtml .= "\n\t\t\t\t" . '<option value="">' . $this->nullText . '</option>';
 		foreach ($valuesArray as $key => $value) {
-			$widgetHtml .= "\n\t\t\t\t<option" . (application::isAssociativeArray ($valuesArray) ? " value=\"$key\"" : '') . (in_array ((application::isAssociativeArray ($valuesArray) ? $key : $value), $this->form[$elementName]) ? ' selected="selected"' : '') . '>' . htmlentities ($value) . '</option>';
+			$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities (($valuesAreAssociativeArray ? $key : $value)) . '"' . (in_array (($valuesAreAssociativeArray ? $key : $value), $this->form[$elementName]) ? ' selected="selected"' : '') . '>' . htmlentities ($value) . '</option>';
 		}
 		$widgetHtml .= "\n\t\t\t</select>\n\t\t";
 		
@@ -832,7 +860,7 @@ class form
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
 			'valuesArray' => $valuesArray,
-			'multiple' => $multiple,
+			'suitableAsEmailTarget' => $suitableAsEmailTarget,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -881,6 +909,16 @@ class form
 		# Make sure the element is not empty
 		if (!isSet ($this->form[$elementName])) {$this->form[$elementName] = '';}
 		
+		# Check whether the array is an associative array
+		$valuesAreAssociativeArray = application::isAssociativeArray ($valuesArray);
+		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($valuesArray) : array_values ($valuesArray));
+		
+		# Ensure that the initial value, if one is set, is in the valuesArray
+		#!# Should the initial value being set be the 'real' or visible value when using an associative array?
+		if ((!empty ($initialValue)) && (!in_array ($initialValue, $submittableValues))) {
+			$this->formSetupErrors['initialValuesMissingFromValuesArray'] = "In the <strong>$elementName</strong> element, the initial value was not found in the list of available items for selection by the user.";
+		}
+		
 		# Ensure that the 'null' text does not clash with any items in the valuesArray
 		if (in_array ($this->nullText, $valuesArray)) {
 			$this->formSetupErrors['initialValuesNullClash'] = "In the <strong>$elementName</strong> element, the null text ('" . $this->nullText . "') clashes with one of list of available items for selection by the user. One or the other must be changed.";
@@ -897,8 +935,10 @@ class form
 		
 		# Define the widget's core HTML
 		$widgetHtml = '';
-		for ($i = 0; $i < count ($valuesArray); $i++) {
-			$widgetHtml .= "\n\t\t\t" . '<input type="radio" id="' . ereg_replace (' ', '_', $elementName) . $i . '" name="' . $this->formName . "[$elementName]\" value=\"" . htmlentities ($valuesArray[$i]) . '"' . ($this->form[$elementName] == $valuesArray[$i] ? ' checked="checked"' : '') . " /><label for=\"" . ereg_replace (' ', '_', $elementName) . $i . '">' . htmlentities ($valuesArray[$i]) . "</label><br />";
+		foreach ($valuesArray as $key => $value) {
+			$elementId = ereg_replace (' ', '_', $elementName . '_' . $value);
+			$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
+			$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->formName . "[$elementName]\"" . ' value="' . htmlentities ($submittableValue) . '"' . (($submittableValue == $this->form[$elementName]) ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlentities ($value) . "</label><br />";
 		}
 		$widgetHtml .= "\n\t\t";
 		
@@ -916,6 +956,7 @@ class form
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
 			'valuesArray' => $valuesArray,
+			'suitableAsEmailTarget' => $required,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -970,30 +1011,47 @@ class form
 		$totalSubItems = count ($valuesArray);
 		if ($minimumRequired > $totalSubItems) {$this->formSetupErrors['checkboxesMinimumMismatch'] = "The required minimum number of checkboxes (<strong>$minimumRequired</strong>) specified is above the number of checkboxes actually available (<strong>$totalSubItems</strong>).";}
 		
+		# Check whether the array is an associative array
+		$valuesAreAssociativeArray = application::isAssociativeArray ($valuesArray);
+		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($valuesArray) : array_values ($valuesArray));
+		
+		# Ensure that all initial values are in the valuesArray
+		$initialValues = application::ensureArray ($initialValues);
+		foreach ($initialValues as $initialValue) {
+			if (!in_array ($initialValue, $submittableValues)) {
+				$missingValues[] = $initialValue;
+			}
+		}
+		if (isSet ($missingValues)) {
+			$totalMissingValues = count ($missingValues);
+			$this->formSetupErrors['initialValuesMissingFromValuesArray'] = "In the <strong>$elementName</strong> element, the initial " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+		}
+		
 		# Start a tally to check the number of checkboxes checked
 		$checkedTally = 0;
 		
 		# Loop through each element subname and construct HTML
 		$widgetHtml = '';
-		for ($checkboxNumber = 0; $checkboxNumber < $totalSubItems; $checkboxNumber++) {
+		foreach ($valuesArray as $key => $value) {
 			
-			# Define the element ID, which must be unique
-			#!# This needs to deal with encoding, so that all id="" names are valid XHTML
-			$elementId = str_replace (' ', '_', ($this->formName . '__' . $elementName . '__' . $checkboxNumber));
+			# Assign the submittable value
+			$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
+			
+			# Define the element ID, which must be unique	
+			#!# This needs to deal with encoding, so that all id="" names are valid XHTML - e.g. ! will result in an invalid item
+			$elementId = str_replace (' ', '_', ($this->formName . '__' . $elementName . '__' . $submittableValue));
 			
 			# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 			if (!$this->formPosted) {
-				foreach ($initialValues as $initialValue) {
-					if ($initialValue == $valuesArray[$checkboxNumber]) {
-						$this->form[$elementName][$checkboxNumber] = true;
-					}
+				if (in_array ($submittableValue, $initialValues)) {
+					$this->form[$elementName][$submittableValue] = true;
 				}
 			}
 			
 			# Apply stickyness to each checkbox if necessary
 			$stickynessHtml = '';
-			if (isSet ($this->form[$elementName][$checkboxNumber])) {
-				if ($this->form[$elementName][$checkboxNumber]) {
+			if (isSet ($this->form[$elementName][$submittableValue])) {
+				if ($this->form[$elementName][$submittableValue]) {
 					$stickynessHtml = ' checked="checked"';
 					
 					# Tally the number of items checked
@@ -1001,11 +1059,11 @@ class form
 				}
 			} else {
 				# Ensure every element is defined (even if empty), so that the case of writing to a file doesn't go wrong
-				$this->form[$elementName][$checkboxNumber] = '';
+				$this->form[$elementName][$submittableValue] = '';
 			}
 			
 			# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-			$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" id="' . $elementId . '" name="' . $this->formName . "[$elementName][$checkboxNumber]" . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . $valuesArray[$checkboxNumber] . "</label><br />";
+			$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->formName . "[$elementName][$submittableValue]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . $value . "</label><br />";
 		}
 		
 		# Make sure the number of checkboxes given is above the $minimumRequired
@@ -1033,6 +1091,7 @@ class form
 			'required' => false,
 			'requiredButEmpty' => false, # This is covered by $elementProblems
 			'valuesArray' => $valuesArray,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -1206,6 +1265,7 @@ class form
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
 			'level' => $level,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -1377,6 +1437,7 @@ class form
 			'requiredButEmpty' => (isSet ($requiredButEmpty) ? $requiredButEmpty : false),
 			'uploadDirectory' => $uploadDirectory,
 			'subfields' => $subfields,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 			'enableVersionControl' => $enableVersionControl,
 			'forcedFileName' => $forcedFileName,
@@ -1446,6 +1507,7 @@ class form
 			'problems' => false,
 			'required' => true,
 			'requiredButEmpty' => false,
+			'suitableAsEmailTarget' => false,
 			'outputFormat' => $outputFormat,
 		);
 	}
@@ -1485,6 +1547,34 @@ class form
 			'requiredButEmpty' => false,
 			'outputFormat' => array (),	// The outputFormat specification must always be array
 		);
+	}
+	
+	
+	# Function to determine whether an array of values for a select form is suitable as an e-mail target
+	function suitableAsEmailTarget ($valuesArray)
+	{
+		# Ensure the values are an array
+		$valuesArray = application::ensureArray ($valuesArray);
+		
+		# Return true if all e-mails are valid
+		$allValidEmail = true;
+		foreach ($valuesArray as $value) {
+			if (!application::validEmail ($value)) {
+				$allValidEmail = false;
+				break;
+			}
+		}
+		if ($allValidEmail) {return true;}
+		
+		# If any of the suffixed ones would not be valid as an e-mail, then flag 'syntax'
+		foreach ($valuesArray as $value) {
+			if (!application::validEmail ($value . '@example.com')) {
+				return 'syntax';
+			}
+		}
+		
+		# Otherwise return that a suffix would be required
+		return 'suffix';
 	}
 	
 	
@@ -1612,14 +1702,81 @@ class form
 	/**
 	 * Output the result as an e-mail
 	 */
-	function setOutputEmail ($recipient, $administrator = '', $subjectTitle = 'Form submission results')
+	#!# Not fully tested yet
+	function setOutputEmail ($recipient, $administrator = '', $subjectTitle = 'Form submission results', $chosenElementSuffix = NULL)
 	{
 		# Flag that this method is required
 		$this->outputMethods['email'] = true;
 		
-		# Assign the recipient and administrator
+		# Assign the recipient by default to $recipient; If the recipient is not a valid e-mail address then assume that it should be taken from a field
 		$this->configureResultEmailRecipient = $recipient;
-		$this->configureResultEmailAdministrator = ($administrator != '' ? $administrator : $_SERVER['SERVER_ADMIN']);
+		if (!application::validEmail ($recipient)) {
+			
+			# If the recipient is supposed to be a form field, start by checking that an existent field is supplied
+			if (!isSet ($this->elements[$recipient])) {
+				$this->formSetupErrors['setOutputEmailElementNonexistent'] = "The chosen field (<strong>$recipient</strong>) (which has been specified as an alternative to a valid e-mail address) for the submitter's confirmation e-mail does not exist.";
+			} else {
+				
+				# If the field type is not suitable as an e-mail target, throw a setup error
+				if (!$this->elements[$recipient]['suitableAsEmailTarget']) {
+					$this->formSetupErrors['setOutputEmailElementInvalid'] = "The chosen field (<strong>$recipient</strong>) is not a valid field from which the recipient of the result-containing e-mail can be taken.";
+				} else {
+					
+					# If the field type is a suitable type but the possible results are not all syntactically valid, then say so
+					#R# This sort of check should be done before now; refactor to avoid passing keywords such as 'syntax' and 'suffix'
+					if ($this->elements[$recipient]['suitableAsEmailTarget'] === 'syntax') {
+						$this->formSetupErrors['setOutputEmailElementWidgetSuffixInvalid'] = "The results for the chosen field (<strong>$recipient</strong>) for the receipient of the result-containing e-mail are not all usable as the prefix for a valid e-mail address, even though this has been specified as the field from which the e-mail recipient is taken.";
+					} else {
+						
+						# If a suffix has been supplied, ensure that it will make a valid e-mail address
+						#R# Again, this sort of check should be done before now
+						if ($this->elements[$recipient]['suitableAsEmailTarget'] === 'suffix') {
+							if (empty ($chosenElementSuffix)) {
+								$this->formSetupErrors['setOutputEmailElementSuffixMissing'] = "The chosen field (<strong>$recipient</strong>) for the receipient of the result-containing e-mail must have a suffix supplied within the e-mail output specification.";
+							} else {
+								#!# The use of 'foo' is a hack to supply ::validEmail with a full e-mail rather than just the domain part - need to replace ::validEmail with a ::validEmailDomain regexp instead
+								if (!application::validEmail ('foo' . (substr ($chosenElementSuffix, 0, 1) != '@' ? '@' . $chosenElementSuffix : $chosenElementSuffix))) {
+									$this->formSetupErrors['setOutputEmailElementSuffixInvalid'] = "The e-mail suffix specified for the chosen field (<strong>$recipient</strong>) for the receipient of the result-containing e-mail contains a syntax error.";
+								} else {
+									
+									# As the suffix is confirmed requried and valid, assign the recipient suffix
+									$this->configureResultEmailRecipientSuffix = $chosenElementSuffix;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		# Assign the administrator by default to $administrator; if none is specified, use the SERVER_ADMIN, otherwise use the supplied administrator if that is a valid e-mail address
+		#R# Refactor this section to a new method returning the required value
+		#!# This next line should not be required - it is being duplicated, or a setup error should be thrown
+		$this->configureResultEmailAdministrator = $administrator;
+		if (!$administrator) {
+			$this->configureResultEmailAdministrator = $_SERVER['SERVER_ADMIN'];
+		} else {
+			if (application::validEmail ($administrator)) {
+				$this->configureResultEmailAdministrator = $administrator;
+			} else {
+				
+				# If the address includes an @ but is not a valid address, state this as an error
+				#!# What is the point of this?
+				if (strpos ($administrator, '@') !== false) {
+					$this->formSetupErrors['setOutputEmailReceipientEmailSyntaxInvalid'] = "The chosen e-mail sender address (<strong>$administrator</strong>) contains an @ symbol but is not a valid e-mail address.";
+				} else {
+					
+					# If not a valid e-mail address check for an existent and then valid field name
+					if (!isSet ($this->elements[$administrator])) {
+						$this->formSetupErrors['setOutputEmailReceipientInvalid'] = "The chosen e-mail sender address (<strong>$administrator</strong>) is a non-existent field name.";
+					} else {
+						if ($this->elements[$administrator]['type'] != 'email') {
+							$this->formSetupErrors['setOutputEmailReceipientInvalidType'] = "The chosen e-mail sender address (<strong>$administrator</strong>) is not an e-mail type field name.";
+						}
+					}
+				}
+			}
+		}
 		
 		# Assign the subject title
 		$this->configureResultEmailedSubjectTitle['email'] = $subjectTitle;
@@ -1645,6 +1802,7 @@ class form
 				
 				# If the form has been posted and the relevant element is assigned, assign the recipient (i.e. the submitter's) e-mail address (which is validated by this point)
 				if ($this->formPosted) {
+					#!# As noted later on, this really must be replaced with a formSetupErrors call here
 					if (!empty ($this->form[$chosenElementName])) {
 						$this->configureResultConfirmationEmailRecipient = $this->form[$chosenElementName];
 					}
@@ -1904,6 +2062,8 @@ class form
 			$this->formSetupErrors['namespaceFormNameContainsSquareBrackets'] = 'The name of the form ('. $this->formName . ') cannot include square brackets.';
 		}
 		
+		#!# Need a check to disallow valid e-mail addresses as an element name, or encode - this is to prevent setOutputEmail () picking a form element which should actually be an e-mail address
+		
 		# Disallow _heading at the start of an element
 		#!# This will also be listed alongside the 'Element names cannot start with _heading'.. warning
 		foreach ($this->elements as $elementName => $elementAttributes) {
@@ -2109,21 +2269,30 @@ class form
 				
 				case 'checkboxes':
 					
-					# For the component array, create an array with every defined element being assigned as itemName => boolean
-					foreach ($this->elements[$elementName]['valuesArray'] as $index => $name) {
-						$outputData[$elementName]['rawcomponents'][$name] = ($this->form[$elementName][$index] == 'true');
+					# Check whether the array is an associative array
+					$valuesAreAssociativeArray = application::isAssociativeArray ($this->elements[$elementName]['valuesArray']);
+					
+					# For the component array, create an array with every defined element being assigned as itemName => boolean; checking is done against the available values rather than the posted values to prevent offsets
+					foreach ($this->elements[$elementName]['valuesArray'] as $key => $value) {
+						$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
+						$outputData[$elementName]['rawcomponents'][$submittableValue] = ($this->form[$elementName][$submittableValue] == 'true');
 					}
 					
-					# For the compiled version, make an array of those items checked, starting with an empty array in case none are checked
-					$outputData[$elementName]['compiled'] = array ();
-					foreach ($this->form[$elementName] as $checkedCheckboxNumber => $boolean) {
-						if ($boolean) {
-							$outputData[$elementName]['compiled'][] = $this->elements[$elementName]['valuesArray'][$checkedCheckboxNumber];
+					# Make an array of those items checked, starting with an empty array in case none are checked
+					$checked = array ();
+					$checkedPresented = array ();
+					foreach ($outputData[$elementName]['rawcomponents'] as $key => $value) {
+						if ($value) {
+							$checked[] = $key;
+							
+							# For the presented version, substitute the index name with the presented name if the array is associative
+							$checkedPresented[] = ($valuesAreAssociativeArray ? $this->elements[$elementName]['valuesArray'][$key] : $key);
 						}
 					}
 					
-					# For the presented version, separate the compiled items by a comma-newline
-					$outputData[$elementName]['presented'] = implode (",\n", $outputData[$elementName]['compiled']);
+					# Separate the compiled/presented items by a comma-newline
+					$outputData[$elementName]['compiled'] = implode (",\n", $checked);
+					$outputData[$elementName]['presented'] = implode (",\n", $checkedPresented);
 					
 					break;
 					
@@ -2178,15 +2347,24 @@ class form
 					break;
 					
 				case 'radiobuttons':
-					# Take the selected option
-					$outputData[$elementName]['presented'] = $this->form[$elementName];
+					# Check whether the array is an associative array
+					$valuesAreAssociativeArray = application::isAssociativeArray ($this->elements[$elementName]['valuesArray']);
+					$submittableValues = ($valuesAreAssociativeArray ? array_keys ($this->elements[$elementName]['valuesArray']) : array_values ($this->elements[$elementName]['valuesArray']));
 					
-					# For the compiled version, create an array with every defined element being assigned as itemName => boolean
+					# For the rawcomponents version, create an array with every defined element being assigned as itemName => boolean
 					$outputData[$elementName]['rawcomponents'] = array ();
-					foreach ($this->elements[$elementName]['valuesArray'] as $itemName) {
-						if ($itemName == $this->nullText) {continue;}
-						$outputData[$elementName]['rawcomponents'][$itemName] = ($this->form[$elementName] == $itemName);
+					foreach ($this->elements[$elementName]['valuesArray'] as $key => $value) {
+						$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
+						if ($submittableValue == $this->nullText) {continue;}
+						$outputData[$elementName]['rawcomponents'][$submittableValue] = ($this->form[$elementName] == $submittableValue);
 					}
+					
+					# Take the selected option and ensure that this is in the array of available values
+					#!# What if it's not? - This check should be moved up higher
+					$outputData[$elementName]['compiled'] = (in_array ($this->form[$elementName], $submittableValues) ? $this->form[$elementName] : '');
+					
+					# For the presented version, substitute the visible text version used for the actual value if necessary
+					$outputData[$elementName]['presented'] = (in_array ($this->form[$elementName], $submittableValues) ? ($valuesAreAssociativeArray ? $this->elements[$elementName]['valuesArray'][$this->form[$elementName]] : $this->form[$elementName]) : '');
 					break;
 					
 				case 'heading':
@@ -2208,24 +2386,30 @@ class form
 					break;
 					
 				case 'select':
-/*					
-					# If the select widget is not in multiple mode, return a single item
-					if (!$this->elements[$elementName]['multiple']) {
-						$outputData[$elementName]['presented'] = $this->form[$elementName][0];
-						
-					# Create the various other presentations if not in multiple mode
-					} else {
-*/
-						# For the component array, loop through each defined element name and assign the boolean value for it
-						foreach ($this->elements[$elementName]['valuesArray'] as $itemName) {
-							$outputData[$elementName]['rawcomponents'][$itemName] = (in_array ($itemName, $this->form[$elementName]));
-						}
-						
-						# For the presented version, separate the compiled items by a comma-space
-						$outputData[$elementName]['presented'] = implode (",\n", $this->form[$elementName]);
-/*
+					# Check whether the array is an associative array
+					$valuesAreAssociativeArray = application::isAssociativeArray ($this->elements[$elementName]['valuesArray']);
+					
+					# For the component array, loop through each defined element name and assign the boolean value for it
+					foreach ($this->elements[$elementName]['valuesArray'] as $key => $value) {
+						$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
+						$outputData[$elementName]['rawcomponents'][$submittableValue] = (in_array ($submittableValue, $this->form[$elementName]));
 					}
-*/
+					
+					# For the compiled version, separate the compiled items by a comma-space
+					$outputData[$elementName]['compiled'] = implode (",\n", $this->form[$elementName]);
+					
+					# For the presented version, substitute the visible text version used for the actual value if necessary
+					#R# Can this be compbined with the compiled and the use of array_keys/array_values to simplify this?
+					if (!$valuesAreAssociativeArray) {
+						$outputData[$elementName]['presented'] = $outputData[$elementName]['compiled'];
+					} else {
+						
+						$chosen = array ();
+						foreach ($this->form[$elementName] as $key => $value) {
+							$chosen[] = $this->elements[$elementName]['valuesArray'][$value];
+						}
+						$outputData[$elementName]['presented'] = implode (",\n", $chosen);
+					}
 					break;
 					
 				case 'upload':
@@ -2394,13 +2578,13 @@ class form
 			'checkboxes' => array (
 				'_descriptions' => array (
 					'rawcomponents'	=> 'Array with every defined element being assigned as itemName => boolean true/false',
-					'compiled'		=> 'Array of checked items only as autonumber => itemName',
-					'presented'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
+					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
+					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
-				'file'				=> array ('rawcomponents', 'presented'),
-				'email'				=> array ('presented', 'rawcomponents', 'compiled'),
-				'confirmationEmail'	=> array ('presented'),
-				'screen'			=> array ('presented'),
+				'file'				=> array ('rawcomponents', 'compiled', 'presented'),
+				'email'				=> array ('compiled', 'rawcomponents', 'presented'),
+				'confirmationEmail'	=> array ('presented', 'compiled'),
+				'screen'			=> array ('presented', 'compiled'),
 				'processing'		=> array ('rawcomponents', 'compiled', 'presented'),
 			),
 			
@@ -2469,25 +2653,28 @@ class form
 			'radiobuttons' => array (
 				'_descriptions' => array (
 					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean',
-					'presented'		=> 'The (single) chosen item, if any',
+					'compiled'		=> 'The (single) chosen item, if any',
+					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
-				'file'				=> array ('presented', 'rawcomponents'), #, 'compiled'
-				'email'				=> array ('presented', 'rawcomponents'), #, 'compiled'
-				'confirmationEmail'	=> array ('presented'), #, 'compiled'
-				'screen'			=> array ('presented'), #, 'compiled'
-				'processing'		=> array ('presented', 'rawcomponents'), #, 'compiled'
+				'file'				=> array ('compiled', 'rawcomponents', 'presented'),
+				'email'				=> array ('compiled', 'rawcomponents', 'presented'),
+				'confirmationEmail'	=> array ('presented', 'compiled'),
+				'screen'			=> array ('presented', 'compiled'),
+				'processing'		=> array ('compiled', 'rawcomponents', 'presented'),
 			),
 			
 			'select' => array (
 				'_descriptions' => array (
 					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean',
-					'presented'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
+					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
+					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
-				'file'				=> array ('presented', 'rawcomponents'),
-				'email'				=> array ('presented', 'rawcomponents'),
-				'confirmationEmail'	=> array ('presented'),
-				'screen'			=> array ('presented'),
-				'processing'		=> array ('rawcomponents', 'presented'),
+				#!# Ideally, when multiple is false, the default for file would become 'compiled'; this would have to be done by merging presented and compiled (making them unselectable) and using the spare as a modified copy of rawcomponents
+				'file'				=> array ('compiled', 'presented', 'rawcomponents'),
+				'email'				=> array ('compiled', 'presented', 'rawcomponents'),
+				'confirmationEmail'	=> array ('presented', 'compiled'),
+				'screen'			=> array ('presented', 'compiled'),
+				'processing'		=> array ('rawcomponents', 'compiled', 'presented'),
 			),
 			
 			'textarea' => array (
@@ -2673,13 +2860,17 @@ class form
 			# Remove empty elements from display
 			if (empty ($data)) {continue;}
 			
+			/*
 			# For associative select types, substitute the submitted value with the the visible value
 			#!# PATCHED IN 041201; This needs to be applied to other select types and to dealt with generically in the processing stage; also, should this be made configurable, or is it assumed that the visible version is always wanted for the confirmation screen?
 			if ($this->elements[$elementName]['type'] == 'select') {
 				if (application::isAssociativeArray ($this->elements[$elementName]['valuesArray'])) {
-					$data = $this->elements[$elementName]['valuesArray'][$data];
+					foreach ($this->form[$elementName] as $key => $value) {
+						$data[$key] = $this->form[$elementName]['valuesArray'][$data[$key]];
+					}
 				}
 			}
+			*/
 			
 			# If the data is an array, convert the data to a printable representation of the array
 			if (is_array ($data)) {$data = application::printArray ($data);}
@@ -2707,6 +2898,7 @@ class form
 	function outputDataEmailed ($presentedData, $outputType)
 	{
 		# If, for the confirmation type, a confirmation address has not been assigned, say so and take no further action
+		#!# This should be moved up so that a confirmation e-mail widget is a required field
 		if ($outputType == 'confirmationEmail') {
 			if (empty ($this->configureResultConfirmationEmailRecipient)) {
 				echo "\n\n" . '<p class="error">A confirmation e-mail could not be sent as no address was given.</p>';
@@ -2741,9 +2933,22 @@ class form
 			}
 		}
 		
+		# Select the relevant recipient; for an e-mail type select either the receipient or the relevant field plus suffix
+		if ($outputType == 'email') {
+			if (application::validEmail ($this->configureResultEmailRecipient)) {
+				$recipient = $this->configureResultEmailRecipient;
+			} else {
+				#!# Makes the assumption of it always being the compiled item. Is this always true? Check also whether it can be guaranteed earlier that only a single item is going to be selected
+				$recipient = $this->outputData[$this->configureResultEmailRecipient]['compiled'] . (!empty ($this->configureResultEmailRecipientSuffix) ? $this->configureResultEmailRecipientSuffix : '');
+			}
+		} else {
+			$recipient = $this->configureResultConfirmationEmailRecipient;
+		}
+		
 		# Send the e-mail
+		#!# Add an @ and a message if sending fails (marking whether the info has been logged in other ways)
 		$success = mail (
-			$recipient = ($outputType == 'email' ? $this->configureResultEmailRecipient : $this->configureResultConfirmationEmailRecipient),
+			$recipient,
 			$this->configureResultEmailedSubjectTitle[$outputType],
 			wordwrap ($introductoryText . "\n\n\n\n" . implode ("\n\n\n", $resultLines)),
 			'From: Website feedback <' . ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator) . ">\n"
@@ -2845,6 +3050,7 @@ class form
 
 #!# Make the file specification of the form more user-friendly (e.g. specify / or ./ options)
 #!# Do a single error check that the number of posted elements matches the number defined; this is useful for checking that e.g. hidden fields are being posted
+#!# Need to add basic protection for ensuring that form sub-elements submitted (in selectable types) are in the list of available values; this has already been achieved for checkboxes, relatively easily
 #!# Add form setup checking validate input types like cols= is numeric, etc.
 #!# Add a warnings flag in the style of the errors flagging to warn of changes which have been made silently
 #!# Need to add configurable option to add headings to new CSV when created
@@ -2855,7 +3061,7 @@ class form
 #!# Convert the e-mail widget type to be a stub with a regexp on the normal input type
 #!# Enable maximums as well as the existing minimums
 #!# Complete the restriction notices
-#!# Add a CSS class to each type of widget so that more detailed styling can be applied without use of javascript
+#!# Add a CSS class to each type of widget so that more detailed styling can be applied
 #!# Enable locales, e.g. ordering month-date-year for US users
 #!# Consider language localisation (put error messages into a global array)
 #!# Add in <span>&#64;</span> for on-screen e-mail types
@@ -2863,6 +3069,7 @@ class form
 #!# Apache setup needs to be carefully tested, in conjunction with php.net/ini-set and php.net/configuration.changes
 #!# Add links to the id="$elementName" form elements in cases of USER errors
 #!# Need to prevent the form code itself being overwritable by uploads...
+
 
 # Version 2 feature proposals
 #!# Allow multiple carry-throughs, perhaps using formCarried[$formNumber][...]: Add carry-through as an additional array section; then translate the additional array as a this-> input to hidden fields.

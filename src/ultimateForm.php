@@ -50,7 +50,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
  * @copyright Copyright © 2003-4, Martin Lucas-Smith, University of Cambridge 2003-4
- * @version 0.95
+ * @version 0.96
  */
 class form
 {
@@ -91,7 +91,7 @@ class form
 	 * Constructor
 	 * @param array $arguments Settings
 	 */
-	function form ($arguments)
+	function form ($arguments = array ())
 	{
 		# Load the application support library which itself requires the pureContent framework file, pureContent.php; this will clean up $_SERVER
 		require_once ('application.php');
@@ -956,8 +956,8 @@ class form
 		# Check whether the element name already been used accidentally (i.e. two fields with the same name) and if so add it to the array of duplicated element names
 		if (isSet ($this->elements[$elementName])) {$this->duplicatedElementNames[] = $elementName;}
 		
-		# Make sure the element is not empty
-		if (!isSet ($this->form[$elementName])) {$this->form[$elementName] = '';}
+		# Make sure the element is not empty; NB the [] is required to prevent Uninitialized string offsets at the stickynessHtml creation point - basically the isSet would otherwise fail because of checking an array key existing for a non-array element
+		if (!isSet ($this->form[$elementName])) {$this->form[$elementName][] = '';}
 		
 		# Check that valuesArray is not empty
 		if (empty ($valuesArray)) {$this->formSetupErrors['checkboxesNoValues'] = 'No values have been set for the set of checkboxes.';}
@@ -1352,7 +1352,7 @@ class form
 		if (!empty ($disallowedExtensions)) {
 			$restrictions[] = 'Disallowed file extensions: ' . implode (',', $disallowedExtensions);
 		}
-		$restrictions = implode (";\n", $restrictions);
+		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
 		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$elementName] = array (
@@ -2202,6 +2202,8 @@ class form
 					# Perform the file upload and obtain arrays of failed and successful uploads
 					list ($successes, $failures) = $this->performUpload ($elementName, $this->elements[$elementName]['uploadDirectory'], $this->elements[$elementName]['enableVersionControl']);
 					
+#!# There needs to be some way round about here of getting the raw array containing everything back, done in such a way that the CSV writing won't fail
+					
 					# Start the compiled result
 					$outputData[$elementName]['presented'] = '';
 					$outputData[$elementName]['compiled'] = array ();
@@ -2209,19 +2211,21 @@ class form
 					# If there were any succesful uploads, assign the compiled output
 					if (!empty ($successes)) {
 						
-						# For the compiled version, give the number of files uploaded and their names
-						$totalSuccesses = count ($successes);
-						$outputData[$elementName]['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode (', ', $successes) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
-						
 						# Add each of the files to the master array, appending the location for each
-						foreach ($successes as $success) {
+						foreach ($successes as $success => $attributes) {
+							$filenames[] = $success;
 							$outputData[$elementName]['compiled'][] = $this->elements[$elementName]['uploadDirectory'] . $success;
 						}
+						
+						# For the compiled version, give the number of files uploaded and their names
+						$totalSuccesses = count ($successes);
+						$outputData[$elementName]['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode (', ', $filenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
 					}
 					
 					# If there were any failures, list them also
 					if (!empty ($failures)) {
 						$totalFailures = count ($failures);
+						#!# ' ' being added even if there are no successes
 						$outputData[$elementName]['presented'] .= ' ' . $totalFailures . ($totalFailures > 1 ? ' files' : ' file') . ' (' . implode (', ', $failures) . ') unfortunately failed to copy over for some unspecified reason.';
 					}
 					
@@ -2770,13 +2774,14 @@ class form
 				# Attempt to upload the file
 				if (!move_uploaded_file ($_FILES[$this->formName]['tmp_name'][$elementName][$key], $uploadDirectory . $_FILES[$this->formName]['name'][$elementName][$key])) {
 					# Create an array of any failed file uploads
-					$failures[] = $attributes['name'];
+					#!# Not sure what happens if this fails, given that the attributes may not exist
+					$failures[$attributes['name']] = $attributes;
 					
 				# Continue if the file upload attempt was successful
 				} else {
 					# Create an array of any successful file uploads. For security reasons, if the filename is modified to prevent accidental overwrites, the original filename is not modified here
 					#!# There needs to be a differential between presented and actual data in cases where a different filename is actually written to the disk
-					$successes[] = $attributes['name'];
+					$successes[$attributes['name']] = $attributes;
 				}
 			}
 		}

@@ -48,7 +48,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
  * @copyright Copyright © 2003-5, Martin Lucas-Smith, University of Cambridge
- * @version 0.98
+ * @version 0.99b1
  */
 class form
 {
@@ -84,6 +84,9 @@ class form
 	var $configureResultConfirmationEmailAbuseNotice = true;	// Whether to include an abuse report notice in any confirmation e-mail sent
 	var $configureResultEmailedSubjectTitle = array ();			// An array to hold the e-mail subject title for either e-mail result type
 	
+	# Constants
+	var $timestamp;
+	
 	## Load initial state and assign settings ##
 	
 	/**
@@ -98,10 +101,14 @@ class form
 		# Load the date processing library
 		require_once ('datetime.php');
 		
+		# Assign constants
+		$this->timestamp = date ('Y-m-d H:m:s');
+		
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentsSpecification = array (
 			'formName'						=> 'form',									# Name of the form
 			'showPresentationMatrix'		=> false,									# Whether to show the presentation defaults
+			'displayTitles'					=> true,									# Whether to show user-supplied titles for each widget
 			'displayDescriptions'			=> true,									# Whether to show user-supplied descriptions for each widget
 			'displayRestrictions'			=> true,									# Whether to show/hide restriction guidelines
 			'display'						=> 'tables',								# Whether to display the form using 'tables', 'css' (CSS layout) or 'paragraphs'
@@ -124,6 +131,13 @@ class form
 			'autoCenturyConversionEnabled'	=> true,									# Whether years entered as two digits should automatically be converted to four
 			'autoCenturyConversionLastYear'	=> 69,										# The last two figures of the last year where '20' is automatically prepended
 			'nullText'						=> 'Please select value',					# The 'null' text for e.g. selection boxes
+			'opening'						=> false,									# Optional starting datetime as an SQL string
+			'closing'						=> false,									# Optional closing datetime as an SQL string
+			'validUsers'					=> false,									# Optional valid user(s) - if this is set, a user will be required. To set, specify string/array of valid user(s), or '*' to require any user
+			'user'							=> false,									# Explicitly-supplied username (if none specified, will check for REMOTE_USER being set
+			'userKey'						=> false,									# Whether to log the username, as the key
+			'loggedUserUnique'				=> false,									# Run in user-uniqueness mode, making the key of any CSV the username and checking for resubmissions
+			'timestamping'					=> false,									# Add a timestamp to any CSV entry
 		);
 		
 		# Import supplied arguments assign defaults; NB: array_merge is NOT used, as this could create unintended globals
@@ -131,8 +145,21 @@ class form
 			$this->{$argument} = (isSet ($arguments[$argument]) ? $arguments[$argument] : $defaultValue);
 		}
 		
+		# Ensure the userlist is an array, whether empty or otherwise
+		$this->validUsers = application::ensureArray ($this->validUsers);
+		
+		# If no user is supplied, attempt to obtain the REMOTE_USER (if one exists) as the default
+		if (!$this->user) {$this->user = (isSet ($_SERVER['REMOTE_USER']) ? $_SERVER['REMOTE_USER'] : false);}
+		
+		# Assign the opening and closing time
+		$this->opening = ($this->opening ? strtotime ($this->opening . ' GMT') : NULL);
+		$this->closing = ($this->closing ? strtotime ($this->closing . ' GMT') : NULL);
+		
 		# Assign whether the form has been posted or not
 		$this->formPosted = (isSet ($_POST[$this->formName]));
+		
+		# Add in the hidden security fields if required, having verified username existence if relevant; these need to go at the start so that any username is set as the key
+		$this->addHiddenSecurityFields ();
 		
 		# Import the posted data if the form is posted; this has to be done initially otherwise the input widgets won't have anything to reference
 		if ($this->formPosted) {$this->form = $_POST[$this->formName];}
@@ -511,6 +538,215 @@ class form
 	
 	
 	/**
+	 * Create a rich text editor field based on FCKeditor v.2 RC3 - www.fckeditor.net
+	 * @param array $arguments Supplied arguments - see template
+	 */
+	function richtext ($arguments)
+	{
+		# Specify available arguments as defaults or as NULL (to represent a required argument)
+		$argumentsSpecification = array (
+			'richtext' => array (
+				'elementName'			=> NULL,	# Name of the element
+				'title'					=> NULL,		# Introductory text
+				'elementDescription'	=> '',		# Description text
+				'outputFormat'			=> array (),# Presentation format (CURRENTLY UNDOCUMENTED)
+				'required'				=> false,	# Whether required or not
+				'width'					=> '600px',		# Width
+				'height'				=> '400px',		# Height
+				'editorConfig'				=> array (	# Editor configuration
+					'CustomConfigurationsPath' => '/_fckeditor/fckconfig-customised.js',
+					'FontFormats'			=> 'p;h1;h2;h3;h4;h5;h6;pre',
+					'UserFilesPath'			=> '/',
+					'EditorAreaCSS'			=> '',
+					'BaseHref'				=> '',
+					#'FormatIndentator'		=> "\t",
+					'GeckoUseSPAN'			=> false,	#!# Even in .js version this seems to have no effect
+					'StartupFocus'			=> false,
+					'ToolbarCanCollapse'	=> false,
+/*
+					# Trying the syntax at http://www.heygrady.com/tutorials/example-2b2.php.txt :
+					'ToolbarSets' => array ( 'NewToolbar' => array (
+						array( 'Source' ),
+						array( 'Cut','Copy','Paste','PasteText','-','Print' ),
+						array( 'Undo','Redo','-','SelectAll','RemoveFormat' ),
+						array( 'Bold','Italic','Underline','StrikeThrough','-','Subscript','Superscript' ),
+						array( 'OrderedList','UnorderedList','-','Outdent','Indent' ),
+						array( 'Link','Unlink' ),
+						array( 'Image','Table','Rule','SpecialChar' ),
+						array( 'FontFormat','-','TextColor' ),
+						array( 'About' ),
+						)),
+*/
+
+#					"ToolbarSets['pureContent']" => "[
+#							['Source'],
+#							['Cut','Copy','Paste','PasteText','PasteWord','-'/*,'SpellCheck'*/],
+#							['Undo','Redo',/*'-','Find','Replace',*/'-','SelectAll','RemoveFormat'],
+#							['Bold','Italic','StrikeThrough','-','Subscript','Superscript'],
+#							['OrderedList','UnorderedList','-'],
+#							['Link','Unlink'/*,'Anchor'*/],
+#							['Image','Table','Rule','SpecialChar'/*,'UniversalKey'*/],
+#							/*['Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden']*/
+#							/*['ShowTableBorders','ShowDetails','-','Zoom'],*/
+#							[/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-']
+#						];",
+
+					'LinkBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Connector=connectors/php/connector.php',
+					'ImageBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Type=Image&Connector=connectors/php/connector.php',
+				),
+				'initialValue'			=> '',		# Default value (optional)
+				'editorBasePath'		=> '/_fckeditor/',	# Location of the editor files
+				'editorToolbarSet'		=> 'pureContent',	# Editor toolbar set
+		));
+		
+		# Ensure that arguments with a non-null default value are set (throwing an error if not), or assign the default value if none is specified
+		foreach ($argumentsSpecification as $fieldType => $availableArguments) {
+			foreach ($availableArguments as $argument => $defaultValue) {
+				if (is_null ($defaultValue)) {
+					if (!isSet ($arguments[$argument])) {
+						$this->formSetupErrors['absent' . ucfirst ($fieldType) . ucfirst ($argument)] = "No '$argument' has been set for a specified $fieldType field.";
+						${$argument} = $fieldType;
+					} else {
+						${$argument} = $arguments[$argument];
+					}
+					
+				# Deal with subarguments for the config section
+				} elseif ($argument == 'editorConfig') {
+					foreach ($defaultValue as $subArgument => $subDefaultValue) {
+						if (is_null ($subDefaultValue)) {
+							if (!isSet ($arguments[$argument][$subArgument])) {
+								$this->formSetupErrors['absent' . ucfirst ($fieldType) . ucfirst ($argument) . ucfirst ($subArgument)] = "No '$subArgument' has been set for a specified $argument argument in a specified $fieldType field.";
+								${$argument}[$subArgument] = $fieldType;
+							} else {
+								${$argument}[$subArgument] = $arguments[$argument][$subArgument];
+							}
+						} else {
+							${$argument}[$subArgument] = (isSet ($arguments[$argument][$subArgument]) ? $arguments[$argument][$subArgument] : $subDefaultValue);
+						}
+					}
+					
+				} else {
+					${$argument} = (isSet ($arguments[$argument]) ? $arguments[$argument] : $defaultValue);
+				}
+			}
+		}
+		
+		# Check whether the element name already been used accidentally (i.e. two fields with the same name) and if so add it to the array of duplicated element names
+		if (isSet ($this->elements[$elementName])) {$this->duplicatedElementNames[] = $elementName;}
+		
+		# Make sure the element is not empty
+		if (!isSet ($this->form[$elementName])) {$this->form[$elementName] = '';}
+		
+		# Handle whitespace issues
+		#!# Policy issue of whether this should apply on a per-line basis
+		$this->form[$elementName] = $this->handleWhiteSpace ($this->form[$elementName]);
+		
+		# Check whether the field satisfies any requirement for a field to be required
+		$requiredButEmpty = (($required) && ($this->form[$elementName] == ''));
+		
+		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
+		if (!$this->formPosted) {$this->form[$elementName] = $initialValue;}
+		
+		# Define the widget's core HTML by instantiating the richtext editor module and setting required options
+		require_once ('fckeditor.php');
+		$editor = new FCKeditor ($this->formName . "[$elementName]");
+		$editor->BasePath	= $editorBasePath;
+		$editor->Width		= $width;
+		$editor->Height		= $height;
+		$editor->ToolbarSet	= $editorToolbarSet;
+		$editor->Value		= $this->form[$elementName];
+		$editor->Config		= $editorConfig;
+		$widgetHtml = $editor->CreateHtml ();
+		
+		# Add the widget to the master array for eventual processing
+		$this->elements[$elementName] = array (
+			'type' => 'richtext',
+			'html' => $widgetHtml,
+			'title' => $title,
+			'description' => $elementDescription,
+			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'problems' => (isSet ($elementProblems) ? $elementProblems : false),
+			'required' => $required,
+			'requiredButEmpty' => $requiredButEmpty,
+			'suitableAsEmailTarget' => false,
+			'outputFormat' => $outputFormat,
+		);
+	}
+	
+	
+	# Function to clean the content
+	#!# More tidying needed
+	function richtextClean ($content)
+	{
+		# Set options, as at http://tidy.sourceforge.net/docs/quickref.html
+		$parameters = array (
+			'output-xhtml' => true,
+			'show-body-only'	=> true,
+			'clean' => true,
+			'enclose-text'	=> true,
+			'drop-proprietary-attributes' => true,
+			'drop-font-tags' => true,
+			'drop-empty-paras' => true,
+			'hide-comments' => true,
+			'join-classes' => true,
+			'join-styles' => true,
+			'logical-emphasis' => true,
+			'merge-divs'	=> true,
+			'word-2000'	=> true,
+			#'indent'	=> true,
+			'indent-spaces'	=> 4,
+			'wrap'	=> 0,
+			'fix-backslash'	=> false,
+			'force-output'	=> true,
+			'bare'	=> true,
+		);
+		
+		# If the tidy extension is not available (e.g. PHP4), return the content directly
+		if (!function_exists ('tidy_parse_string')) {return $content;}
+		
+		# Tidy up the output; see http://www.zend.com/php5/articles/php5-tidy.php for a tutorial
+		$content = tidy_parse_string ($content, $parameters);
+		tidy_clean_repair ($content);
+		$content = tidy_get_output ($content);
+		
+		# Strip certain tags
+		$stripTags = array ('span');
+		foreach ($stripTags as $tag) {
+			$contents = preg_replace ("/<\/?" . $tag . "(.|\s)*?>/", '', $content);
+		}
+		
+		# Define further regexp replacements
+		$manualRegexpReplacements = array (
+			'<?xml:namespace([^>]*)>' => '',
+		);
+		$content = ereg_replace ('<\?xml:namespace([^>]*)>', '', $content);
+		
+		# Define further replacements
+		$manualStringReplacements = array (
+			# Cleanliness formatting
+			'<h'	=> "\n<h",
+			'</h1>'	=> "</h1>\n",
+			'</h2>'	=> "</h2>\n",
+			'</h3>'	=> "</h3>\n",
+			'</h4>'	=> "</h4>\n",
+			'</h5>'	=> "</h5>\n",
+			'</h6>'	=> "</h6>\n",
+			
+			# Windows characters
+			"\n    " => "\n\t",
+			"\t    " => "\t\t",
+			
+			# WordHTML characters
+			'<o:p> </o:p>'	=> '',
+		);
+		$content = str_replace (array_keys ($manualStringReplacements), array_values ($manualStringReplacements), $content);
+		
+		# Return the tidied content
+		return $content;
+	}
+	
+	
+	/**
 	 * Create a textarea with multiple lines that are split into an array of values
 	 * @param array $arguments Supplied arguments - see template
 	 */
@@ -779,21 +1015,23 @@ class form
 		#!# Way of applying more than one item?
 		#!# Apply this to checkboxes and radio buttons also
 		#!# Need to make 'url:$' in the values array not allowable as a genuine option
-		$identifier = 'url:$';
-		if (substr ($initialValues[0], 0, strlen ($identifier)) == $identifier) {
-			$urlArgumentKey = substr ($initialValues[0], strlen ($identifier));
-			$initialValues = array (application::urlSuppliedValue ($urlArgumentKey, $submittableValues));
-		} else {
-			
-			# Ensure that all initial values are in the valuesArray
-			foreach ($initialValues as $initialValue) {
-				if (!in_array ($initialValue, $submittableValues)) {
-					$missingValues[] = $initialValue;
+		if (isSet ($initialValues[0])) {
+			$identifier = 'url:$';
+			if (substr ($initialValues[0], 0, strlen ($identifier)) == $identifier) {
+				$urlArgumentKey = substr ($initialValues[0], strlen ($identifier));
+				$initialValues = array (application::urlSuppliedValue ($urlArgumentKey, $submittableValues));
+			} else {
+				
+				# Ensure that all initial values are in the valuesArray
+				foreach ($initialValues as $initialValue) {
+					if (!in_array ($initialValue, $submittableValues)) {
+						$missingValues[] = $initialValue;
+					}
 				}
-			}
-			if (isSet ($missingValues)) {
-				$totalMissingValues = count ($missingValues);
-				$this->formSetupErrors['initialValuesMissingFromValuesArray'] = "In the <strong>$elementName</strong> element, the initial " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+				if (isSet ($missingValues)) {
+					$totalMissingValues = count ($missingValues);
+					$this->formSetupErrors['initialValuesMissingFromValuesArray'] = "In the <strong>$elementName</strong> element, the initial " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+				}
 			}
 		}
 		
@@ -820,6 +1058,9 @@ class form
 		if (($totalSubmitted != 0) && ($totalSubmitted < $minimumRequired)) {
 			$elementProblems['insufficientSelected'] = ($minimumRequired != $totalSubItems ? 'At least' : 'All') . " <strong>$minimumRequired</strong> " . ($minimumRequired > 1 ? 'items' : 'item') . ' must be selected.';
 		}
+		
+		# Prevent multiple submissions when not in multiple mode
+		if (!$multiple && ($totalSubmitted > 1)) {$elementProblems['multipleSubmissionsDisallowed'] = 'More than one item was submitted but only one is acceptable';}
 		
 		# If nothing has been submitted mark it as required but empty
 		$requiredButEmpty = (($required) && ($totalSubmitted == 0));
@@ -1617,6 +1858,7 @@ class form
 		return application::dumpData ($data);
 	}
 	
+	
 	/**
 	 * Function to show debugging information (configured form elements and submitted form elements) if required
 	 * @access private
@@ -1708,8 +1950,17 @@ class form
 		# Flag that this method is required
 		$this->outputMethods['email'] = true;
 		
-		# Assign the recipient by default to $recipient; If the recipient is not a valid e-mail address then assume that it should be taken from a field
+		# If the recipient is an array, split it into a recipient as the first and cc: as the remainder:
+		if (is_array ($recipient)) {
+			$recipientList = $recipient;
+			$recipient = array_shift ($recipientList);
+			$this->configureResultEmailCc = $recipientList;
+		}
+		
+		# Assign the recipient by default to $recipient
 		$this->configureResultEmailRecipient = $recipient;
+		
+		# If the recipient is not a valid e-mail address then assume that it should be taken from a field
 		if (!application::validEmail ($recipient)) {
 			
 			# If the recipient is supposed to be a form field, start by checking that an existent field is supplied
@@ -1867,6 +2118,66 @@ class form
 	}
 	
 	
+	# Function to add built-in hidden security fields
+	#!# This and hiddenSecurityFieldSubmissionInvalid () should be refactored into a small class
+	function addHiddenSecurityFields ()
+	{
+		# Firstly (since username may be in use as a key) create a hidden username if required and a username is supplied
+		$userCheckInUse = ($this->user && $this->userKey);
+		if ($userCheckInUse) {
+			$securityFields['user'] = $this->user;
+		}
+		
+		# Create a hidden timestamp if necessary
+		if ($this->timestamping) {
+			$securityFields['timestamp'] = $this->timestamp;
+		}
+		
+		# Make an internal call to the external interface
+		#!# Add security-verifications as a reserved word
+		if (isSet ($securityFields)) {
+			$this->hidden (array (
+			    'elementName'	=> 'security-verifications',
+				'valuesArray'	=> $securityFields,
+			));
+		}
+	}
+	
+	
+	# Function to validate built-in hidden security fields
+	function hiddenSecurityFieldSubmissionInvalid ()
+	{
+		# End checking if the form is not posted or there is no username
+		if (!$this->formPosted || !$this->user || !$this->userKey) {return false;}
+		
+		# Check for faked submissions
+		if ($this->form['security-verifications']['user'] != $this->user) {
+			$this->elementProblems = "\n" . '<p class="warning">The username which was silently submitted (' . $this->form['security-verifications']['user'] . ') does not match the username you previously logged in as (' . $this->user . '). This has been reported as potential abuse and will be investigated.</p>';
+			error_log ("A potentially fake submission has been made by {$this->user}, claiming to be {$this->form['security-verifications']['user']}. Please investigate.");
+			#!# Should this really force ending of further checks?
+			return true;
+		}
+		
+		# If user uniqueness check is required, check that the user has not already made a submission
+		if ($this->loggedUserUnique) {
+			$csvData = application::getCsvData ($this->configureResultFileFilename);
+			/* #!# Can't enable this section until application::getCsvData recognises the difference between an empty file and an unopenable/missing file
+			if (!$csvData) {
+				$this->formSetupErrors['csvInaccessible'] = 'It was not possible to make a check for repeat submissions as the data source could not be opened.';
+				return true;
+			} */
+			if (array_key_exists ($this->user, $csvData)) {
+				echo "\n" . '<p class="warning">You appear to have already made a submission. If you believe this is not the case, please contact the webmaster to resolve the situation.</p>';
+				return true;
+			}
+		}
+		
+		# Otherwise return false (i.e. that there were no problems)
+		return false;
+	}
+	
+	
+	
 	## Main processing ##
 	
 	/**
@@ -1883,9 +2194,17 @@ class form
 		# Show debugging information firstly if required
 		if ($this->debug) {$this->showDebuggingInformation ();}
 		
+		# Check whether the user is a valid user (must be before the formSetupOk check)
+		if (!$this->validUser ()) {return false;}
+		
+		# Check whether the facility is open
+		if (!$this->facilityIsOpen ($this->opening, $this->closing)) {return false;}
+		
+		# Validate hidden security fields
+		if ($this->hiddenSecurityFieldSubmissionInvalid ()) {return false;}
+		
 		# Run checks if the form has been posted
-		$problemsFound = false;
-		if ($this->formPosted) {$problemsFound = $this->checkForElementProblems ();}
+		$problemsFound = ($this->formPosted ? $this->checkForElementProblems () : false);
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		if (!$this->formPosted || $problemsFound) {
@@ -1912,8 +2231,49 @@ class form
 	}
 	
 	
-	
 	## Form processing support ##
+	
+	# Function to determine whether this facility is open
+	function facilityIsOpen ($opening, $closing)
+	{
+		# Check that the opening time has passed, if one is specified, ensuring that the date is correctly specified
+		if (!is_null ($opening)) {
+			if (time () < $opening) {
+				echo '<p class="warning">This facility is not yet open. Please return later.</p>';
+				return false;
+			}
+		}
+		
+		# Check that the closing time has passed
+		if (!is_null ($closing)) {
+			if (time () > $closing) {
+				echo '<p class="warning">This facility is now closed.</p>';
+				return false;
+			}
+		}
+		
+		# Otherwise return true
+		return true;
+	}
+	
+	
+	# Function to determine if the user is a valid user
+	function validUser ()
+	{
+		# Return true if no users are specified
+		if (!$this->validUsers) {return true;}
+		
+		# If '*' is specified for valid users, allow any through
+		if ($this->validUsers[0] == '*') {return true;}
+		
+		# If the username is supplied in a list, return true
+		if (in_array ($this->user, $this->validUsers)) {return true;}
+		
+		# Otherwise state that the user is not in the list and return false
+		echo "\n" . '<p class="warning">You do not appear to be in the list of valid users. If you believe you should be, please contact the webmaster to resolve the situation.</p>';
+		return false;
+	}
+	
 	
 	/**
 	 * Function to check for form setup errors
@@ -1927,6 +2287,16 @@ class form
 		
 		# Check that there are no namespace clashes against internal defaults
 		$this->preventNamespaceClashes ();
+		
+		# If a user is to be required, ensure there is a server-supplied username
+		if ($this->validUsers && !$this->user) {$this->formSetupErrors['usernameMissing'] = 'No username is being supplied, but the form setup requires that one is supplied, either explicitly or implicitly through the server environment. Please check the server configuration.';}
+		
+		# If a user uniqueness check is required, ensure that the file output mode is in use and that the user is being logged as a CSV key
+		if ($this->loggedUserUnique && !$this->outputMethods['file']) {$this->formSetupErrors['loggedUserUniqueRequiresFileOutput'] = "The settings specify that usernames are checked for uniqueness against existing submissions, but no log file of submissions is being made. Please ensure that the 'file' output type is enabled if wanting to check for uniqueness.";}
+		if ($this->loggedUserUnique && !$this->userKey) {$this->formSetupErrors['loggedUserUniqueRequiresUserKey'] = 'The settings specify that usernames are checked for uniqueness against existing submissions, but usernames are not set to be logged in the data. Please ensure that both are enabled if wanting to check for uniqueness.';}
+		
+		# Check the opening and closing time syntax is correct if they are supplied
+		if ($this->opening === -1 || $this->closing === -1) {$this->formSetupErrors['availabilityWronglySpecified'] = 'The ' . ($this->opening === -1 ? 'opening' : '') . ($this->opening === -1 && $this->closing === -1 ? ' and ' : '') . ($this->closing === -1 ? 'closing' : '') . ($this->opening === -1 && $this->closing === -1 ? ' times are' : ' time is') . ' not correctly specified. Please correct the syntax.';}
 		
 		# Check that an empty form hasn't been requested (i.e. there must be at least one form field)
 		#!# This needs to be modified to take account of headers (which should not be included)
@@ -2099,9 +2469,11 @@ class form
 		#!# If an upload widget is needed, insert a client-side max-file-size tag
 		#if ($this->uploadElementPresent) {$html .= "\n\t" . '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';}
 		
-		# Loop through each of the elements to construct the form HTML
+		# Start the HTML
 		$formHtml = '';
 		$hiddenHtml = '';
+		
+		# Loop through each of the elements to construct the form HTML
 		foreach ($elements as $elementName => $elementAttributes) {
 			
 			# For hidden elements, buffer the hidden HTML
@@ -2132,8 +2504,11 @@ class form
 							$formHtml .= "\n" . $elementAttributes['html'];
 						} else {
 							$formHtml .= "\n" . '<p id="' . $elementName . '">';
-							$formHtml .= "\n\t" . $elementAttributes['title'] . '<br />';
-							if ($displayRestriction) {$formHtml .= "<br /><span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ')</span>';}
+							$formHtml .= "\n\t";
+							if ($this->displayTitles) {
+								$formHtml .= $elementAttributes['title'] . '<br />';
+								if ($displayRestriction) {$formHtml .= "<br /><span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ')</span>';}
+							}
 							$formHtml .= $elementAttributes['html'];
 							if ($this->displayDescriptions) {if ($elementAttributes['description'] != '') {$formHtml .= "<br />\n<span class=\"description\">" . $elementAttributes['description'] . '</span>';}}
 							$formHtml .= "\n</p>";
@@ -2147,8 +2522,11 @@ class form
 						if ($elementAttributes['type'] == 'heading') {
 							$formHtml .= "\n\t<span class=\"title\">" . $elementAttributes['html'] . '</span>';
 						} else {
-							$formHtml .= "\n\t<span class=\"label\">" . $elementAttributes['title'] . '</span>';
-							if ($displayRestriction) {$formHtml .= "\n\t<span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ')</span>';}
+							$formHtml .= "\n\t";
+							if ($this->displayTitles) {
+								$formHtml .= "<span class=\"label\">" . $elementAttributes['title'] . '</span>';
+								if ($displayRestriction) {$formHtml .= "\n\t<span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ')</span>';}
+							}
 							$formHtml .= "\n\t<span class=\"data\">" . $elementAttributes['html'] . '</span>';
 							if ($this->displayDescriptions) {if ($elementAttributes['description'] != '') {$formHtml .= "\n\t<span class=\"description\">" . $elementAttributes['description'] . '</span>';}}
 						}
@@ -2157,13 +2535,18 @@ class form
 						
 					# By default, display as tables
 					default:
-						$formHtml .= "\n\t" . '<tr id="' . $elementName . '">';
+						# Start by determining the number of columns which will be needed for headings involving a colspan
+						$colspan = 1 + ($this->displayTitles) + ($this->displayDescriptions);
+						$formHtml .= "\n\t" . '<tr class="' . $elementName . '">';
 						if ($elementAttributes['type'] == 'heading') {
-							$formHtml .= "\n\t\t<td colspan=\"3\">" . $elementAttributes['html'] . '</td>';
+							$formHtml .= "\n\t\t<td colspan=\"$colspan\">" . $elementAttributes['html'] . '</td>';
 						} else {
-							$formHtml .= "\n\t\t<td class=\"title\">" . ($elementAttributes['title'] == '' ? '&nbsp;' : $elementAttributes['title']);
-							if ($displayRestriction) {$formHtml .= "<br />\n\t\t\t<span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ")</span>\n\t\t";}
-							$formHtml .= '</td>';
+							$formHtml .= "\n\t\t";
+							if ($this->displayTitles) {
+								$formHtml .= "<td class=\"title\">" . ($elementAttributes['title'] == '' ? '&nbsp;' : $elementAttributes['title']);
+								if ($displayRestriction) {$formHtml .= "<br />\n\t\t\t<span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ")</span>\n\t\t";}
+								$formHtml .= '</td>';
+							}
 							$formHtml .= "\n\t\t<td class=\"data\">" . $elementAttributes['html'] . "</td>";
 							if ($this->displayDescriptions) {$formHtml .= "\n\t\t<td class=\"description\">" . ($elementAttributes['description'] == '' ? '&nbsp;' : $elementAttributes['description']) . '</td>';}
 						}
@@ -2333,6 +2716,11 @@ class form
 					
 					break;
 					
+				case 'richtext':
+					# Clean the HTML
+					$outputData[$elementName]['presented'] = $this->richtextClean ($this->form[$elementName]);
+					break;
+					
 				case 'textareaMultipleXy':	// Fallthrough
 					# Assign the raw data directly to the output array
 					$outputData[$elementName]['presented'] = $this->form[$elementName];
@@ -2406,7 +2794,9 @@ class form
 						
 						$chosen = array ();
 						foreach ($this->form[$elementName] as $key => $value) {
-							$chosen[] = $this->elements[$elementName]['valuesArray'][$value];
+							if (isSet ($this->elements[$elementName]['valuesArray'][$value])) {
+								$chosen[] = $this->elements[$elementName]['valuesArray'][$value];
+							}
 						}
 						$outputData[$elementName]['presented'] = implode (",\n", $chosen);
 					}
@@ -2689,6 +3079,17 @@ class form
 				'processing'		=> array ('presented', 'rawcomponents'), #, 'compiled'
 			),
 			
+			'richtext' => array (
+				'_descriptions' => array (
+					'presented'		=> 'Show as unaltered string',
+				),
+				'file'				=> array ('presented'),
+				'email'				=> array ('presented'),
+				'confirmationEmail'	=> array ('presented'),
+				'screen'			=> array ('presented'),
+				'processing'		=> array ('presented'),
+			),
+			
 			'textareaMultipleY' => array (
 				'_descriptions' => array (
 					'presented'		=> 'Show as unaltered string',
@@ -2945,13 +3346,18 @@ class form
 			$recipient = $this->configureResultConfirmationEmailRecipient;
 		}
 		
+		# Define the additional headers
+		$additionalHeaders = 'From: Website feedback <' . ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator) . ">\r\n";
+		if (isSet ($this->configureResultEmailCc)) {$additionalHeaders .= 'Cc: ' . implode (', ', $this->configureResultEmailCc) . "\r\n";}
+		
+		
 		# Send the e-mail
 		#!# Add an @ and a message if sending fails (marking whether the info has been logged in other ways)
 		$success = mail (
 			$recipient,
 			$this->configureResultEmailedSubjectTitle[$outputType],
 			wordwrap ($introductoryText . "\n\n\n\n" . implode ("\n\n\n", $resultLines)),
-			'From: Website feedback <' . ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator) . ">\n"
+			$additionalHeaders
 		);
 		
 		# Confirm sending (or an error) for the confirmation e-mail type
@@ -3053,8 +3459,8 @@ class form
 #!# Need to add basic protection for ensuring that form sub-elements submitted (in selectable types) are in the list of available values; this has already been achieved for checkboxes, relatively easily
 #!# Add form setup checking validate input types like cols= is numeric, etc.
 #!# Add a warnings flag in the style of the errors flagging to warn of changes which have been made silently
-#!# Need to add configurable option to add headings to new CSV when created
-#!# Why does hidden data actually need to be posted, given that its contents are already retrievable directly by the script?
+#!# Need to add configurable option (enabled by default) to add headings to new CSV when created
+#!# Consider a flag (enabled by default) to use hidden data internally rather than the posted version
 #!# Ideally add a catch to prevent the same text appearing twice in the errors box (e.g. two widgets with "details" as the descriptive text)
 #!# Input type="image" like submit but note http://www.blooberry.com/indexdot/html/tagpages/i/inputimage.htm has co-ordinates as well
 #!# Throw a 'fake input' error if the number of files uploaded is greater than the number of form elements
@@ -3068,17 +3474,17 @@ class form
 #!# Add standalone database-writing
 #!# Apache setup needs to be carefully tested, in conjunction with php.net/ini-set and php.net/configuration.changes
 #!# Add links to the id="$elementName" form elements in cases of USER errors
-#!# Need to prevent the form code itself being overwritable by uploads...
+#!# Need to prevent the form code itself being overwritable by uploads... (is that possible to ensure?)
 
 
 # Version 2 feature proposals
+#!# Full object orientation - change the form into a package of objects
+#!#		Change each input type to an object, with a series of possible checks that can be implemented - class within a class?
+#!# 	Change the output methods to objects
 #!# Allow multiple carry-throughs, perhaps using formCarried[$formNumber][...]: Add carry-through as an additional array section; then translate the additional array as a this-> input to hidden fields.
 #!# Enable javascript as an option
 #!# 	Use ideas in http://www.sitepoint.com/article/1273/3 for having js-validation with an icon
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]
-#!# Full object orientation - change the form into a package of objects
-#!#		Change each input type to an object, with a series of possible checks that can be implemented - class within a class?
-#!# 	Change the output methods to objects
 
 
 ?>

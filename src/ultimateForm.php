@@ -140,7 +140,7 @@ class form
 		'formName' => 'name',
 		'showPresentationMatrix' => 'displayPresentationMatrix',
 		'showFormCompleteText' => 'displayFormCompleteText',
-		'requiredFieldIndicatorDisplay' => 'requiredFieldIndicator',
+		'requiredFieldIndicator' => 'requiredFieldIndicator',
 		'resetButtonVisible' => 'resetButton',
 	);
 	
@@ -956,7 +956,8 @@ class form
 		foreach ($arguments['values'] as $key => $value) {
 			$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
 			$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
-			$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->name . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($submittableValue) . '"' . (($submittableValue == $elementValue) ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlentities ($value) . "</label><br />";
+			#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
+			$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->name . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($submittableValue) . '"' . (($submittableValue == $elementValue) ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($value)) . "</label><br />";
 		}
 		$widgetHtml .= "\n\t\t";
 		
@@ -1640,7 +1641,7 @@ class form
 	function cleanId ($id)
 	{
 		# Define the replacements
-		$replacements = array (' ', '!', '(', ')', '[', ']',);
+		$replacements = array (' ', ',', '†', '!', '(', ')', '[', ']',);
 		
 		# Perform the replacements
 		$id = str_replace ($replacements, '_', $id);
@@ -2961,7 +2962,7 @@ class form
 		}
 		
 		# Introduce the table
-		$html .= "\n\n" . '<p class="success">The information submitted is confirmed as:</p>';
+		$html  = "\n\n" . '<p class="success">The information submitted is confirmed as:</p>';
 		$html .= "\n" . '<table class="results" summary="Table of results">';
 		
 		# Assemble the HTML, convert newlines to breaks (without a newline in the HTML), tabs to four spaces, and convert HTML entities

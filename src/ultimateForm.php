@@ -48,7 +48,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
  * @copyright Copyright © 2003-5, Martin Lucas-Smith, University of Cambridge
- * @version 0.99b3
+ * @version 0.99b5
  */
 class form
 {
@@ -134,6 +134,7 @@ class form
 		'timestamping'					=> false,									# Add a timestamp to any CSV entry
 	);
 	
+	/*
 	# Temporary API compatibility fixes
 	var $apiFix = array (
 		// Global paramaters:
@@ -143,6 +144,7 @@ class form
 		'requiredFieldIndicator' => 'requiredFieldIndicator',
 		'resetButtonVisible' => 'resetButton',
 	);
+	*/
 	
 	
 	## Load initial state and assign settings ##
@@ -160,7 +162,7 @@ class form
 		$this->timestamp = date ('Y-m-d H:m:s');
 		
 		# Import supplied arguments to assign defaults against specified ones available
-		$suppliedArguments = $this->apiFix ($suppliedArguments);
+		/* $suppliedArguments = $this->apiFix ($suppliedArguments); */
 		foreach ($this->argumentDefaults as $argument => $defaultValue) {
 			$this->{$argument} = (isSet ($suppliedArguments[$argument]) ? $suppliedArguments[$argument] : $defaultValue);
 			#!# Temporary while refactoring - need to REMOVE $this->{$argument} above by moving everything to $this->settings[$argument] instead
@@ -190,6 +192,7 @@ class form
 	}
 	
 	
+	/*
 	# Function to fix arguments under the old API
 	function apiFix ($arguments)
 	{
@@ -206,6 +209,7 @@ class form
 		# Return the fixed arguments
 		return $arguments;
 	}
+	*/
 	
 	
 	## Supported form widget types ##
@@ -478,7 +482,7 @@ class form
 	
 	# Note: make sure file_uploads is on in the upload location!
 	
-	The following source code alterations must be made to FCKeditor 2.0
+	The following source code alterations must be made to FCKeditor 2.1
 	
 	1. Customised configurations which cannot go in the PHP at present
 	Add the supplied file /_fckeditor/fckconfig-customised.js
@@ -489,47 +493,25 @@ class form
 	
 	3. Open /_fckeditor/editor/filemanager/browser/default/connectors/php/config.php and change:
 	$Config['Enabled'] = true ;
-	$Config['UserFilesPath'] = '' ;
+	$Config['UserFilesPath'] = '/' ;
+	$Config['UserFilesAbsolutePath'] = $_SERVER['DOCUMENT_ROOT'];
 	
-	4. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of GetUrlFromPath() the line:
+	4. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of GetUrlFromPath() and ServerMapFolder() the lines:
 	#MLS# Don't differentiate locations based on the resource type
 	$resourceType = '';
 	
-	5. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of ServerMapFolder() the line:
-	#MLS# Don't differentiate locations based on the resource type
-	$resourceType = '';
-	
-	6. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of CreateServerFolder() the line:
+	5. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of CreateServerFolder() the line:
 	#MLS# Ensure the folder path has no double-slashes, or mkdir may fail on certain platforms
 	while (strpos ($folderPath, '//') !== false) {$folderPath = str_replace ('//', '/', $folderPath);}
 	
-	7. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of GetRootPath() the line:
-	#MLS# Return the document root instead of (incorrectly) trying to work it out
-	return $_SERVER['DOCUMENT_ROOT'];
 	
-	
-	The following are experienced deficiencies in FCKeditor 2.0 [Final release]
-	- Undo/redo is a bit sporadic, but better than in earlier versions (IE6, Firefox)
+	The following are experienced deficiencies in FCKeditor 2.1
+	- Undo/redo doesn't work in Firefox
+	- Auto-hyperlinking doesn't work in Firefox	http://sourceforge.net/tracker/index.php?func=detail&aid=1314815&group_id=75348&atid=543653
 	- Format box doesn't update to current item (IE6)	http://sourceforge.net/tracker/index.php?func=detail&aid=1187220&group_id=75348&atid=543653
-	- CSS underlining inheritance seems wrong (IE6?, Firefox?)
+	- CSS underlining inheritance seems wrong in Firefox
 	- API deficiencies: DocType = '', FormatIndentator = "\t", ToolbarSets all have to be set outside PHP
-	
-	The following are experienced deficiencies in the EARLIER FCKeditor 2.0 FC
-	- Undo/redo doesn't work (IE6)		http://sourceforge.net/tracker/index.php?func=detail&aid=1214125&group_id=75348&atid=543653
-	- Anchor symbol doesn't display (IE6, Firefox)		http://sourceforge.net/tracker/index.php?func=detail&aid=1202468&group_id=75348&atid=543653
-	- Format box doesn't update to current item (IE6)	http://sourceforge.net/tracker/index.php?func=detail&aid=1187220&group_id=75348&atid=543653
-	- CSS underlining inheritance seems wrong (IE6?, Firefox)	http://sourceforge.net/tracker/index.php?func=detail&aid=1230485&group_id=75348&atid=543653
-	- API deficiencies: DocType = '', FormatIndentator = "\t", ToolbarSets all have to be set outside PHP
-	
-	The following are experienced deficiencies in the EARLIER FCKeditor 2.0 Beta3
-	- Cut/paste row doesn't show (Firefox)
-	- Undo/redo doesn't work (IE6, Firefox)
-	- Anchor symbol doesn't display (Firefox)
-	- Format box doesn't update to current item (IE6)
-	- CSS underlining inheritance seems wrong (Firefox)
-	- Arrow keys (Firefox)
-	- Copy/paste buttons usable (Firefox)
-	- API deficiencies: DocType = '', FormatIndentator = "\t", ToolbarSets all have to be set outside PHP
+	- Pasting across richtext boxes fails	http://sourceforge.net/tracker/index.php?func=detail&aid=1315954&group_id=75348&atid=543653
 	
 	*/
 	
@@ -553,7 +535,7 @@ class form
 				'FontFormats'			=> 'p;h1;h2;h3;h4;h5;h6;pre',
 				'UserFilesPath'			=> '/',
 				'EditorAreaCSS'			=> '',
-				'BaseHref'				=> '',
+				'BaseHref'				=> '',	// Doesn't work, and http://sourceforge.net/tracker/?group_id=75348&atid=543653&func=detail&aid=1205638 doesn't fix it
 				#'FormatIndentator'		=> "\t",
 				'GeckoUseSPAN'			=> false,	#!# Even in .js version this seems to have no effect
 				'StartupFocus'			=> false,
@@ -888,6 +870,7 @@ class form
 			'suitableAsEmailTarget' => $suitableAsEmailTarget,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			'values' => $arguments['values'],
 		);
 	}
 	
@@ -1002,6 +985,7 @@ class form
 			'suitableAsEmailTarget' => $arguments['required'],
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			'values' => $arguments['values'],
 		);
 	}
 	
@@ -1160,6 +1144,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			'values' => $arguments['values'],
 		);
 	}
 	
@@ -1281,9 +1266,9 @@ class form
 						# If the time parsing passes, substitute the submitted version with the parsed and corrected version
 						if ($time = datetime::parseTime ($elementValue['time'])) {
 							$elementValue['time'] = $time;
-						
-						# If, instead, the time parsing fails, leave the original submitted version and add the problem to the errors array
 						} else {
+							
+							# If, instead, the time parsing fails, leave the original submitted version and add the problem to the errors array
 							$elementProblems['timePartInvalid'] = 'The time part is invalid!';
 						}
 					}
@@ -1315,7 +1300,6 @@ class form
 		$widgetHtml .= "\n\t\t\t\t" . '</select>';
 		$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">y:&nbsp;</span><input size="4" name="' . $this->name . '[' . $arguments['name'] . '][year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
 		$widgetHtml .= "\n\t\t\t</fieldset>";
-		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
@@ -1337,6 +1321,7 @@ class form
 				$data['compiled'] = $this->form[$arguments['name']]['year'] . '-' . $this->form[$arguments['name']]['month'] . '-' . $this->form[$arguments['name']]['day'] . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : '');
 				
 				# Make the presented version in english text
+				#!# date () corrupts dates after 2038; see php.net/date. Suggest not re-presenting it if year is too great.
 				$data['presented'] = (($arguments['level'] == 'datetime') ? $this->form[$arguments['name']]['time'] . ', ': '') . date ('jS F, Y', mktime (0, 0, 0, $this->form[$arguments['name']]['month'], $this->form[$arguments['name']]['day'], $this->form[$arguments['name']]['year']));
 			}
 		}
@@ -1566,6 +1551,7 @@ class form
 		
 		# Loop through each hidden data sub-array and create the HTML
 		$widgetHtml = "\n";
+		#!# Need to add check that $arguments['values'] is actually an array, probably in $widget->getArguments ()
 		foreach ($arguments['values'] as $key => $value) {
 			$widgetHtml .= "\n\t" . '<input type="hidden" name="' . $this->name . "[{$arguments['name']}][$key]" . '" value="' . $value . '" />';
 		}
@@ -3238,6 +3224,7 @@ class formWidget
 	var $functionName;
 	
 	# Temporary API compatibility fixes
+	/*
 	var $apiFix = array (
 		// Widget parameters:
 		'elementName' => 'name',
@@ -3251,6 +3238,7 @@ class formWidget
 		'minimumRequired' => 'required',
 		'maximumRequired' => 'maximum',
 	);
+	*/
 	
 	
 	# Constructor
@@ -3299,7 +3287,7 @@ class formWidget
 	function assignArguments ($suppliedArguments, $argumentDefaults, $functionName, $subargument = NULL)
 	{
 		# Apply API argument backwards compatibility
-		$suppliedArguments = $this->apiFix ($suppliedArguments);
+		/* $suppliedArguments = $this->apiFix ($suppliedArguments); */
 		
 		# Merge the defaults: ensure that arguments with a non-null default value are set (throwing an error if not), or assign the default value if none is specified
 		foreach ($argumentDefaults as $argument => $defaultValue) {
@@ -3337,6 +3325,7 @@ class formWidget
 	}
 	
 	
+	/*
 	# Function to fix arguments under the old API
 	function apiFix ($arguments)
 	{
@@ -3353,6 +3342,7 @@ class formWidget
 		# Return the fixed arguments
 		return $arguments;
 	}
+	*/
 	
 	
 	/**
@@ -3477,6 +3467,7 @@ class formWidget
 #!# Add POST security for hidden fields - do this by ignoring the posted data (submitting to external can't be dealt with)
 #!# Not all $widgetHtml declarations have an id="" given (make sure it is $this>cleanId'd though)
 #!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/
+#!# Prevent insecure bcc:ing as per http://lists.evolt.org/harvest/detail.cgi?w=20050725&id=6342
 
 
 # Version 2 feature proposals
@@ -3489,6 +3480,7 @@ class formWidget
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]
 #!# Add AJAX validation flag See: http://particletree.com/features/smart-validation-with-ajax (but modified version needed because this doesn't use Unobtrusive DHTML)
 #!# Self-creating
+#!# Postponed files system
 
 
 ?>

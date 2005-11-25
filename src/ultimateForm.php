@@ -48,7 +48,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
  * @copyright Copyright © 2003-5, Martin Lucas-Smith, University of Cambridge
- * @version 0.99b5
+ * @version 0.99b6
  */
 class form
 {
@@ -83,6 +83,7 @@ class form
 	var $configureResultConfirmationEmailRecipient = '';		// The recipient of any confirmation e-mail
 	var $configureResultConfirmationEmailAbuseNotice = true;	// Whether to include an abuse report notice in any confirmation e-mail sent
 	var $configureResultEmailedSubjectTitle = array ();			// An array to hold the e-mail subject title for either e-mail result type
+	var $configureResultScreenShowUnsubmitted;					// Whether, in screen results mode, unsubmitted widgets that are not required will be listed
 	
 	# Supported output types
 	var $supportedTypes = array ('file', 'email', 'confirmationEmail', 'screen', 'processing');
@@ -734,7 +735,8 @@ class form
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
 		$arguments['default'] = application::ensureArray ($arguments['default']);
 		
-		#!# Currently can set minimum to 2 while multiple is off
+		# If not using multiple mode, ensure that more than one cannot be set as required
+		if (!$arguments['multiple'] && ($arguments['required'] > 1)) {$this->formSetupErrors['selectMultipleMismatch'] = "More than one value is set as being required to be selected but multiple mode is off. One or the other should be changed.";}
 		
 		# Ensure that there cannot be multiple initial values set if the multiple flag is off
 		$totalDefaults = count ($arguments['default']);
@@ -743,7 +745,7 @@ class form
 		}
 		
 		# Check whether the array is an associative array
-		$valuesAreAssociativeArray = (application::isAssociativeArray ($arguments['values']) || $arguments['forceAssociative']);
+		$valuesAreAssociativeArray = ($arguments['forceAssociative'] || application::isAssociativeArray ($arguments['values']));
 		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($arguments['values']) : array_values ($arguments['values']));
 		
 		# Special syntax to set the value of a URL-supplied GET value as the initial value; if the supplied item is not present, ignore it; otherwise replace the default(s) array with the single selected item
@@ -871,6 +873,7 @@ class form
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
+			'multiple' => $arguments['multiple'],
 		);
 	}
 	
@@ -890,6 +893,8 @@ class form
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'default'				=> array (),# Pre-selected item
+			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
+			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->nullText,	# Override null text for a specific select widget (if false, the master value is assumed)
 		);
 		
@@ -913,7 +918,7 @@ class form
 		if (empty ($arguments['values'])) {$this->formSetupErrors['radiobuttonsNoValues'] = 'No values have been set for the set of radio buttons.';}
 		
 		# Check whether the array is an associative array
-		$valuesAreAssociativeArray = application::isAssociativeArray ($arguments['values']);
+		$valuesAreAssociativeArray = ($arguments['forceAssociative'] || application::isAssociativeArray ($arguments['values']));
 		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($arguments['values']) : array_values ($arguments['values']));
 		
 		# Ensure that the initial value, if one is set, is in the array of values
@@ -936,11 +941,16 @@ class form
 		
 		# Define the widget's core HTML
 		$widgetHtml = '';
+		$subwidgetIndex = 1;
 		foreach ($arguments['values'] as $key => $value) {
 			$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
 			$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
 			#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-			$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->name . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($submittableValue) . '"' . (($submittableValue == $elementValue) ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($value)) . "</label><br />";
+			$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->name . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($submittableValue) . '"' . (($submittableValue == $elementValue) ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($value)) . '</label>';
+			
+			# Add a line break if required
+			if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
+			$subwidgetIndex++;
 		}
 		$widgetHtml .= "\n\t\t";
 		
@@ -954,6 +964,7 @@ class form
 		if ($this->formPosted) {
 			
 			# Check whether the array is an associative array
+			#!# As above - refactor then remove
 			$valuesAreAssociativeArray = application::isAssociativeArray ($arguments['values']);
 			$submittableValues = ($valuesAreAssociativeArray ? array_keys ($arguments['values']) : array_values ($arguments['values']));
 			
@@ -1187,6 +1198,8 @@ class form
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 		if (!$this->formPosted) {
+			# Firstly convert the timestamp keyword to a real date then assign the
+			if ($arguments['default'] == 'timestamp') {$arguments['default'] = date ('Y-m-d H:i:s');}
 			$elementValue = datetime::getDateTimeArray ($arguments['default']);
 		} else {
  			
@@ -1914,10 +1927,13 @@ class form
 	/**
 	 * Output (display) the results on screen
 	 */
-	function setOutputScreen ()
+	function setOutputScreen ($displayUnsubmitted = true)
 	{
 		# Flag that this method is required
 		$this->outputMethods['screen'] = true;
+		
+		# Flag whether to display as empty (rather than absent) those widgets which are optional and have had nothing submitted
+		$this->configureResultScreenShowUnsubmitted = $displayUnsubmitted;
 	}
 	
 	
@@ -2665,6 +2681,20 @@ class form
 			# If the presentation matrix has a specification for the element (only heading should not do so), merge the setup-assigned output formats over the defaults in the presentation matrix
 			if (isSet ($presentationDefaults[$attributes['type']])) {
 				$this->elements[$element]['output'] = array_merge ($presentationDefaults[$attributes['type']], $attributes['output']);
+				
+				# Slightly hacky special case: for a select type, if in multiple mode, use the multiple output format instead
+				if ($attributes['type'] == 'select') {
+					foreach ($this->elements[$element]['output'] as $outputType => $outputFormat) {
+						$indicatorLength = 0 - strlen ($indicator = " [when in 'multiple' mode]");
+						if (substr ($outputType, $indicatorLength) == $indicator) {
+							$replacementType = substr ($outputType, 0, $indicatorLength);
+							if ($this->elements[$element]['multiple']) {
+								$this->elements[$element]['output'][$replacementType] = $presentationDefaults[$attributes['type']][$outputType];
+							}
+							unset ($this->elements[$element]['output'][$outputType]);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -2786,12 +2816,13 @@ class form
 					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
-				#!# Ideally, when multiple is false, the default for file would become 'compiled'; this would have to be done by merging presented and compiled (making them unselectable) and using the spare as a modified copy of rawcomponents
-				'file'				=> array ('compiled', 'presented', 'rawcomponents'),
+				'file'				=> array ('compiled', 'rawcomponents', 'presented'),
+				"file [when in 'multiple' mode]"		=> array ('rawcomponents', 'compiled', 'presented'),
 				'email'				=> array ('compiled', 'presented', 'rawcomponents'),
 				'confirmationEmail'	=> array ('presented', 'compiled'),
 				'screen'			=> array ('presented', 'compiled'),
-				'processing'		=> array ('rawcomponents', 'compiled', 'presented'),
+				'processing'		=> array ('compiled', 'presented', 'rawcomponents'),
+				"processing [when in 'multiple' mode]"	=> array ('rawcomponents', 'compiled', 'presented'),
 			),
 			
 			'textarea' => array (
@@ -2955,12 +2986,12 @@ class form
 		foreach ($presentedData as $name => $data) {
 			
 			# Remove empty elements from display
-			if (empty ($data)) {continue;}
+			if (empty ($data) && !$this->configureResultScreenShowUnsubmitted) {continue;}
 			
 			/*
 			# For associative select types, substitute the submitted value with the the visible value
-			#!# PATCHED IN 041201; This needs to be applied to other select types and to dealt with generically in the processing stage; also, should this be made configurable, or is it assumed that the visible version is always wanted for the confirmation screen?
-			if ($this->elements[$name]['type'] == 'select') {
+			#!# PATCHED IN 041201; This needs to be applied to other select types and to dealt with generically in the processing stage; also, should this be made configurable, or is it assumed that the visible version is always wanted for the confirmation screen?; also what about forceAssociative?
+			if ($this->elements[$name]['type'] == 'select' || $this->elements[$name]['type'] == 'radiobuttons') {
 				if (application::isAssociativeArray ($this->elements[$name]['values'])) {
 					foreach ($this->form[$name] as $key => $value) {
 						$data[$key] = $this->form[$name]['values'][$data[$key]];
@@ -2975,7 +3006,7 @@ class form
 			# Compile the HTML
 			$html .= "\n\t<tr>";
 			$html .= "\n\t\t" . '<td class="key">' . (isSet ($this->elements[$name]['title']) ? $this->elements[$name]['title'] : $name) . ':</td>';
-			$html .= "\n\t\t" . '<td class="value">' . str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data)) . '</td>';
+			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? '(No data submitted)' : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data))) . '</td>';
 			$html .= "\n\t</tr>";
 		}
 		$html .= "\n" . '</table>';

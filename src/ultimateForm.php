@@ -20,6 +20,7 @@
  * - Customisable submit button text accesskey and location (start/end of form)
  * - Regular expression hooks for various widget types
  * - Templating mechanism
+ * - The ability to set elements as non-editable
  * 
  * REQUIREMENTS:
  * - PHP4.1 or above
@@ -48,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
  * @copyright Copyright © 2003-5, Martin Lucas-Smith, University of Cambridge
- * @version 0.99b6
+ * @version 0.99b7
  */
 class form
 {
@@ -63,7 +64,7 @@ class form
 	# Main variables
 	var $name;									// The name of the form
 	var $location;								// The location where the form is submitted to
-	var $duplicatedelementNames = array ();		// The array to hold any duplicated form field names
+	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
 	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added
 	var $elementProblems = array ();			// Array of submitted element problems
 	
@@ -91,7 +92,8 @@ class form
 	
 	# Constants
 	var $timestamp;
-	var $minimumPhpVersion = 4.3; // md5_file requires 4.2+; file_get_contents is 4.3+
+	var $minimumPhpVersion = 4.3;	// md5_file requires 4.2+; file_get_contents is 4.3+
+	var $escapeCharacter = "'";		// Character used for escaping of output
 	
 	# Specify available arguments as defaults or as NULL (to represent a required argument)
 	var $argumentDefaults = array (
@@ -133,6 +135,7 @@ class form
 		'userKey'						=> false,									# Whether to log the username, as the key
 		'loggedUserUnique'				=> false,									# Run in user-uniqueness mode, making the key of any CSV the username and checking for resubmissions
 		'timestamping'					=> false,									# Add a timestamp to any CSV entry
+		'escapeOutput'					=> false,									# Whether to escape output in the processing output ONLY (will not affect other types) - either true (defaults to ') or the string to escape
 	);
 	
 	/*
@@ -180,7 +183,7 @@ class form
 		if (!$this->user) {$this->user = (isSet ($_SERVER['REMOTE_USER']) ? $_SERVER['REMOTE_USER'] : false);}
 		
 		# Assign whether the form has been posted or not
-		$this->formPosted = (isSet ($_POST[$this->name]));
+		$this->formPosted = (isSet ($_POST[$this->name]) || isSet ($_FILES[$this->name]));
 		
 		# Add in the hidden security fields if required, having verified username existence if relevant; these need to go at the start so that any username is set as the key
 		$this->addHiddenSecurityFields ();
@@ -225,6 +228,7 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
@@ -240,6 +244,9 @@ class form
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, $functionName);
 		
 		$arguments = $widget->getArguments ();
+		
+		# If the widget is not editable, fix the form value to the default
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
 		
 		# Register the element name to enable duplicate checking
 		$this->registerElementName ($arguments['name']);
@@ -272,12 +279,20 @@ class form
 		# Describe restrictions on the widget
 		if ($arguments['enforceNumeric'] && ($functionName != 'email')) {$restriction = 'Must be numeric';}
 		if ($functionName == 'email') {$restriction = 'Must be valid';}
+		if ($arguments['regexp'] && ($functionName != 'email')) {$restriction = 'A specific pattern is required';}
 		
-		# Define the widget's core HTML
-		$widgetHtml = '<input name="' . $this->name . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($elementValue) . '" />';
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
+		
+		# Define the widget's core HTML
+		if ($arguments['editable']) {
+			$widgetHtml = '<input name="' . $this->name . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+		} else {
+			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']]));
+			#!# Change to registering hidden internally
+			$widgetHtml .= '<input name="' . $this->name . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+		}
 		
 		# Get the posted data
 		if ($this->formPosted) {
@@ -295,7 +310,7 @@ class form
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $requiredButEmpty,
@@ -337,6 +352,7 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
@@ -347,12 +363,16 @@ class form
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression(s) against which the submission must (all) validate (optional)
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 		);
 		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
 		
 		$arguments = $widget->getArguments ();
+		
+		# If the widget is not editable, fix the form value to the default
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
 		
 		# Register the element name to enable duplicate checking
 		$this->registerElementName ($arguments['name']);
@@ -423,11 +443,16 @@ class form
 				break;
 		}
 		
-		# Define the widget's core HTML
-		$widgetHtml = '<textarea name="' . $this->name . "[{$arguments['name']}]\" id=\"" . $this->name . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\">" . htmlentities ($elementValue) . '</textarea>';
-		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
+		
+		# Define the widget's core HTML
+		if ($arguments['editable']) {
+			$widgetHtml = '<textarea name="' . $this->name . "[{$arguments['name']}]\" id=\"" . $this->name . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
+		} else {
+			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']])));
+			$widgetHtml .= '<input name="' . $this->name . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+		}
 		
 		# Get the posted data
 		if ($this->formPosted) {
@@ -463,7 +488,7 @@ class form
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $requiredButEmpty,
@@ -521,6 +546,7 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> NULL,		# Introductory text
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
@@ -566,6 +592,9 @@ class form
 		
 		$arguments = $widget->getArguments ();
 		
+		# If the widget is not editable, fix the form value to the default
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
+		
 		# Register the element name to enable duplicate checking
 		$this->registerElementName ($arguments['name']);
 		
@@ -583,16 +612,23 @@ class form
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 		if (!$this->formPosted) {$elementValue = $arguments['default'];}
 		
-		# Define the widget's core HTML by instantiating the richtext editor module and setting required options
-		require_once ('fckeditor.php');
-		$editor = new FCKeditor ("{$this->name}[{$arguments['name']}]");
-		$editor->BasePath	= $arguments['editorBasePath'];
-		$editor->Width		= $arguments['width'];
-		$editor->Height		= $arguments['height'];
-		$editor->ToolbarSet	= $arguments['editorToolbarSet'];
-		$editor->Value		= $elementValue;
-		$editor->Config		= $arguments['editorConfig'];
-		$widgetHtml = $editor->CreateHtml ();
+		# Define the widget's core HTML
+		if ($arguments['editable']) {
+			
+			# Define the widget's core HTML by instantiating the richtext editor module and setting required options
+			require_once ('fckeditor.php');
+			$editor = new FCKeditor ("{$this->name}[{$arguments['name']}]");
+			$editor->BasePath	= $arguments['editorBasePath'];
+			$editor->Width		= $arguments['width'];
+			$editor->Height		= $arguments['height'];
+			$editor->ToolbarSet	= $arguments['editorToolbarSet'];
+			$editor->Value		= $elementValue;
+			$editor->Config		= $arguments['editorConfig'];
+			$widgetHtml = $editor->CreateHtml ();
+		} else {
+			$widgetHtml = $this->form[$arguments['name']];
+			$widgetHtml .= '<input name="' . $this->name . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+		}
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
@@ -610,7 +646,7 @@ class form
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $requiredButEmpty,
@@ -699,13 +735,14 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
 			'multiple'				=> false,	# Whether to create a multiple-mode select box
 			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
-			'size'			=> 1,		# Number of rows (optional; defaults to 1)
+			'size'			=> 5,		# Number of rows visible in multiple mode (optional; defaults to 1)
 			'default'				=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->nullText,	# Override null text for a specific select widget
@@ -715,6 +752,12 @@ class form
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
 		
 		$arguments = $widget->getArguments ();
+		
+		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
+		$arguments['default'] = application::ensureArray ($arguments['default']);
+		
+		# If the widget is not editable, fix the form value to the default
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
 		
 		# Register the element name to enable duplicate checking
 		$this->registerElementName ($arguments['name']);
@@ -732,9 +775,6 @@ class form
 		$totalSubItems = count ($arguments['values']);
 		if ($arguments['required'] > $totalSubItems) {$this->formSetupErrors['selectMinimumMismatch'] = "The required minimum number of items which must be selected (<strong>{$arguments['required']}</strong>) specified is above the number of select items actually available (<strong>$totalSubItems</strong>).";}
 		
-		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
-		$arguments['default'] = application::ensureArray ($arguments['default']);
-		
 		# If not using multiple mode, ensure that more than one cannot be set as required
 		if (!$arguments['multiple'] && ($arguments['required'] > 1)) {$this->formSetupErrors['selectMultipleMismatch'] = "More than one value is set as being required to be selected but multiple mode is off. One or the other should be changed.";}
 		
@@ -744,51 +784,35 @@ class form
 			$this->formSetupErrors['defaultTooMany'] = "In the <strong>{$arguments['name']}</strong> element, $totalDefaults total initial values were assigned but the form has been set up to allow only one item to be selected by the user.";
 		}
 		
-		# Check whether the array is an associative array
-		$valuesAreAssociativeArray = ($arguments['forceAssociative'] || application::isAssociativeArray ($arguments['values']));
-		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($arguments['values']) : array_values ($arguments['values']));
+		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
+		$arguments['values'] = $this->cleanAvailableValues ($arguments['values'], $arguments['forceAssociative']);
 		
-		# Special syntax to set the value of a URL-supplied GET value as the initial value; if the supplied item is not present, ignore it; otherwise replace the default(s) array with the single selected item
-		#!# Way of applying more than one item?
+		# Perform substitution of the special syntax to set the value of a URL-supplied GET value as the initial value; if the supplied item is not present, ignore it; otherwise replace the default(s) array with the single selected item; this can only be applied once
 		#!# Apply this to checkboxes and radio buttons also
-		#!# Need to make 'url:$' in the values array not allowable as a genuine option
-		if (isSet ($arguments['default'][0])) {
-			$identifier = 'url:$';
-			if (substr ($arguments['default'][0], 0, strlen ($identifier)) == $identifier) {
-				$urlArgumentKey = substr ($arguments['default'][0], strlen ($identifier));
-				$arguments['default'] = array (application::urlSuppliedValue ($urlArgumentKey, $submittableValues));
-			} else {
-				
-				# Ensure that all initial values are in the array of values
-				foreach ($arguments['default'] as $defaultValue) {
-					if (!in_array ($defaultValue, $submittableValues)) {
-						$missingValues[] = $defaultValue;
-					}
-				}
-				if (isSet ($missingValues)) {
-					$totalMissingValues = count ($missingValues);
-					$this->formSetupErrors['defaultMissingFromValues'] = "In the <strong>{$arguments['name']}</strong> element, the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+		#!# Need to make 'url:$' in the values array not allowable as a genuine option]
+		$identifier = 'url:$';
+		foreach ($arguments['default'] as $key => $defaultValue) {
+			if (substr ($defaultValue, 0, strlen ($identifier)) == $identifier) {
+				$urlArgumentKey = substr ($defaultValue, strlen ($identifier));
+				# Ensure that the URL supplied is one of the possible values, or delete the identifier key entirely
+				if (!$arguments['default'][$key] = application::urlSuppliedValue ($urlArgumentKey, array_keys ($arguments['values']))) {
+					unset ($arguments['default'][$key]);
 				}
 			}
 		}
 		
-		# Ensure that the 'null' text does not clash with any items in the array of values
-		if (in_array ($arguments['nullText'], $submittableValues)) {
-			$this->formSetupErrors['defaultNullClash'] = "In the <strong>{$arguments['name']}</strong> element, the null text ('{$arguments['nullText']}') clashes with one of list of available items for selection by the user. One or the other must be changed.";
-		}
-		
-		# Clear the null text if it appears, or empty submissions
-		#!# Need to modify this as the null text should never be a submitted value now
-		foreach ($elementValue as $key => $value) {
-			#!# Is the empty ($value) check being done for other similar elements to prevent empty submissions?
-			if (($elementValue[$key] == $arguments['nullText']) || (empty ($value))) {
-				unset ($elementValue[$key]);
-				break;
-			}
-		}
+		# Ensure that all initial values are in the array of values
+		$this->ensureDefaultsAvailable ($arguments);
 		
 		# Emulate the need for the field to be 'required', i.e. the minimum number of fields is greater than 0
 		$required = ($arguments['required'] > 0);
+		
+		# Remove null if it's submitted, so that it can never end up in the results; this is different to radiobuttons, because a radiobutton set can have nothing selected on first load, whereas a select always has something selected, so a null must be present
+		foreach ($elementValue as $index => $submittedValue) {
+			if ($submittedValue == '') {
+				unset ($elementValue[$index]);
+			}
+		}
 		
 		# Produce a problem message if the number submitted is fewer than the number required
 		$totalSubmitted = count ($elementValue);
@@ -814,49 +838,68 @@ class form
 		#R# This can become ternary, or make $arguments['multiple'] / $arguments['required'] as arguments to suitableAsEmailTarget
 		$suitableAsEmailTarget = false;
 		#!# Apply this to checkboxes
-		if ((!$arguments['multiple']) && ($arguments['required'] == 1)) {
-			$suitableAsEmailTarget = $this->suitableAsEmailTarget ($submittableValues);
+		if ((!$arguments['multiple']) && ($arguments['required'] == 1) && ($arguments['editable'] || (!$arguments['editable'] && count ($arguments['default']) == 1))) {
+			$suitableAsEmailTarget = $this->suitableAsEmailTarget (array_keys ($arguments['values']));
 		}
 		
 		# Define the widget's core HTML
-		$widgetHtml = "\n\t\t\t<select name=\"" . $this->name . "[{$arguments['name']}][]\"" . (($arguments['multiple']) ? ' multiple="multiple"' : '') . " size=\"{$arguments['size']}\">";
-		#!# Does this now mean that a check for submissions of $arguments['nullText'] is no longer required, as the value will be "" ?
-		$widgetHtml .= "\n\t\t\t\t" . '<option value="">' . $arguments['nullText'] . '</option>';
-		foreach ($arguments['values'] as $key => $value) {
-			$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities (($valuesAreAssociativeArray ? $key : $value)) . '"' . (in_array (($valuesAreAssociativeArray ? $key : $value), $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($value) . '</option>';
+		if ($arguments['editable']) {
+			$widgetHtml = "\n\t\t\t<select name=\"" . $this->name . "[{$arguments['name']}][]\"" . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
+			
+			# Add a null field to the selection if in multiple mode and a value is required (for single fields, null is helpful; for multiple not required, some users may not know how to de-select a field)
+			$values = (($arguments['multiple'] && $arguments['required']) ? $arguments['values'] : array ('' => $arguments['nullText']) + $arguments['values']);
+			
+			# Create the widget
+			foreach ($values as $value => $visible) {
+				$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible) . '</option>';
+			}
+			$widgetHtml .= "\n\t\t\t</select>\n\t\t";
+		} else {
+			
+			# Loop through each default argument (if any) to prepare them
+			#!# Need to double-check that $arguments['default'] isn't being changed above this point [$arguments['default'] is deliberately used here because of the $identifier system above]
+			$presentableDefaults = array ();
+			foreach ($arguments['default'] as $argument) {
+				$presentableDefaults[$argument] = $arguments['values'][$argument];
+			}
+			
+			# Set the widget HTML
+			$widgetHtml  = implode ("<span class=\"comment\">,</span>\n<br />", array_values ($presentableDefaults));
+			if (!$presentableDefaults) {
+				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
+			} else {
+				foreach ($presentableDefaults as $value => $visible) {
+					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->name . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($value) . '" />';
+				}
+			}
+			
+			# Re-assign the values back to the 'submitted' form value
+			$elementValue = array_keys ($presentableDefaults);
 		}
-		$widgetHtml .= "\n\t\t\t</select>\n\t\t";
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
-		# Get the posted data
+		# Get the posted data; there is no need to clear null submissions because it will just get ignored, not being in the values list
 		if ($this->formPosted) {
 			
 			# For the component array, loop through each defined element name and assign the boolean value for it
-			foreach ($arguments['values'] as $key => $value) {
+			foreach ($arguments['values'] as $value => $visible) {
 				#!# $submittableValues is defined above and is similar: refactor to remove these lines
-				$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
-				$data['rawcomponents'][$submittableValue] = (in_array ($submittableValue, $this->form[$arguments['name']]));
+				$data['rawcomponents'][$value] = (in_array ($value, $this->form[$arguments['name']]));
 			}
 			
 			# For the compiled version, separate the compiled items by a comma-space
 			$data['compiled'] = implode (",\n", $this->form[$arguments['name']]);
 			
 			# For the presented version, substitute the visible text version used for the actual value if necessary
-			#R# Can this be compbined with the compiled and the use of array_keys/array_values to simplify this?
-			if (!$valuesAreAssociativeArray) {
-				$data['presented'] = $data['compiled'];
-			} else {
-				
-				$chosen = array ();
-				foreach ($this->form[$arguments['name']] as $key => $value) {
-					if (isSet ($arguments['values'][$value])) {
-						$chosen[] = $arguments['values'][$value];
-					}
+			$chosen = array ();
+			foreach ($this->form[$arguments['name']] as /*$key =>*/ $value) {
+				if (isSet ($arguments['values'][$value])) {
+					$chosen[] = $arguments['values'][$value];
 				}
-				$data['presented'] = implode (",\n", $chosen);
 			}
+			$data['presented'] = implode (",\n", $chosen);
 		}
 		
 		# Add the widget to the master array for eventual processing
@@ -865,7 +908,7 @@ class form
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $required,
 			'requiredButEmpty' => $requiredButEmpty,
@@ -887,6 +930,7 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
@@ -903,6 +947,15 @@ class form
 		
 		$arguments = $widget->getArguments ();
 		
+		# If the widget is not editable, fix the form value to the default
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
+		
+		# Do a sanity-check to check that a non-editable field can succeed
+		#!# Apply to all cases?
+		if (!$arguments['editable'] && $arguments['required'] && !$arguments['default']) {
+			$this->formSetupErrors['defaultTooMany'] = "In the <strong>{$arguments['name']}</strong> element, you cannot set a non-editable field to be required but have no initial value.";
+		}
+		
 		# Register the element name to enable duplicate checking
 		$this->registerElementName ($arguments['name']);
 		
@@ -917,70 +970,77 @@ class form
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {$this->formSetupErrors['radiobuttonsNoValues'] = 'No values have been set for the set of radio buttons.';}
 		
-		# Check whether the array is an associative array
-		$valuesAreAssociativeArray = ($arguments['forceAssociative'] || application::isAssociativeArray ($arguments['values']));
-		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($arguments['values']) : array_values ($arguments['values']));
-		
-		# Ensure that the initial value, if one is set, is in the array of values
-		#!# Should the initial value being set be the 'real' or visible value when using an associative array?
-		if ((!empty ($arguments['default'])) && (!in_array ($arguments['default'], $submittableValues))) {
-			$this->formSetupErrors['defaultMissingFromValuesArray'] = "In the <strong>{$arguments['name']}</strong> element, the initial value was not found in the list of available items for selection by the user.";
+		# Ensure that there cannot be multiple initial values set if the multiple flag is off; note that the default can be specified as an array, for easy swapping with a select (which in singular mode behaves similarly)
+		$arguments['default'] = application::ensureArray ($arguments['default']);
+		if (count ($arguments['default']) > 1) {
+			$this->formSetupErrors['defaultTooMany'] = "In the <strong>{$arguments['name']}</strong> element, $totalDefaults total initial values were assigned but only one can be set as a default.";
 		}
 		
-		# Ensure that the 'null' text does not clash with any items in the array of values
-		#!# Does this matter, if the value is not submitted?
-		if (in_array ($arguments['nullText'], $arguments['values'])) {
-			$this->formSetupErrors['defaultNullClash'] = "In the <strong>{$arguments['name']}</strong> element, the null text ('{$arguments['nullText']}') clashes with one of list of available items for selection by the user. One or the other must be changed.";
+		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
+		$arguments['values'] = $this->cleanAvailableValues ($arguments['values'], $arguments['forceAssociative']);
+		
+		# Ensure that all initial values are in the array of values
+		$this->ensureDefaultsAvailable ($arguments);
+		
+		# If the field is not a required field (and therefore there is a null text field), ensure that none of the values have an empty string as the value (which is reserved for the null)
+		#!# Policy question: should empty values be allowed at all? If so, make a special constant for a null field but which doesn't have the software name included
+		if (!$arguments['required'] && in_array ('', array_keys ($arguments['values']))) {
+			$this->formSetupErrors['defaultNullClash'] = "In the <strong>{$arguments['name']}</strong> element, one value was assigned to an empty value (i.e. '').";
 		}
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
-		if (!$this->formPosted) {$elementValue = $arguments['default'];}
-		
-		# If it's not a required field, add a null field here
-		if (!$arguments['required']) {array_unshift ($arguments['values'], $arguments['nullText']);}
+		if (!$this->formPosted) {
+			foreach ($arguments['default'] as $elementValue) {}
+		}
 		
 		# Define the widget's core HTML
 		$widgetHtml = '';
-		$subwidgetIndex = 1;
-		foreach ($arguments['values'] as $key => $value) {
-			$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
-			$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
-			#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-			$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->name . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($submittableValue) . '"' . (($submittableValue == $elementValue) ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($value)) . '</label>';
+		if ($arguments['editable']) {
+			$subwidgetIndex = 1;
 			
-			# Add a line break if required
-			if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
-			$subwidgetIndex++;
+			# If it's not a required field, add a null field to the selection
+			$values = ($arguments['required'] ? $arguments['values'] : array ('' => $arguments['nullText']) + $arguments['values']);
+			
+			# Create the widget
+			foreach ($values as $value => $visible) {
+				$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
+				
+				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
+				$visible = str_replace ('†', '&dagger;', htmlentities ($visible));
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->name . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . $visible . '</label>';
+				
+				# Add a line break if required
+				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
+				$subwidgetIndex++;
+			}
+			$widgetHtml .= "\n\t\t";
+		} else {
+			
+			# Set the widget HTML if any default is given
+			if ($arguments['default']) {
+				$widgetHtml  = htmlentities ($arguments['values'][$elementValue]);
+				$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->name . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($elementValue) . '" />';
+			}
 		}
-		$widgetHtml .= "\n\t\t";
-		
-		# Clear a null submission (this must come after the HTML is defined)
-		if ($elementValue == $arguments['nullText']) {$elementValue = '';}
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
-		# Get the posted data
+		# Get the posted data; there is no need to clear null submissions because it will just get ignored, not being in the values list
 		if ($this->formPosted) {
-			
-			# Check whether the array is an associative array
-			#!# As above - refactor then remove
-			$valuesAreAssociativeArray = application::isAssociativeArray ($arguments['values']);
-			$submittableValues = ($valuesAreAssociativeArray ? array_keys ($arguments['values']) : array_values ($arguments['values']));
 			
 			# For the rawcomponents version, create an array with every defined element being assigned as itemName => boolean
 			$data['rawcomponents'] = array ();
-			foreach ($arguments['values'] as $key => $value) {
-				$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
-				$data['rawcomponents'][$submittableValue] = ($this->form[$arguments['name']] == $submittableValue);
+			foreach ($arguments['values'] as $value => $visible) {
+				$data['rawcomponents'][$value] = ($this->form[$arguments['name']] == $value);
 			}
 			
 			# Take the selected option and ensure that this is in the array of available values
 			#!# What if it's not? - This check should be moved up higher
-			$data['compiled'] = (in_array ($this->form[$arguments['name']], $submittableValues) ? $this->form[$arguments['name']] : '');
+			$data['compiled'] = (in_array ($this->form[$arguments['name']], array_keys ($arguments['values'])) ? $this->form[$arguments['name']] : '');
 			
-			# For the presented version, substitute the visible text version used for the actual value if necessary
-			$data['presented'] = (in_array ($this->form[$arguments['name']], $submittableValues) ? ($valuesAreAssociativeArray ? $arguments['values'][$this->form[$arguments['name']]] : $this->form[$arguments['name']]) : '');
+			# For the presented version, use the visible text version
+			$data['presented'] = (in_array ($this->form[$arguments['name']], array_keys ($arguments['values'])) ? $arguments['values'][$this->form[$arguments['name']]] : '');
 		}
 		
 		# Add the widget to the master array for eventual processing
@@ -989,7 +1049,7 @@ class form
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $requiredButEmpty,
@@ -1010,20 +1070,24 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
 			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
-#!# Hack!
-			'maximum'		=> 999,		# The maximum number which must be selected (defaults to 0)
+			'maximum'		=> 0,		# The maximum number which must be selected (defaults to 0, i.e. no maximum checking done)
 			'default'			=> array (),# Pre-selected item(s)
+			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 		);
 		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
 		
 		$arguments = $widget->getArguments ();
+		
+		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
+		$arguments['default'] = application::ensureArray ($arguments['default']);
 		
 		# Register the element name to enable duplicate checking
 		$this->registerElementName ($arguments['name']);
@@ -1042,76 +1106,100 @@ class form
 		
 		# Check that the given minimum required is not more than the number of checkboxes actually available
 		$totalSubItems = count ($arguments['values']);
-		if ($arguments['required'] > $totalSubItems) {$this->formSetupErrors['checkboxesMinimumMismatch'] = "The required minimum number of checkboxes (<strong>{$arguments['required']}</strong>) specified is above the number of checkboxes actually available (<strong>$totalSubItems</strong>).";}
+		if ($arguments['required'] > $totalSubItems) {$this->formSetupErrors['checkboxesMinimumMismatch'] = "In the <strong>{$arguments['name']}</strong> element, The required minimum number of checkboxes (<strong>{$arguments['required']}</strong>) specified is above the number of checkboxes actually available (<strong>$totalSubItems</strong>).";}
+		if ($arguments['maximum'] && $arguments['required'] && ($arguments['maximum'] < $arguments['required'])) {$this->formSetupErrors['checkboxesMaximumMismatch'] = "In the <strong>{$arguments['name']}</strong> element, A maximum and a minimum number of checkboxes have both been specified but this maximum (<strong>{$arguments['maximum']}</strong>) is less than the minimum (<strong>{$arguments['required']}</strong>) required.";}
 		
-		# Check whether the array is an associative array
-		$valuesAreAssociativeArray = application::isAssociativeArray ($arguments['values']);
-		$submittableValues = ($valuesAreAssociativeArray ? array_keys ($arguments['values']) : array_values ($arguments['values']));
+		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
+		$arguments['values'] = $this->cleanAvailableValues ($arguments['values'], $arguments['forceAssociative']);
 		
 		# Ensure that all initial values are in the array of values
-		$arguments['default'] = application::ensureArray ($arguments['default']);
-		foreach ($arguments['default'] as $defaultValue) {
-			if (!in_array ($defaultValue, $submittableValues)) {
-				$missingValues[] = $defaultValue;
-			}
-		}
-		if (isSet ($missingValues)) {
-			$totalMissingValues = count ($missingValues);
-			$this->formSetupErrors['defaultMissingFromValuesArray'] = "In the <strong>{$arguments['name']}</strong> element, the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
-		}
+		$this->ensureDefaultsAvailable ($arguments);
 		
 		# Start a tally to check the number of checkboxes checked
 		$checkedTally = 0;
 		
 		# Loop through each element subname and construct HTML
 		$widgetHtml = '';
-		foreach ($arguments['values'] as $key => $value) {
-			
-			# Assign the submittable value
-			$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
-			
-			# Define the element ID, which must be unique	
-			$elementId = $this->cleanId ("{$this->name}__{$arguments['name']}__{$submittableValue}");
-			
-			# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
-			if (!$this->formPosted) {
-				if (in_array ($submittableValue, $arguments['default'])) {
-					$elementValue[$submittableValue] = true;
+		if ($arguments['editable']) {
+			$subwidgetIndex = 1;
+			foreach ($arguments['values'] as $value => $visible) {
+				
+				# Define the element ID, which must be unique	
+				$elementId = $this->cleanId ("{$this->name}__{$arguments['name']}__{$value}");
+				
+				# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
+				if (!$this->formPosted) {
+					if (in_array ($value, $arguments['default'])) {
+						$elementValue[$value] = true;
+					}
 				}
+				
+				# Apply stickyness to each checkbox if necessary
+				$stickynessHtml = '';
+				if (isSet ($elementValue[$value])) {
+					if ($elementValue[$value]) {
+						$stickynessHtml = ' checked="checked"';
+						
+						# Tally the number of items checked
+						$checkedTally++;
+					}
+				} else {
+					# Ensure every element is defined (even if empty), so that the case of writing to a file doesn't go wrong
+					$elementValue[$value] = '';
+				}
+				
+				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
+				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->name . "[{$arguments['name']}][{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
+				
+				# Add a line break if required
+				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
+				$subwidgetIndex++;
+			}
+		} else {
+			
+			# Loop through each default argument (if any) to prepare them
+			#!# Need to double-check that $arguments['default'] isn't being changed above this point [$arguments['default'] is deliberately used here because of the $identifier system above]
+			$presentableDefaults = array ();
+			foreach ($arguments['default'] as $argument) {
+				$presentableDefaults[$argument] = $arguments['values'][$argument];
 			}
 			
-			# Apply stickyness to each checkbox if necessary
-			$stickynessHtml = '';
-			if (isSet ($elementValue[$submittableValue])) {
-				if ($elementValue[$submittableValue]) {
-					$stickynessHtml = ' checked="checked"';
-					
-					# Tally the number of items checked
-					$checkedTally++;
-				}
+			# Set the widget HTML
+			$widgetHtml  = implode ("<span class=\"comment\">,</span>\n<br />", array_values ($presentableDefaults));
+			if (!$presentableDefaults) {
+				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
-				# Ensure every element is defined (even if empty), so that the case of writing to a file doesn't go wrong
-				$elementValue[$submittableValue] = '';
+				foreach ($presentableDefaults as $value => $visible) {
+					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->name . "[{$arguments['name']}][{$value}]\" type=\"hidden\" value=\"true\" />";
+				}
 			}
 			
-			# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-			$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->name . "[{$arguments['name']}][{$submittableValue}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . $value . "</label><br />";
+			# Re-assign the values back to the 'submitted' form value
+			$elementValue = array ();
+			foreach ($arguments['default'] as $argument) {
+				$elementValue[$argument] = 'true';
+			}
 		}
 		
 		# Make sure the number of checkboxes given is above the $arguments['required']
 		if ($checkedTally < $arguments['required']) {
-			$elementProblems['insufficientSelected'] = "A minimum of {$arguments['required']} checkboxes are required to be selected.";
+			$elementProblems['insufficientSelected'] = "A minimum of {$arguments['required']} " . ($arguments['required'] == 1 ? 'item' : 'items') . ' must be selected';
 		}
 		
 		# Make sure the number of checkboxes given is above the maximum required
-		#!# Hacked in quickly on 041103 - needs regression testing
-		if ($checkedTally > $arguments['maximum']) {
-			$elementProblems['tooManySelected'] = "A maximum of {$arguments['maximum']} checkboxes are required to be selected.";
+		if ($arguments['maximum']) {
+			if ($checkedTally > $arguments['maximum']) {
+				$elementProblems['tooManySelected'] = "A maximum of {$arguments['maximum']} " . ($arguments['maximum'] == 1 ? 'item' : 'items') . ' can be selected';
+			}
 		}
 		
 		# Describe restrictions on the widget
-		#!# Show maximum also
-		if ($arguments['required'] > 1) {$restriction = "Minimum {$arguments['required']} items required";}
+		#!# Rewrite a more complex but clearer description, e.g. "exactly 3", "between 1 and 3 must", "at least 1", "between 0 and 3 can", etc
+		if ($arguments['required']) {$restriction[] = "A minimum of {$arguments['required']} " . ($arguments['required'] == 1 ? 'item' : 'items') . ' must be selected';}
+		if ($arguments['maximum']) {$restriction[] = "A maximum of {$arguments['maximum']} " . ($arguments['maximum'] == 1 ? 'item' : 'items') . ' can be selected';}
+		if (isSet ($restriction)) {
+			$restriction = implode (';<br />', $restriction);
+		}
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
@@ -1120,9 +1208,8 @@ class form
 		if ($this->formPosted) {
 			
 			# For the component array, create an array with every defined element being assigned as itemName => boolean; checking is done against the available values rather than the posted values to prevent offsets
-			foreach ($arguments['values'] as $key => $value) {
-				$submittableValue = ($valuesAreAssociativeArray ? $key : $value);
-				$data['rawcomponents'][$submittableValue] = ($this->form[$arguments['name']][$submittableValue] == 'true');
+			foreach ($arguments['values'] as $value => $visible) {
+				$data['rawcomponents'][$value] = ($this->form[$arguments['name']][$value] == 'true');
 			}
 			
 			# Make an array of those items checked, starting with an empty array in case none are checked
@@ -1132,8 +1219,8 @@ class form
 				if ($value) {
 					$checked[] = $key;
 					
-					# For the presented version, substitute the index name with the presented name if the array is associative
-					$checkedPresented[] = ($valuesAreAssociativeArray ? $arguments['values'][$key] : $key);
+					# For the presented version, substitute the index name with the presented name
+					$checkedPresented[] = $arguments['values'][$key];
 				}
 			}
 			
@@ -1148,7 +1235,7 @@ class form
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => false,
 			'requiredButEmpty' => false, # This is covered by $elementProblems
@@ -1169,6 +1256,7 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
@@ -1177,13 +1265,24 @@ class form
 			'default'				=> '',		# Initial value - either 'timestamp' or an SQL string
 		);
 		
+		# Load the date processing library
+		#!# Ideally this really should be higher up in the class, e.g. in the setup area
+		require_once ('datetime.php');
+		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
 		
 		$arguments = $widget->getArguments ();
 		
+		# Convert the default if using the 'timestamp' keyword; cache a copy for later use
+		$isTimestamp = ($arguments['default'] == 'timestamp');
+		if ($isTimestamp) {$arguments['default'] = date ('Y-m-d' . (($arguments['level'] == 'datetime') ? ' H:i:s' : ''));}
+		
 		# Register the element name to enable duplicate checking
 		$this->registerElementName ($arguments['name']);
+		
+		# If the widget is not editable, fix the form value to the default
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = datetime::getDateTimeArray ($arguments['default']);}
 		
 		# Obtain the value of the form submission (which may be empty)  (ensure that a full date and time array exists to prevent undefined offsets in case an incomplete set has been posted)
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ('year' => '', 'month' => '', 'day' => '', 'time' => ''));
@@ -1193,13 +1292,8 @@ class form
 		# Start a flag later used for checking whether all fields are empty against the requirement that a field should be completed
 		$requiredButEmpty = false;
 		
-		# Load the date processing library
-		require_once ('datetime.php');
-		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 		if (!$this->formPosted) {
-			# Firstly convert the timestamp keyword to a real date then assign the
-			if ($arguments['default'] == 'timestamp') {$arguments['default'] = date ('Y-m-d H:i:s');}
 			$elementValue = datetime::getDateTimeArray ($arguments['default']);
 		} else {
  			
@@ -1293,26 +1387,34 @@ class form
 		if ($arguments['level'] == 'datetime') {$restriction = 'Time can be entered flexibly';}
 		
 		# Start to define the widget's core HTML
-		#!# Add fieldsets to remaining form widgets or scrap
-		$widgetHtml = "\n\t\t\t<fieldset>";
-		
-		# Add in the time if required
-		if ($arguments['level'] == 'datetime') {
-			$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span><input name="' . $this->name . '[' . $arguments['name'] . '][time]" type="text" size="10" value="' . $elementValue['time'] . '" />';
+		if ($arguments['editable']) {
+			#!# Add fieldsets to remaining form widgets or scrap
+			$widgetHtml = "\n\t\t\t<fieldset>";
+			
+			# Add in the time if required
+			if ($arguments['level'] == 'datetime') {
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span><input name="' . $this->name . '[' . $arguments['name'] . '][time]" type="text" size="10" value="' . $elementValue['time'] . '" />';
+			}
+			
+			# Define the date, month and year input boxes; if the day or year are 0 then nothing will be displayed
+			$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . $this->name . '[' . $arguments['name'] . '][day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
+			$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
+			$widgetHtml .= "\n\t\t\t\t" . '<select name="' . $this->name . '[' . $arguments['name'] . '][month]">';
+			$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+			$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
+			foreach ($months as $monthNumber => $monthName) {
+				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="' . sprintf ('%02s', $monthNumber) . '"' . (($elementValue['month'] == sprintf ('%02s', $monthNumber)) ? ' selected="selected"' : '') . '>' . $monthName . '</option>';
+			}
+			$widgetHtml .= "\n\t\t\t\t" . '</select>';
+			$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">y:&nbsp;</span><input size="4" name="' . $this->name . '[' . $arguments['name'] . '][year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
+			$widgetHtml .= "\n\t\t\t</fieldset>";
+		} else {
+			
+			# Non-editable version
+			$widgetHtml  = ($isTimestamp ? '<span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : datetime::presentDateFromArray ($elementValue, $arguments['level']));
+			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->name . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($arguments['default']) . '" />';
 		}
 		
-		# Define the date, month and year input boxes; if the day or year are 0 then nothing will be displayed
-		$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . $this->name . '[' . $arguments['name'] . '][day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
-		$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
-		$widgetHtml .= "\n\t\t\t\t" . '<select name="' . $this->name . '[' . $arguments['name'] . '][month]">';
-		$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
-		$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
-		foreach ($months as $monthNumber => $monthName) {
-			$widgetHtml .= "\n\t\t\t\t\t" . '<option value="' . sprintf ('%02s', $monthNumber) . '"' . (($elementValue['month'] == sprintf ('%02s', $monthNumber)) ? ' selected="selected"' : '') . '>' . $monthName . '</option>';
-		}
-		$widgetHtml .= "\n\t\t\t\t" . '</select>';
-		$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">y:&nbsp;</span><input size="4" name="' . $this->name . '[' . $arguments['name'] . '][year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
-		$widgetHtml .= "\n\t\t\t</fieldset>";
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
@@ -1335,7 +1437,7 @@ class form
 				
 				# Make the presented version in english text
 				#!# date () corrupts dates after 2038; see php.net/date. Suggest not re-presenting it if year is too great.
-				$data['presented'] = (($arguments['level'] == 'datetime') ? $this->form[$arguments['name']]['time'] . ', ': '') . date ('jS F, Y', mktime (0, 0, 0, $this->form[$arguments['name']]['month'], $this->form[$arguments['name']]['day'], $this->form[$arguments['name']]['year']));
+				$data['presented'] = datetime::presentDateFromArray ($this->form[$arguments['name']], $arguments['level']);
 			}
 		}
 		
@@ -1345,7 +1447,7 @@ class form
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) ? $restriction : false),
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $requiredButEmpty,
@@ -1636,6 +1738,48 @@ class form
 	}
 	
 	
+	# Function to clean available values
+	function cleanAvailableValues ($originalValues, $forceAssociative)
+	{
+		# Determine if the values are an associative array
+		$valuesAreAssociativeArray = ($forceAssociative || application::isAssociativeArray ($originalValues));
+		
+		# If already an associative array, return the original values
+		if ($valuesAreAssociativeArray) {
+			return $originalValues;
+		}
+		
+		# If not an associative array, convert to value=>value format and return that
+		foreach ($originalValues as $value) {
+			$values[$value] = $value;
+		}
+		return $values;
+	}
+	
+	
+	# Function to ensure that all initial values are in the array of values
+	function ensureDefaultsAvailable ($arguments)
+	{
+		# Convert to an array (for this local function only) if not already
+		if (!is_array ($arguments['default'])) {
+			$arguments['default'] = application::ensureArray ($arguments['default']);
+		}
+		
+		# For an array of defaults, check through each
+		foreach ($arguments['default'] as $defaultValue) {
+			if (!in_array ($defaultValue, array_keys ($arguments['values']))) {
+				$missingValues[] = $defaultValue;
+			}
+		}
+		
+		# Construct the warning message
+		if (isSet ($missingValues)) {
+			$totalMissingValues = count ($missingValues);
+			$this->formSetupErrors['defaultMissingFromValuesArray'] = "In the <strong>{$arguments['name']}</strong> element, the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+		}
+	}
+	
+	
 	# Function to clean an HTML id attribute
 	function cleanId ($id)
 	{
@@ -1735,12 +1879,12 @@ class form
 		
 		# Show configured form elements
 		echo "\n\n" . '<h3 id="configured">Configured form elements - $this->elements :</h3>';
-		application::dumpData ($this->elements);
+		$this->dumpData ($this->elements);
 		
 		# Show submitted form elements, if the form has been submitted
 		if ($this->formPosted) {
 			echo "\n\n" . '<h3 id="submitted">Submitted form elements - $this->form :</h3>';
-			application::dumpData ($this->form);
+			$this->dumpData ($this->form);
 		}
 		
 		# End the debugging HTML
@@ -2134,7 +2278,7 @@ class form
 		if (empty ($this->elements)) {$this->formSetupErrors['formEmpty'] = 'No form elements have been defined (i.e. the form is empty).';}
 		
 		# If there are any duplicated keys, list each duplicated key in bold with a comma between (but not after) each
-		if (!empty ($this->duplicatedelementNames)) {$this->formSetupErrors['duplicatedelementNames'] = 'The following field ' . (count (array_unique ($this->duplicatedelementNames)) == 1 ? 'name has' : 'names have been') . ' been duplicated in the form setup: <strong>' . implode ('</strong>, <strong>', array_unique ($this->duplicatedelementNames)) .  '</strong>.';}
+		if (!empty ($this->duplicatedElementNames)) {$this->formSetupErrors['duplicatedElementNames'] = 'The following field ' . (count (array_unique ($this->duplicatedElementNames)) == 1 ? 'name has' : 'names have been') . ' been duplicated in the form setup: <strong>' . implode ('</strong>, <strong>', array_unique ($this->duplicatedElementNames)) .  '</strong>.';}
 		
 		# Validate the output format syntax items, looping through each and adding it to an array of items if an mispelt/unsupported item is found
 		#!# Move this into a new widget object's constructor
@@ -2317,7 +2461,7 @@ class form
 	function registerElementName ($name)
 	{
 		# Add the name to the list of duplicated element names if it is already set
-		if (isSet ($this->elements[$name])) {$this->duplicatedelementNames[] = $name;}
+		if (isSet ($this->elements[$name])) {$this->duplicatedElementNames[] = $name;}
 	}
 	
 	
@@ -2962,8 +3106,39 @@ class form
 	 */
 	function outputDataProcessing ($presentedData)
 	{
+		# Escape the output if necessary
+		if ($this->settings['escapeOutput']) {
+			
+			# Set the default escaping type to '
+			if ($this->settings['escapeOutput'] === true) {
+				$this->settings['escapeOutput'] = $this->escapeCharacter;
+			}
+			
+			# Loop through the data, whether scalar or one-level array
+			$presentedData = $this->escapeOutputIterative ($presentedData, $this->settings['escapeOutput']);
+		}
+		
 		# Return the raw, uncompiled data
 		return $presentedData;
+	}
+	
+	
+	# Function to perform escaping iteratively
+	function escapeOutputIterative ($data, $character)
+	{
+		# For a scalar, return the escaped value
+		if (!is_array ($data)) {
+			$data = str_replace ($character, '\\' . $character, $data);
+		} else {
+			
+			# For an array value, iterate instead
+			foreach ($data as $key => $value) {
+				$data[$key] = $this->escapeOutputIterative ($value, $character);
+			}
+		}
+		
+		# Finally, return the escaped data structure
+		return $data;
 	}
 	
 	
@@ -2988,25 +3163,13 @@ class form
 			# Remove empty elements from display
 			if (empty ($data) && !$this->configureResultScreenShowUnsubmitted) {continue;}
 			
-			/*
-			# For associative select types, substitute the submitted value with the the visible value
-			#!# PATCHED IN 041201; This needs to be applied to other select types and to dealt with generically in the processing stage; also, should this be made configurable, or is it assumed that the visible version is always wanted for the confirmation screen?; also what about forceAssociative?
-			if ($this->elements[$name]['type'] == 'select' || $this->elements[$name]['type'] == 'radiobuttons') {
-				if (application::isAssociativeArray ($this->elements[$name]['values'])) {
-					foreach ($this->form[$name] as $key => $value) {
-						$data[$key] = $this->form[$name]['values'][$data[$key]];
-					}
-				}
-			}
-			*/
-			
 			# If the data is an array, convert the data to a printable representation of the array
 			if (is_array ($data)) {$data = application::printArray ($data);}
 			
 			# Compile the HTML
 			$html .= "\n\t<tr>";
 			$html .= "\n\t\t" . '<td class="key">' . (isSet ($this->elements[$name]['title']) ? $this->elements[$name]['title'] : $name) . ':</td>';
-			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? '(No data submitted)' : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data))) . '</td>';
+			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data))) . '</td>';
 			$html .= "\n\t</tr>";
 		}
 		$html .= "\n" . '</table>';
@@ -3014,8 +3177,6 @@ class form
 		# Show the constructed HTML
 		echo $html;
 	}
-	
-	
 	
 	
 	
@@ -3317,9 +3478,6 @@ class formWidget
 	# Function to merge the arguments
 	function assignArguments ($suppliedArguments, $argumentDefaults, $functionName, $subargument = NULL)
 	{
-		# Apply API argument backwards compatibility
-		/* $suppliedArguments = $this->apiFix ($suppliedArguments); */
-		
 		# Merge the defaults: ensure that arguments with a non-null default value are set (throwing an error if not), or assign the default value if none is specified
 		foreach ($argumentDefaults as $argument => $defaultValue) {
 			if (is_null ($defaultValue)) {
@@ -3354,26 +3512,6 @@ class formWidget
 		# Return the arguments
 		return $arguments;
 	}
-	
-	
-	/*
-	# Function to fix arguments under the old API
-	function apiFix ($arguments)
-	{
-		# Loop through the compatibility fixes
-		foreach ($this->apiFix as $old => $new) {
-			
-			# Replace the old argument with the new if found
-			if (isSet ($arguments[$old])) {
-				$arguments[$new] = $arguments[$old];
-				unset ($arguments[$old]);
-			}
-		}
-		
-		# Return the fixed arguments
-		return $arguments;
-	}
-	*/
 	
 	
 	/**
@@ -3448,8 +3586,8 @@ class formWidget
 	# Perform regexp checks
 	function regexpCheck ()
 	{
-		# End if the form is empty
-		if (!$this->value) {return;}
+		# End if the form is empty; strlen is used rather than a boolean check, as a submission of the string '0' will otherwise fail this check incorrectly
+		if (strlen ($this->value) == 0) {return;}
 		
 		# Regexp checks (for non-e-mail types)
 		if ($this->arguments['regexp'] && ($this->functionName != 'email')) {
@@ -3470,7 +3608,7 @@ class formWidget
 	# Function to determine if a widget is required but empty
 	function requiredButEmpty ()
 	{
-		return (($this->arguments['required']) && (!$this->value));
+		return (($this->arguments['required']) && (strlen ($this->value) == 0));
 	}
 }
 
@@ -3485,7 +3623,7 @@ class formWidget
 #!# Ideally add a catch to prevent the same text appearing twice in the errors box (e.g. two widgets with "details" as the descriptive text)
 #!# Throw a 'fake input' error if the number of files uploaded is greater than the number of form elements
 #!# Convert the e-mail widget type to be a stub with a regexp on the normal input type
-#!# Enable maximums as well as the existing minimums
+#!# Enable maximums to other fields
 #!# Complete the restriction notices
 #!# Add a CSS class to each type of widget so that more detailed styling can be applied
 #!# Enable locales, e.g. ordering month-date-year for US users
@@ -3494,7 +3632,7 @@ class formWidget
 #!# Add standalone database-writing
 #!# Apache setup needs to be carefully tested, in conjunction with php.net/ini-set and php.net/configuration.changes
 #!# Add links to the id="$name" form elements in cases of USER errors (not for the templating mode though)
-#!# Need to prevent the form code itself being overwritable by uploads... (is that possible to ensure?)
+#!# Need to prevent the form code itself being overwritable by uploads... by doing a check on the filenames
 #!# Add POST security for hidden fields - do this by ignoring the posted data (submitting to external can't be dealt with)
 #!# Not all $widgetHtml declarations have an id="" given (make sure it is $this>cleanId'd though)
 #!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/
@@ -3512,6 +3650,8 @@ class formWidget
 #!# Add AJAX validation flag See: http://particletree.com/features/smart-validation-with-ajax (but modified version needed because this doesn't use Unobtrusive DHTML)
 #!# Self-creating
 #!# Postponed files system
+
+# Enable specification of a validation function
 
 
 ?>

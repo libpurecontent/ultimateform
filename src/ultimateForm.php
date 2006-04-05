@@ -48,8 +48,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
- * @copyright Copyright © 2003-5, Martin Lucas-Smith, University of Cambridge
- * @version 0.99b8
+ * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
+ * @version 1.0.0
  */
 class form
 {
@@ -71,7 +71,7 @@ class form
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
 	var $formDisplayed = false;					// Flag for whether the form has been displayed
-	var $formSetupOk = false;					// Flag for whether the form has been set up OK
+	var $setupOk = false;					// Flag for whether the form has been set up OK
 	var $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
@@ -89,55 +89,58 @@ class form
 	var $configureResultConfirmationEmailShowUnsubmitted;		// Whether, in e-mail confirmation results mode, unsubmitted widgets that are not required will be listed
 	
 	# Supported output types
-	var $supportedTypes = array ('file', 'email', 'confirmationEmail', 'screen', 'processing');
+	var $supportedTypes = array ('file', 'email', 'confirmationEmail', 'screen', 'processing', 'database');
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
 	var $timestamp;
 	var $minimumPhpVersion = 4.3;	// md5_file requires 4.2+; file_get_contents is 4.3+
-	var $escapeCharacter = "'";		// Character used for escaping of output
+	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
 	
 	# Specify available arguments as defaults or as NULL (to represent a required argument)
 	var $argumentDefaults = array (
-		'name'							=> 'form',									# Name of the form
-		'div'							=> 'ultimateform',							# The value of <div class=""> which surrounds the entire output (or false for none)
-		'displayPresentationMatrix'		=> false,									# Whether to show the presentation defaults
-		'displayTitles'					=> true,									# Whether to show user-supplied titles for each widget
-		'displayDescriptions'			=> true,									# Whether to show user-supplied descriptions for each widget
-		'displayRestrictions'			=> true,									# Whether to show/hide restriction guidelines
-		'display'						=> 'tables',								# Whether to display the form using 'tables', 'css' (CSS layout) 'paragraphs' or 'template'
-		'displayTemplate'				=> '',										# Either a filename or a (long) string containing placemarkers
-		'displayTemplatePatternWidget'	=> '{%element}',							# The pattern used for signifying element name widget positions when templating
-		'displayTemplatePatternLabel'	=> '{[%element]}',							# The pattern used for signifying element name label positions (optional) when templating
-		'displayTemplatePatternSpecial'	=> '{[[%element]]}',						# The pattern used for signifying element name special item positions (e.g. submit, reset, problems) when templating
-		'debug'							=> false,									# Whether to switch on debugging
-		'developmentEnvironment'		=> false,									# Whether to run in development mode
-		'displayColons'					=> true,									# Whether to show colons after the initial description
-		'whiteSpaceTrimSurrounding'		=> true,									# Whether to trim surrounding white space in any forms which are submitted
-		'whiteSpaceCheatAllowed'		=> false,									# Whether to allow people to cheat submitting whitespace only in required fields
-		'formCompleteText'				=> 'Many thanks for your input.',			# The form completion text
-		'displayFormCompleteText'		=> true,									# Whether to show the form complete text when completed
-		'submitButtonAtEnd'				=> true,									# Whether the submit button appears at the end or the start of the form
-		'submitButtonText'				=> 'Submit!',								# The form submit button text
-		'submitButtonAccesskey'			=> 's',										# The form submit button accesskey
-		'submitButtonImage'				=> false,									# Location of an image to replace the form submit button
-		'resetButton'					=> false,									# Whether the reset button is visible (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
-		'resetButtonText'				=> 'Clear changes',							# The form reset button
-		'resetButtonAccesskey'			=> 'r',										# The form reset button accesskey
-		'warningMessage'				=> false,									# The form incompletion message (a specialised default is used)
-		'requiredFieldIndicator'		=> true,									# Whether the required field indicator is to be displayed (top / bottom/true / false) (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
-		'submitTo'						=> false,									# The form processing location if being overriden
-		'autoCenturyConversionEnabled'	=> true,									# Whether years entered as two digits should automatically be converted to four
-		'autoCenturyConversionLastYear'	=> 69,										# The last two figures of the last year where '20' is automatically prepended
-		'nullText'						=> 'Please select',							# The 'null' text for e.g. selection boxes
-		'opening'						=> false,									# Optional starting datetime as an SQL string
-		'closing'						=> false,									# Optional closing datetime as an SQL string
-		'validUsers'					=> false,									# Optional valid user(s) - if this is set, a user will be required. To set, specify string/array of valid user(s), or '*' to require any user
-		'user'							=> false,									# Explicitly-supplied username (if none specified, will check for REMOTE_USER being set
-		'userKey'						=> false,									# Whether to log the username, as the key
-		'loggedUserUnique'				=> false,									# Run in user-uniqueness mode, making the key of any CSV the username and checking for resubmissions
-		'timestamping'					=> false,									# Add a timestamp to any CSV entry
-		'escapeOutput'					=> false,									# Whether to escape output in the processing output ONLY (will not affect other types) - either true (defaults to ') or the string to escape
+		'name'								=> 'form',							# Name of the form
+		'div'								=> 'ultimateform',					# The value of <div class=""> which surrounds the entire output (or false for none)
+		'displayPresentationMatrix'			=> false,							# Whether to show the presentation defaults
+		'displayTitles'						=> true,							# Whether to show user-supplied titles for each widget
+		'displayDescriptions'				=> true,							# Whether to show user-supplied descriptions for each widget
+		'displayRestrictions'				=> true,							# Whether to show/hide restriction guidelines
+		'display'							=> 'tables',						# Whether to display the form using 'tables', 'css' (CSS layout) 'paragraphs' or 'template'
+		'displayTemplate'					=> '',								# Either a filename or a (long) string containing placemarkers
+		'displayTemplatePatternWidget'		=> '{%element}',					# The pattern used for signifying element name widget positions when templating
+		'displayTemplatePatternLabel'		=> '{[%element]}',					# The pattern used for signifying element name label positions (optional) when templating
+		'displayTemplatePatternSpecial'		=> '{[[%element]]}',				# The pattern used for signifying element name special item positions (e.g. submit, reset, problems) when templating
+		'debug'								=> false,							# Whether to switch on debugging
+		'developmentEnvironment'			=> false,							# Whether to run in development mode
+		'displayColons'						=> true,							# Whether to show colons after the initial description
+		'whiteSpaceTrimSurrounding'			=> true,							# Whether to trim surrounding white space in any forms which are submitted
+		'whiteSpaceCheatAllowed'			=> false,							# Whether to allow people to cheat submitting whitespace only in required fields
+		'formCompleteText'					=> 'Many thanks for your input.',	# The form completion text (or false if not to display it at all)
+		'submitButtonAtEnd'					=> true,							# Whether the submit button appears at the end or the start of the form
+		'submitButtonText'					=> 'Submit!',						# The form submit button text
+		'submitButtonAccesskey'				=> 's',								# The form submit button accesskey
+		'submitButtonImage'					=> false,							# Location of an image to replace the form submit button
+		'resetButton'						=> false,							# Whether the reset button is visible (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
+		'resetButtonText'					=> 'Clear changes',					# The form reset button
+		'resetButtonAccesskey'				=> 'r',								# The form reset button accesskey
+		'warningMessage'					=> false,							# The form incompletion message (a specialised default is used)
+		'requiredFieldIndicator'			=> true,							# Whether the required field indicator is to be displayed (top / bottom/true / false) (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
+		'requiredFieldClass'				=> 'required',						# The CSS class used to mark a widget as required
+		'submitTo'							=> false,							# The form processing location if being overriden
+		'autoCenturyConversionEnabled'		=> true,							# Whether years entered as two digits should automatically be converted to four
+		'autoCenturyConversionLastYear'		=> 69,								# The last two figures of the last year where '20' is automatically prepended
+		'nullText'							=> 'Please select',					# The 'null' text for e.g. selection boxes
+		'opening'							=> false,							# Optional starting datetime as an SQL string
+		'closing'							=> false,							# Optional closing datetime as an SQL string
+		'validUsers'						=> false,							# Optional valid user(s) - if this is set, a user will be required. To set, specify string/array of valid user(s), or '*' to require any user
+		'user'								=> false,							# Explicitly-supplied username (if none specified, will check for REMOTE_USER being set
+		'userKey'							=> false,							# Whether to log the username, as the key
+		'loggedUserUnique'					=> false,							# Run in user-uniqueness mode, making the key of any CSV the username and checking for resubmissions
+		'timestamping'						=> false,							# Add a timestamp to any CSV entry
+		'escapeOutput'						=> false,							# Whether to escape output in the processing output ONLY (will not affect other types)
+		'emailIntroductoryText'				=> '',								# Introductory text for e-mail output type
+		'confirmationEmailIntroductoryText'	=> '',								# Introductory text for confirmation e-mail output type
+		'callback'							=> false,							# Callback function (string name) (NB cannot be $this->methodname) with one integer parameter, so be called just before emitting form HTML - -1 is errors on form, 0 is blank form, 1 is result presentation if any (not called at all if form not displayed)
 	);
 	
 	
@@ -160,7 +163,7 @@ class form
 			$this->settings[$argument] = (isSet ($suppliedArguments[$argument]) ? $suppliedArguments[$argument] : $defaultValue);
 		}
 		
-		# Define the submission location (as _SERVER cannot be set in a class variable declaration)
+		# Define the submission location (as _SERVER cannot be set in a class variable declaration); PATH_INFO attacks (see: http://forum.hardened-php.net/viewtopic.php?id=20 ) are not relevant here for this form usage
 		if ($this->settings['submitTo'] === false) {$this->settings['submitTo'] = $_SERVER['REQUEST_URI'];}
 		
 		# Ensure the userlist is an array, whether empty or otherwise
@@ -169,17 +172,17 @@ class form
 		# If no user is supplied, attempt to obtain the REMOTE_USER (if one exists) as the default
 		if (!$this->settings['user']) {$this->settings['user'] = (isSet ($_SERVER['REMOTE_USER']) ? $_SERVER['REMOTE_USER'] : false);}
 		
+		# If there are files posted, merge the multi-part posting of files to the main form array, effectively emulating the structure of a standard form input type
+		if (!empty ($_FILES[$this->settings['name']])) {$this->mergeFilesIntoPost ();}
+		
 		# Assign whether the form has been posted or not
-		$this->formPosted = (isSet ($_POST[$this->settings['name']]) || isSet ($_FILES[$this->settings['name']]));
+		$this->formPosted = (isSet ($_POST[$this->settings['name']]));
 		
 		# Add in the hidden security fields if required, having verified username existence if relevant; these need to go at the start so that any username is set as the key
 		$this->addHiddenSecurityFields ();
 		
 		# Import the posted data if the form is posted; this has to be done initially otherwise the input widgets won't have anything to reference
 		if ($this->formPosted) {$this->form = $_POST[$this->settings['name']];}
-		
-		# If there are files posted, merge the multi-part posting of files to the main form array, effectively emulating the structure of a standard form input type
-		if (!empty ($_FILES[$this->settings['name']])) {$this->mergeFilesIntoPost ();}
 	}
 	
 	
@@ -248,11 +251,11 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 		} else {
-			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']]));
+			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlspecialchars ($this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Get the posted data
@@ -278,6 +281,7 @@ class form
 			'suitableAsEmailTarget' => ($functionName == 'email'),
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			'datatype' => "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -406,10 +410,10 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea name="' . $this->settings['name'] . "[{$arguments['name']}]\" id=\"" . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea name="' . $this->settings['name'] . "[{$arguments['name']}]\" id=\"" . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\">" . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
-			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']])));
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlspecialchars ($this->form[$arguments['name']])));
+			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Get the posted data
@@ -453,12 +457,13 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			'datatype' => "`{$arguments['name']}` " . 'BLOB' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
 	
 	/**
-	 * Create a rich text editor field based on FCKeditor 2.1.1
+	 * Create a rich text editor field based on FCKeditor 2.2
 	 * @param array $arguments Supplied arguments - see template
 	 */
 	 
@@ -466,7 +471,7 @@ class form
 	
 	# Note: make sure php_value file_uploads is on in the upload location!
 	
-	The following source code alterations must be made to FCKeditor 2.1.1
+	The following source code alterations must be made to FCKeditor 2.2
 	
 	1. Customised configurations which cannot go in the PHP at present
 	Add the supplied file /_fckeditor/fckconfig-customised.js
@@ -475,23 +480,23 @@ class form
 	// Prevent left-right scrollbars
 	FCKConfig.DocType = '' ;
 	
-	3. Open /_fckeditor/editor/filemanager/browser/default/connectors/php/config.php and change:
+	3. Open editor/filemanager/browser/default/connectors/php/config.php and change:
 	$Config['Enabled'] = true ;
 	$Config['UserFilesPath'] = '/' ;
 	$Config['UserFilesAbsolutePath'] = $_SERVER['DOCUMENT_ROOT'];
 	
-	4. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of GetUrlFromPath() and ServerMapFolder() the lines:
+	4. In editor/filemanager/browser/default/connectors/php/io.php: add at the start of GetUrlFromPath() and ServerMapFolder() the lines:
 	#MLS# Don't differentiate locations based on the resource type
 	$resourceType = '';
 	
-	5. In /_fckeditor/editor/filemanager/browser/default/connectors/php/io.php: add at the start of CreateServerFolder() the line: - see http://sourceforge.net/tracker/index.php?func=detail&aid=1386086&group_id=75348&atid=543655 for official patch request
+	5. In editor/filemanager/browser/default/connectors/php/io.php: add at the start of CreateServerFolder() the line: - see http://sourceforge.net/tracker/index.php?func=detail&aid=1386086&group_id=75348&atid=543655 for official patch request
 	#MLS# Ensure the folder path has no double-slashes, or mkdir may fail on certain platforms
 	while (strpos ($folderPath, '//') !== false) {$folderPath = str_replace ('//', '/', $folderPath);}
 	
 	
-	The following are experienced deficiencies in FCKeditor 2.1.1
+	The following are experienced deficiencies in FCKeditor 2.2:
 	- Auto-hyperlinking doesn't work in Firefox	http://sourceforge.net/tracker/index.php?func=detail&aid=1314815&group_id=75348&atid=543653
-	- Format box doesn't update to current item (IE6)	http://sourceforge.net/tracker/index.php?func=detail&aid=1187220&group_id=75348&atid=543653
+	- Minor problem: In a 'normal' paragraph, format box doesn't update to normal, but headings work fine
 	- CSS underlining inheritance seems wrong in Firefox See: http://sourceforge.net/tracker/?group_id=75348&atid=543653&func=detail&aid=1230485 and https://bugzilla.mozilla.org/show_bug.cgi?id=300358
 	- API deficiency: DocType = '' See: https://sourceforge.net/tracker/index.php?func=detail&aid=1386094&group_id=75348&atid=543653
 	- API deficiency: FormatIndentator = "\t"
@@ -568,8 +573,8 @@ class form
 		
 		$elementValue = $widget->getValue ();
 		
-		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
-		if (!$this->formPosted) {$elementValue = $arguments['default'];}
+		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid), or clean it if posted
+		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments));
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
@@ -586,7 +591,7 @@ class form
 			$widgetHtml = $editor->CreateHtml ();
 		} else {
 			$widgetHtml = $this->form[$arguments['name']];
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -595,8 +600,8 @@ class form
 		# Get the posted data
 		if ($this->formPosted) {
 			
-			# Clean the HTML
-			$data['presented'] = $this->richtextClean ($this->form[$arguments['name']], $arguments);
+			# Get the data
+			$data['presented'] = $elementValue;
 		}
 		
 		# Add the widget to the master array for eventual processing
@@ -612,6 +617,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			'datatype' => "`{$arguments['name']}` " . 'BLOB' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -665,9 +671,11 @@ class form
 		$replacements += array (
 			'<\?xml:namespace([^>]*)>' => '',	// Remove Word XML namespace tags
 			'<o:p> </o:p>'	=> '',	// WordHTML characters
-			"</?span([^>]*)>"	=> '',	// Remove spans
+			'<span>([^<]*)</span>' => '<TEMP2span>\\1</TEMP2span>',	// Protect FIR-style spans
+			"</?span([^>]*)>"	=> '',	// Remove other spans
 			'[[:space:]]*<h([1-6]{1})([^>]*)>[[:space:]]</h([1-6]{1})>[[:space:]]*' => '',	// Headings containing only whitespace
 			'<h([2-6]+)'	=> "\n<h\\1",	// Line breaks before headings 2-6
+			'<br /></h([1-6]+)>'	=> "</h\\1>",	// Pointless line breaks just before a heading closing tag
 			'</h([1-6]+)>'	=> "</h\\1>\n",	// Line breaks after all headings
 			"<(li|tr|/tr|tbody|/tbody)"	=> "\t<\\1",	// Indent level-two tags
 			"<td"	=> "\t\t<td",	// Double-indent level-three tags
@@ -678,7 +686,8 @@ class form
 		# Obfuscate e-mail addresses
 		if ($arguments['protectEmailAddresses']) {
 			$replacements += array (
-				'<TEMPspan>@</TEMPspan>' => '<span>@</span>',
+				'<TEMPspan>@</TEMPspan>' => '<span>&#64;</span>',
+				'<TEMP2span>([^<]*)</TEMP2span>' => '<span>\\1</span>',	// Replace FIR-style spans back
 				'<a href="([^@]*)@([^"]*)">' => '<a href="mailto:\1@\2">',	// Initially catch badly formed HTML versions that miss out mailto: (step 1)
 				'<a href="mailto:mailto:' => '<a href="mailto:',	// Initially catch badly formed HTML versions that miss out mailto: (step 2)
 				'<a href="mailto:([^@]*)@([^"]*)">([^@]*)@([^"]*)</a>' => '\3<span>&#64;</span>\4',
@@ -753,6 +762,15 @@ class form
 		
 		$elementValue = $widget->getValue ();
 		
+		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
+		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		
+		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
+		if (application::isMultidimensionalArray ($arguments['values'])) {
+			$arguments['_valuesMultidimensional'] = $arguments['values'];
+			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
+		}
+		
 		# Check that the array of values is not empty
 		#!# Only run other checks below if this error isn't thrown
 		if (empty ($arguments['values'])) {$this->formSetupErrors['selectNoValues'] = 'No values have been set as selection items.';}
@@ -769,9 +787,6 @@ class form
 		if ((!$arguments['multiple']) && ($totalDefaults > 1)) {
 			$this->formSetupErrors['defaultTooMany'] = "In the <strong>{$arguments['name']}</strong> element, $totalDefaults total initial values were assigned but the form has been set up to allow only one item to be selected by the user.";
 		}
-		
-		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
-		$arguments['values'] = $this->cleanAvailableValues ($arguments['values'], $arguments['forceAssociative']);
 		
 		# Perform substitution of the special syntax to set the value of a URL-supplied GET value as the initial value; if the supplied item is not present, ignore it; otherwise replace the default(s) array with the single selected item; this can only be applied once
 		#!# Apply this to checkboxes and radio buttons also
@@ -822,14 +837,36 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = "\n\t\t\t<select name=\"" . $this->settings['name'] . "[{$arguments['name']}][]\"" . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
 			
 			# Add a null field to the selection if in multiple mode and a value is required (for single fields, null is helpful; for multiple not required, some users may not know how to de-select a field)
-			$values = (($arguments['multiple'] && $arguments['required']) ? $arguments['values'] : array ('' => $arguments['nullText']) + $arguments['values']);
+			#!# Creates error if formSetupErrors['selectNoValues'] thrown - shouldn't be getting this far
+			if (!$arguments['multiple'] || !$arguments['required']) {
+				$arguments['values'] = array ('' => $arguments['nullText']) + $arguments['values'];
+				if (isSet ($arguments['_valuesMultidimensional'])) {
+					$arguments['_valuesMultidimensional'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
+				}
+			}
 			
-			# Create the widget
-			foreach ($values as $value => $visible) {
-				$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible) . '</option>';
+			# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
+			$widgetHtml = "\n\t\t\t<select name=\"" . $this->settings['name'] . "[{$arguments['name']}][]\"" . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
+			if (!isSet ($arguments['_valuesMultidimensional'])) {
+				foreach ($arguments['values'] as $value => $visible) {
+					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlspecialchars ($visible) . '</option>';
+				}
+			} else {
+				
+				# Multidimensional version, which adds optgroup labels
+				foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
+					if (is_array ($mainValue)) {
+						$widgetHtml .= "\n\t\t\t\t\t<optgroup label=\"$key\">";
+						foreach ($mainValue as $value => $visible) {
+							$widgetHtml .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlspecialchars ($visible) . '</option>';
+						}
+						$widgetHtml .= "\n\t\t\t\t\t</optgroup>";
+					} else {
+						$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . (in_array ($key, $elementValue) ? ' selected="selected"' : '') . '>' . htmlspecialchars ($mainValue) . '</option>';
+					}
+				}
 			}
 			$widgetHtml .= "\n\t\t\t</select>\n\t\t";
 		} else {
@@ -847,7 +884,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlspecialchars ($value) . '" />';
 				}
 			}
 			
@@ -880,6 +917,11 @@ class form
 			$data['presented'] = implode (",\n", $chosen);
 		}
 		
+		# Compile the datatype
+		foreach ($arguments['values'] as $key => $value) {
+			$datatype[] = str_replace ("'", "\'", $key);
+		}
+		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
@@ -895,6 +937,7 @@ class form
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'multiple' => $arguments['multiple'],
+			'datatype' => "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')" . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -942,6 +985,17 @@ class form
 		
 		$elementValue = $widget->getValue ();
 		
+		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
+		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		
+		/* #!# Enable when implementing fieldset grouping
+		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
+		if (application::isMultidimensionalArray ($arguments['values'])) {
+			$arguments['_valuesMultidimensional'] = $arguments['values'];
+			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
+		}
+		*/
+		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {$this->formSetupErrors['radiobuttonsNoValues'] = 'No values have been set for the set of radio buttons.';}
 		
@@ -950,9 +1004,6 @@ class form
 		if (count ($arguments['default']) > 1) {
 			$this->formSetupErrors['defaultTooMany'] = "In the <strong>{$arguments['name']}</strong> element, $totalDefaults total initial values were assigned but only one can be set as a default.";
 		}
-		
-		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
-		$arguments['values'] = $this->cleanAvailableValues ($arguments['values'], $arguments['forceAssociative']);
 		
 		# Ensure that all initial values are in the array of values
 		$this->ensureDefaultsAvailable ($arguments);
@@ -974,15 +1025,23 @@ class form
 			$subwidgetIndex = 1;
 			
 			# If it's not a required field, add a null field to the selection
-			$values = ($arguments['required'] ? $arguments['values'] : array ('' => $arguments['nullText']) + $arguments['values']);
+			if (!$arguments['required']) {
+				$arguments['values'] = array ('' => $arguments['nullText']) + $arguments['values'];
+				/* #!# Enable when implementing fieldset grouping
+				if (isSet ($arguments['_valuesMultidimensional'])) {
+					$arguments['_valuesMultidimensional'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
+				}
+				*/
+			}
 			
 			# Create the widget
-			foreach ($values as $value => $visible) {
+			/* #!# Write branching code around here which uses _valuesMultidimensional, when implementing fieldset grouping */
+			foreach ($arguments['values'] as $value => $visible) {
 				$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$visible = str_replace ('†', '&dagger;', htmlentities ($visible));
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->settings['name'] . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . $visible . '</label>';
+				#$visible = str_replace ('†', '&dagger;', htmlspecialchars ($visible));
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->settings['name'] . "[{$arguments['name']}]\"" . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -993,8 +1052,8 @@ class form
 			
 			# Set the widget HTML if any default is given
 			if ($arguments['default']) {
-				$widgetHtml  = htmlentities ($arguments['values'][$elementValue]);
-				$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($elementValue) . '" />';
+				$widgetHtml  = htmlspecialchars ($arguments['values'][$elementValue]);
+				$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlspecialchars ($elementValue) . '" />';
 			}
 		}
 		
@@ -1018,6 +1077,11 @@ class form
 			$data['presented'] = (in_array ($this->form[$arguments['name']], array_keys ($arguments['values'])) ? $arguments['values'][$this->form[$arguments['name']]] : '');
 		}
 		
+		# Compile the datatype
+		foreach ($arguments['values'] as $key => $value) {
+			$datatype[] = str_replace ("'", "\'", $key);
+		}
+		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
@@ -1032,6 +1096,7 @@ class form
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
+			'datatype' => "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')" . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -1070,6 +1135,17 @@ class form
 		
 		$elementValue = $widget->getValue ();
 		
+		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
+		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		
+		/* #!# Enable when implementing fieldset grouping
+		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
+		if (application::isMultidimensionalArray ($arguments['values'])) {
+			$arguments['_valuesMultidimensional'] = $arguments['values'];
+			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
+		}
+		*/
+		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {$this->formSetupErrors['checkboxesNoValues'] = 'No values have been set for the set of checkboxes.';}
 		
@@ -1077,9 +1153,6 @@ class form
 		$totalSubItems = count ($arguments['values']);
 		if ($arguments['required'] > $totalSubItems) {$this->formSetupErrors['checkboxesMinimumMismatch'] = "In the <strong>{$arguments['name']}</strong> element, The required minimum number of checkboxes (<strong>{$arguments['required']}</strong>) specified is above the number of checkboxes actually available (<strong>$totalSubItems</strong>).";}
 		if ($arguments['maximum'] && $arguments['required'] && ($arguments['maximum'] < $arguments['required'])) {$this->formSetupErrors['checkboxesMaximumMismatch'] = "In the <strong>{$arguments['name']}</strong> element, A maximum and a minimum number of checkboxes have both been specified but this maximum (<strong>{$arguments['maximum']}</strong>) is less than the minimum (<strong>{$arguments['required']}</strong>) required.";}
-		
-		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
-		$arguments['values'] = $this->cleanAvailableValues ($arguments['values'], $arguments['forceAssociative']);
 		
 		# Ensure that all initial values are in the array of values
 		$this->ensureDefaultsAvailable ($arguments);
@@ -1090,6 +1163,7 @@ class form
 		# Loop through each element subname and construct HTML
 		$widgetHtml = '';
 		if ($arguments['editable']) {
+			/* #!# Write branching code around here which uses _valuesMultidimensional, when implementing fieldset grouping */
 			$subwidgetIndex = 1;
 			foreach ($arguments['values'] as $value => $visible) {
 				
@@ -1118,7 +1192,7 @@ class form
 				}
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->settings['name'] . "[{$arguments['name']}][{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->settings['name'] . "[{$arguments['name']}][{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1198,6 +1272,13 @@ class form
 			$data['presented'] = implode (",\n", $checkedPresented);
 		}
 		
+		# Compile the datatype
+		foreach ($arguments['values'] as $key => $value) {
+			#!# NOT NULL handling needs to be inserted
+			$checkboxDatatypes[] = "`" . /* $arguments['name'] . '-' . */ str_replace ("'", "\'", $key) . "` " . "ENUM ('true', 'false')" . " COMMENT '" . (addslashes ($arguments['title'])) . "'";
+		}
+		$datatype = implode (",\n", $checkboxDatatypes);
+		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
@@ -1213,6 +1294,8 @@ class form
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
+			#!# Not correct - needs multisplit into boolean
+			'datatype' => $datatype,
 		);
 	}
 	
@@ -1378,8 +1461,8 @@ class form
 		} else {
 			
 			# Non-editable version
-			$widgetHtml  = ($isTimestamp ? '<span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : datetime::presentDateFromArray ($elementValue, $arguments['level']));
-			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($arguments['default']) . '" />';
+			$widgetHtml  = datetime::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : '');
+			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($arguments['default']) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -1421,6 +1504,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			'datatype' => "`{$arguments['name']}` " . strtoupper ($arguments['level']) . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -1438,7 +1522,7 @@ class form
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
-			'uploadDirectory'		=> NULL,	# Path to the file; any format acceptable
+			'directory'				=> NULL,	# Path to the file; any format acceptable
 			'subfields'				=> 1,		# The number of widgets within the widget set (i.e. available file slots)
 			'required'				=> 0,		# The minimum number which must be selected (defaults to 0)
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
@@ -1488,9 +1572,15 @@ class form
 		if ($arguments['required'] != round ($arguments['required'])) {$this->formSetupErrors['uploadSubfieldsMinimumIncorrect'] = "You specified a non-whole number (<strong>{$arguments['required']}</strong>) for the number of file upload widgets in the <strong>{$arguments['name']}</strong> upload element which must the user must upload.";}
 		if ($arguments['required'] > $arguments['subfields']) {$this->formSetupErrors['uploadSubfieldsMinimumMismatch'] = "The required minimum number of files which the user must upload (<strong>{$arguments['required']}</strong>) specified in the <strong>{$arguments['name']}</strong> upload element is above the number of files actually available to be specified for upload (<strong>{$arguments['subfields']}</strong>).";}
 		
-		# Check that the selected directory exists and is writable (it need not exist at present, merely be writable)
-		if (!application::directoryIsWritable ($arguments['uploadDirectory'])) {
-			$this->formSetupErrors['directoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> upload element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
+		# Check that the selected directory exists and is writable (or create it)
+		if (!is_dir ($arguments['directory'])) {
+			if (!application::directoryIsWritable ($arguments['directory'])) {
+				$this->formSetupErrors['directoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> upload element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
+			} else {
+				#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
+				#!# umask seems to have no effect - needs testing
+				mkdir ($arguments['directory'], 0755, $recursive = true);
+			}
 		}
 		
 		# Prevent more files being uploaded than the number of form elements (this is not strictly necessary, however, as the subfield looping below prevents the excess being processed)
@@ -1596,6 +1686,8 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => NULL,	// Because the uploading can only be processed later, this is set to NULL
+			#!# Not finished
+#			'datatype' => "`{$arguments['name']}` " . 'VARCHAR (255)' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -1636,12 +1728,15 @@ class form
 		# Get the posted data
 		if ($this->formPosted) {
 			
+/*
+			#!# Removed - needs to be tested properly first
 			# Throw a fake submission warning if the posted data (which is later ignored anyway) does not match the assigned data
 			if ($arguments['security']) {
 				if ($this->form[$arguments['name']] !== $arguments['values']) {
 					$elementProblems['hiddenFakeSubmission'] = 'The hidden data which was submitted did not match that which was set. This appears to have been a faked submission.';
 				}
 			}
+*/
 			
 			# Map the components onto the array directly and assign the compiled version; no attempt is made to combine the data
 			$data['rawcomponents'] = ($arguments['security'] ? $arguments['values'] : $this->form[$arguments['name']]);
@@ -1663,6 +1758,8 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
+			#!# Not finished
+			#!# 'datatype' => "`{$arguments['name']}` " . 'VARCHAR (255)' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -1706,25 +1803,6 @@ class form
 	}
 	
 	
-	# Function to clean available values
-	function cleanAvailableValues ($originalValues, $forceAssociative)
-	{
-		# Determine if the values are an associative array
-		$valuesAreAssociativeArray = ($forceAssociative || application::isAssociativeArray ($originalValues));
-		
-		# If already an associative array, return the original values
-		if ($valuesAreAssociativeArray) {
-			return $originalValues;
-		}
-		
-		# If not an associative array, convert to value=>value format and return that
-		foreach ($originalValues as $value) {
-			$values[$value] = $value;
-		}
-		return $values;
-	}
-	
-	
 	# Function to ensure that all initial values are in the array of values
 	function ensureDefaultsAvailable ($arguments)
 	{
@@ -1745,6 +1823,31 @@ class form
 			$totalMissingValues = count ($missingValues);
 			$this->formSetupErrors['defaultMissingFromValuesArray'] = "In the <strong>{$arguments['name']}</strong> element, the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
 		}
+	}
+	
+	
+	# Function to ensure that values are associative, even if multidimensional
+	#!# This function should be in the widget class but that won't work until formSetupErrors carry back to the main class
+	function ensureHierarchyAssociative ($originalValues, $forceAssociative, $elementName)
+	{
+		# Convert the values, at any hierarchical level, to being associative
+		if (!$values = application::ensureValuesArrangedAssociatively ($originalValues, $forceAssociative)) {
+			$this->formSetupErrors['hierarchyTooDeep'] = "Multidimensionality is supported only to one level deep, but more levels than this were found in the <strong>$elementName</strong> element.";
+			return $originalValues;
+		}
+		
+		# Create a list of keys to ensure there are no duplicated keys
+		$keys = array ();
+		foreach ($values as $key => $value) {
+			$keys = array_merge ($keys, (is_array ($value) ? array_keys ($value) : array ($key)));
+		}
+		if (count ($keys) != count (array_unique ($keys))) {
+			$this->formSetupErrors['multidimensionalKeyClash'] = "Some of the multidimensional keys in the <strong>$elementName</strong> element clash with other keys elsewhere in the hierarchy. Fix this by changing the key names, possibly by switching on forceAssociative.";
+			return $originalValues;
+		}
+		
+		# Return the arranged values
+		return $values;
 	}
 	
 	
@@ -1803,7 +1906,7 @@ class form
 				
 				# Map the file information into the main form element array
 				if (!empty ($value)) {
-					$this->form[$name][$key] = array (
+					$_POST[$this->settings['name']][$name][$key] = array (
 						'name' => $_FILES[$this->settings['name']]['name'][$name][$key],
 						'type' => $_FILES[$this->settings['name']]['type'][$name][$key],
 						'tmp_name' => $_FILES[$this->settings['name']]['tmp_name'][$name][$key],
@@ -2066,15 +2169,29 @@ class form
 			}
 			
 		# If the file exists, check it is writable
-		} else {
-			if (!is_writable ($filename)) {
-				$this->formSetupErrors['resultsFileNotWritable'] = 'The specified (but already existing) results file is not writable; please check its permissions.';
-			}
+		} else if (!is_writable ($filename)) {
+			$this->formSetupErrors['resultsFileNotWritable'] = 'The specified (but already existing) results file is not writable; please check its permissions.';
 		}
 		
 		# Assign the file location
 		$this->configureResultFileFilename = $filename;
 	}
+	
+	
+	/**
+	 * Output (display) the results to a database
+	 */
+	function setOutputDatabase ($dsn, $table = false)
+	{
+		# Flag that this method is required
+		#!# Change to ->registerOutputMethod ($type) which then does the following line
+		$this->outputMethods['database'] = true;
+		
+		# Set the DSN and table name
+		$this->configureResultDatabaseDsn = $dsn;
+		$this->configureResultDatabaseTable = ($table ? $table : $this->settings['name']);
+	}
+	
 	
 	
 	/**
@@ -2095,6 +2212,33 @@ class form
 	{
 		# Return the elements array
 		return $this->elements;
+	}
+	
+	
+	# Function to get database column specifications
+	function getDatabaseColumnSpecification ($table = false)
+	{
+		# Loop through the elements and extract the specification
+		$columns = array ();
+		foreach ($this->elements as $name => $attributes) {
+			if (isSet ($attributes['datatype'])) {
+				$columns[$name] = $attributes['datatype'];
+			}
+		}
+		
+		# Return the result, with the key names in tact
+		return $columns;
+		
+		/*
+		# Create the SQL string
+		$query = implode (",\n", $columns);
+		
+		# Add the table specification if necessary
+		if ($table) {$query = "CREATE TABLE IF NOT EXISTS {$table} (" . "\n" . $query . "\n)";}
+		
+		# Return the assembled query
+		return $query;
+		*/
 	}
 	
 	
@@ -2172,12 +2316,12 @@ class form
 		if ($this->settings['displayPresentationMatrix']) {$this->displayPresentationMatrix ();}
 		
 		# Check if the form and PHP environment has been set up OK
-		if (!$this->formSetupOk ()) {return false;}
+		if (!$this->_setupOk ()) {return false;}
 		
 		# Show debugging information firstly if required
 		if ($this->settings['debug']) {$this->showDebuggingInformation ();}
 		
-		# Check whether the user is a valid user (must be before the formSetupOk check)
+		# Check whether the user is a valid user (must be before the setupOk check)
 		if (!$this->validUser ()) {return false;}
 		
 		# Check whether the facility is open
@@ -2188,6 +2332,13 @@ class form
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		if (!$this->formPosted || $this->getElementProblems ()) {
+			
+			# Run the callback function if one is set
+			if ($this->settings['callback']) {
+				$this->settings['callback'] ($this->elementProblems ? -1 : 0);
+			}
+			
+			# Display the form and any problems then end
 			echo $this->constructFormHtml ($this->elements, $this->elementProblems);
 			if ($this->settings['div']) {echo "\n</div>";}
 			return false;
@@ -2200,7 +2351,7 @@ class form
 		$this->outputData = $this->prepareData ();
 		
 		# If required, display a summary confirmation of the result
-		if ($this->settings['displayFormCompleteText']) {echo "\n" . '<p class="completion">' . $this->settings['formCompleteText'] . ' </p>';}
+		if ($this->settings['formCompleteText']) {echo "\n" . '<p class="completion">' . $this->settings['formCompleteText'] . ' </p>';}
 		
 		# Loop through each of the processing methods and output it based on the requested method
 		foreach ($this->outputMethods as $outputType => $required) {
@@ -2208,7 +2359,7 @@ class form
 		}
 		
 		# If required, display a link to reset the page
-		if ($this->settings['displayFormCompleteText']) {echo "\n" . '<p><a href="' . $_SERVER['REQUEST_URI'] . '">Click here to reset the page.</a></p>';}
+		if ($this->settings['formCompleteText']) {echo "\n" . '<p><a href="' . $_SERVER['REQUEST_URI'] . '">Click here to reset the page.</a></p>';}
 		
 		# Close the surrounding <div> if relevant
 		if ($this->settings['div']) {echo "\n\n</div>";}
@@ -2267,7 +2418,7 @@ class form
 	 * @todo Add all sorts of other form setup checks as flags within this function
 	 * @access private
 	 */
-	function formSetupOk ()
+	function _setupOk ()
 	{
 		# Check the PHP environment set up is OK
 		$this->validEnvironment ();
@@ -2315,6 +2466,11 @@ class form
 		
 		# Check templating in template mode
 		$this->setupTemplating ();
+		
+		# Validate the callback mode setup
+		if ($this->settings['callback'] && !function_exists ($this->settings['callback'])) {
+			$this->formSetupErrors['callback'] = 'You specified a callback function but no such function exists.';
+		}
 		
 		# If there are any form setup errors - a combination of those just defined and those assigned earlier in the form processing, show them
 		if (!empty ($this->formSetupErrors)) {echo application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, (count ($this->formSetupErrors) > 1 ? 'Various errors were' : 'An error was') . " found in the setup of the form. The website's administrator needs to correct the configuration before the form will work:");}
@@ -2444,6 +2600,7 @@ class form
 		}
 		
 		# Check that magic_quotes are switched off; escaping of user input is handled manually
+		#!# Replace these with data cleaning methods
 		if ((bool) ini_get ('magic_quotes_gpc')) {$this->formSetupErrors['environmentMagicQuotesGpc'] = 'The PHP configuration setting magic_quotes_gpc must be set to <strong>off</strong>.';}
 		if ((bool) ini_get ('magic_quotes_sybase')) {$this->formSetupErrors['environmentMagicQuotesSybase'] = 'The PHP configuration setting magic_quotes_sybase must be set to <strong>off</strong>.';}
 		
@@ -2533,6 +2690,7 @@ class form
 		
 		# Start the constructed form HTML
 		$html .= "\n" . '<form method="post" name="' . $this->settings['name'] . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '">';
+		#!# This needs to be investigated further:  $html .= "\n" . '<input type="hidden" name="_charset_" />';
 		
 		# Start the HTML
 		$formHtml = '';
@@ -2558,7 +2716,8 @@ class form
 			if ($this->settings['displayColons']) {$elementAttributes['title'] .= ':';}
 			
 			# If the element is required, and indicators are in use add an indicator
-			if ($this->settings['requiredFieldIndicator'] && $elementAttributes['required']) {
+			$elementIsRequired = ($this->settings['requiredFieldIndicator'] && $elementAttributes['required']);
+			if ($elementIsRequired) {
 				$elementAttributes['title'] .= '&nbsp;*';
 			}
 			
@@ -2582,7 +2741,7 @@ class form
 					if ($elementAttributes['type'] == 'heading') {
 						$formHtml .= "\n" . $elementAttributes['html'];
 					} else {
-						$formHtml .= "\n" . '<p id="' . $id . '">';
+						$formHtml .= "\n" . '<p id="' . $id . '"' . ($elementIsRequired ? " class=\"{$this->settings['requiredFieldClass']}\"" : '') . '>';
 						$formHtml .= "\n\t";
 						if ($this->settings['displayTitles']) {
 							$formHtml .= $elementAttributes['title'] . '<br />';
@@ -2596,7 +2755,7 @@ class form
 					
 				# Display using divs for CSS layout mode; this is different to paragraphs as the form fields are not conceptually paragraphs
 				case 'css':
-					$formHtml .= "\n" . '<div class="row" id="' . $id . '">';
+					$formHtml .= "\n" . '<div class="row" id="' . $id . '"' . ($elementIsRequired ? " class=\"{$this->settings['requiredFieldClass']}\"" : '') . '>';
 					if ($elementAttributes['type'] == 'heading') {
 						$formHtml .= "\n\t<span class=\"title\">" . $elementAttributes['html'] . '</span>';
 					} else {
@@ -2626,7 +2785,7 @@ class form
 				# Tables
 				case 'tables':
 				default:
-					$formHtml .= "\n\t" . '<tr class="' . $id . '">';
+					$formHtml .= "\n\t" . '<tr class="' . $id . '"' . ($elementIsRequired ? " class=\"{$this->settings['requiredFieldClass']}\"" : '') . '>';
 					if ($elementAttributes['type'] == 'heading') {
 						# Start by determining the number of columns which will be needed for headings involving a colspan
 						$colspan = 1 + ($this->settings['displayTitles']) + ($this->settings['displayDescriptions']);
@@ -2880,6 +3039,7 @@ class form
 				'confirmationEmail'	=> array ('presented', 'compiled'),
 				'screen'			=> array ('presented', 'compiled'),
 				'processing'		=> array ('rawcomponents', 'compiled', 'presented'),
+				'database'			=> array ('compiled'),
 			),
 			
 			'datetime' => array (
@@ -2893,6 +3053,7 @@ class form
 				'confirmationEmail'	=> array ('presented'),
 				'screen'			=> array ('presented'),
 				'processing'		=> array ('compiled', 'rawcomponents', 'presented'),
+				'database'			=> array ('compiled'),
 			),
 			
 			'email' => array (
@@ -2904,6 +3065,7 @@ class form
 				'confirmationEmail'	=> array ('presented'), #, 'rawcomponents', 'compiled'
 				'screen'			=> array ('presented'), #, 'rawcomponents', 'compiled'
 				'processing'		=> array ('presented'), #, 'rawcomponents', 'compiled'
+				'database'			=> array ('presented'),
 			),
 			
 			# heading:
@@ -2919,6 +3081,7 @@ class form
 				'confirmationEmail'	=> array ('presented', 'rawcomponents'),
 				'screen'			=> array ('presented', 'rawcomponents'),
 				'processing'		=> array ('rawcomponents', 'presented'),
+				'database'			=> array ('rawcomponents'),
 			),
 			
 			'input' => array (
@@ -2930,6 +3093,7 @@ class form
 				'confirmationEmail'	=> array ('presented'), #, 'rawcomponents', 'compiled'
 				'screen'			=> array ('presented'), #, 'rawcomponents', 'compiled'
 				'processing'		=> array ('presented'), #, 'rawcomponents', 'compiled'
+				'database'			=> array ('presented'),
 			),
 			
 			'password' => array (
@@ -2942,6 +3106,7 @@ class form
 				'confirmationEmail'	=> array ('presented', 'compiled'), #, 'rawcomponents'	// Compiled allowed even though this means the administrator is allowing them to get their password in plain text via e-mail
 				'screen'			=> array ('presented', 'compiled'), #, 'rawcomponents'
 				'processing'		=> array ('compiled'), #, 'rawcomponents'
+				'database'			=> array ('presented'),
 			),
 			
 			'radiobuttons' => array (
@@ -2955,6 +3120,7 @@ class form
 				'confirmationEmail'	=> array ('presented', 'compiled'),
 				'screen'			=> array ('presented', 'compiled'),
 				'processing'		=> array ('compiled', 'rawcomponents', 'presented'),
+				'database'			=> array ('compiled'),
 			),
 			
 			'richtext' => array (
@@ -2966,6 +3132,7 @@ class form
 				'confirmationEmail'	=> array ('presented'),
 				'screen'			=> array ('presented'),
 				'processing'		=> array ('presented'),
+				'database'			=> array ('presented'),
 			),
 			
 			'select' => array (
@@ -2981,6 +3148,7 @@ class form
 				'screen'			=> array ('presented', 'compiled'),
 				'processing'		=> array ('compiled', 'presented', 'rawcomponents'),
 				"processing [when in 'multiple' mode]"	=> array ('rawcomponents', 'compiled', 'presented'),
+				'database'			=> array ('compiled'),
 			),
 			
 			'textarea' => array (
@@ -3000,6 +3168,7 @@ class form
 				'confirmationEmail'	=> array ('presented'),
 				'screen'			=> array ('presented'),
 				'processing'		=> array ('rawcomponents', 'presented'),
+				'database'			=> array ('presented'),
 			),
 			
 			'upload' => array (
@@ -3013,6 +3182,7 @@ class form
 				'confirmationEmail'	=> array ('presented'),
 				'screen'			=> array ('presented'),
 				'processing'		=> array ('compiled', 'rawcomponents', 'presented'),
+				'database'			=> array ('presented'),
 			),
 		);
 		
@@ -3102,7 +3272,7 @@ class form
 				
 				$html .= "\n\t" . '<tr>';
 				$html .= "\n\t\t" . "<td class=\"displayformat\"><em>$displayFormat</em></td>";
-				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . htmlentities ($presentationMatrix[$type]['_descriptions'][$default]) . ']--></td>';
+				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . htmlspecialchars ($presentationMatrix[$type]['_descriptions'][$default]) . ']--></td>';
 				$html .= "\n\t\t" . "<td>$others</td>";
 				$html .= "\n\t" . '</tr>';
 			}
@@ -3142,7 +3312,9 @@ class form
 	{
 		# For a scalar, return the escaped value
 		if (!is_array ($data)) {
-			$data = str_replace ($character, '\\' . $character, $data);
+			$data = addslashes ($data);
+			#!# Consider adding $data = str_replace ('"', '\\"' . $character, $data); when character is a " - needs further research
+			
 		} else {
 			
 			# For an array value, iterate instead
@@ -3183,7 +3355,7 @@ class form
 			# Compile the HTML
 			$html .= "\n\t<tr>";
 			$html .= "\n\t\t" . '<td class="key">' . (isSet ($this->elements[$name]['title']) ? $this->elements[$name]['title'] : $name) . ':</td>';
-			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data))) . '</td>';
+			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlspecialchars ($data))) . '</td>';
 			$html .= "\n\t</tr>";
 		}
 		$html .= "\n" . '</table>';
@@ -3233,7 +3405,7 @@ class form
 		
 		# Construct the introductory text, including the IP address for the e-mail type
 		#!# Make the IP address bit configurable; currently removed: ($outputType == 'email' ? ', from the IP address ' . $_SERVER['REMOTE_ADDR'] : '')
-		$introductoryText = ($outputType == 'email' ? 'Below is a submission from the form' :  'Below is a confirmation of (apparently) your submission from the form') . " at \n" . $_SERVER['_PAGE_URL'] . "\nmade at " . date ('g:ia, jS F Y') . ', from the IP address ' . $_SERVER['REMOTE_ADDR'] . '.';
+		$introductoryText = ($outputType == 'confirmationEmail' ? $this->settings['confirmationEmailIntroductoryText'] . ($this->settings['confirmationEmailIntroductoryText'] ? "\n\n\n" : '') : $this->settings['emailIntroductoryText'] . ($this->settings['emailIntroductoryText'] ? "\n\n\n" : '')) . ($outputType == 'email' ? 'Below is a submission from the form' :  'Below is a confirmation of (apparently) your submission from the form') . " at \n" . $_SERVER['_PAGE_URL'] . "\nmade at " . date ('g:ia, jS F Y') . ', from the IP address ' . $_SERVER['REMOTE_ADDR'] . '.';
 		
 		# Add an abuse notice if required
 		if (($outputType == 'confirmationEmail') && ($this->configureResultConfirmationEmailAbuseNotice)) {$introductoryText .= "\n\n(If it was not you who submitted the form, please report it as abuse to " . $this->configureResultConfirmationEmailAdministrator . ' .)';}
@@ -3293,7 +3465,7 @@ class form
 		
 		# Confirm sending (or an error) for the confirmation e-mail type
 		if ($outputType == 'confirmationEmail') {
-			echo "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . 					$presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
+			echo "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlspecialchars ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
 		}
 	}
 	
@@ -3315,6 +3487,48 @@ class form
 		# Write the data or handle the error
 		if (!application::writeDataToFile ($data, $this->configureResultFileFilename)) {
 			echo "\n\n" . '<p class="error">There was a problem writing the information you submitted to a file. It is likely this problem is temporary - please wait a short while then press the refresh button.</p>';
+		}
+	}
+	
+	
+	/**
+	 * Function to write the results to a database
+	 * @access private
+	 */
+	#!# Error handling in this function is too basic and needs to be moved higher in the class
+	function outputDataDatabase ($presentedData)
+	{
+		# Connect to the database
+		if (! ($this->connection = @mysql_connect ($this->configureResultDatabaseDsn['hostname'], $this->configureResultDatabaseDsn['username'], $this->configureResultDatabaseDsn['password']) && @mysql_select_db ($this->configureResultDatabaseDsn['database']))) {die ('Could not connect: ' . mysql_error());}
+#!#		if (!$link = mysql_connect ($this->configureResultDatabaseDsn['hostname'], $this->configureResultDatabaseDsn['username'], $this->configureResultDatabaseDsn['password'])) {die ('Could not connect: ' . mysql_error());}
+		mysql_select_db ($this->configureResultDatabaseDsn['database']);
+		
+		# Design the table schema
+		#!# Replace with the output of getDatabaseColumnSpecification()
+		$query  = "CREATE TABLE IF NOT EXISTS {$this->configureResultDatabaseTable} (" . "\n";
+		$columns[] = '`id` INT AUTO_INCREMENT PRIMARY KEY';
+		foreach ($this->elements as $name => $attributes) {
+			if (!isSet ($attributes['datatype'])) {continue;}
+			$columns[] = "`{$name}` {$attributes['datatype']}" . ($attributes['required'] ? ' NOT NULL' : '') . " COMMENT '{$attributes['title']}'";
+		}
+		$query .= implode (",\n", $columns);
+		$query .= ')';
+		
+		# Create the table if it doesn't exist
+		if (!$result = mysql_query ($query, $link)) {die ('Error creating table: ' . mysql_error ());}
+		
+		# Compile the result
+		$data = array ();
+		foreach ($this->elements as $name => $attributes) {
+			if (!isSet ($attributes['datatype'])) {continue;}
+			$data[$name] = addslashes ((is_array ($this->form[$name]) ? implode ('', $this->form[$name]) : $this->form[$name]));
+		}
+		#!# Does no data ever arise?
+		if ($data) {
+			$query  = "INSERT INTO {$this->configureResultDatabaseTable} (" . implode (',', array_keys ($data)) . ") VALUES ('" . implode ("','", array_values ($data)) . "');";
+			
+			# Add the data
+			if (!$result = mysql_query ($query, $link)) {die ('Error inserting data: ' . mysql_error ());}
 		}
 	}
 	
@@ -3346,7 +3560,7 @@ class form
 				}
 				
 				# Check whether a file already exists
-				if (file_exists ($existingFileName = ($arguments['uploadDirectory'] . $_FILES[$this->settings['name']]['name'][$name][$key]))) {
+				if (file_exists ($existingFileName = ($arguments['directory'] . $_FILES[$this->settings['name']]['name'][$name][$key]))) {
 					
 					# Check whether the file being uploaded has the same checksum as the existing file
 					if (md5_file ($existingFileName) != md5_file ($_FILES[$this->settings['name']]['tmp_name'][$name][$key])) {
@@ -3368,7 +3582,7 @@ class form
 				}
 				
 				# Attempt to upload the file
-				if (!move_uploaded_file ($_FILES[$this->settings['name']]['tmp_name'][$name][$key], $arguments['uploadDirectory'] . $_FILES[$this->settings['name']]['name'][$name][$key])) {
+				if (!move_uploaded_file ($_FILES[$this->settings['name']]['tmp_name'][$name][$key], $arguments['directory'] . $_FILES[$this->settings['name']]['name'][$name][$key])) {
 					# Create an array of any failed file uploads
 					#!# Not sure what happens if this fails, given that the attributes may not exist
 					$failures[$attributes['name']] = $attributes;
@@ -3393,7 +3607,7 @@ class form
 				# Add each of the files to the master array, appending the location for each
 				foreach ($successes as $success => $attributes) {
 					$filenames[] = $success;
-					$data['compiled'][] = $arguments['uploadDirectory'] . $success;
+					$data['compiled'][] = $arguments['directory'] . $success;
 				}
 				
 				# For the compiled version, give the number of files uploaded and their names
@@ -3404,8 +3618,7 @@ class form
 			# If there were any failures, list them also
 			if ($failures) {
 				$totalFailures = count ($failures);
-				#!# ' ' being added even if there are no successes
-				$data['presented'] .= ' ' . $totalFailures . ($totalFailures > 1 ? ' files' : ' file') . ' (' . implode (', ', $failures) . ') unfortunately failed to copy over for some unspecified reason.';
+				$data['presented'] .= ($successes ? ' ' : '') . $totalFailures . ($totalFailures > 1 ? ' files' : ' file') . ' (' . implode (', ', array_keys ($failures)) . ') unfortunately failed to copy over for some unspecified reason.';
 			}
 			
 			# The raw component array out with empty fields upto the number of created subfields
@@ -3416,6 +3629,7 @@ class form
 		}
 	}
 }
+
 
 
 # Subclass to provide a widget
@@ -3437,6 +3651,9 @@ class formWidget
 		
 		# Assign the function name
 		$this->functionName = $functionName;
+		
+		# Assign the setup errors array
+		$this->formSetupErrors =& $form->formSetupErrors;
 		
 		# Assign the arguments
 		$this->arguments = $this->assignArguments ($suppliedArguments, $argumentDefaults, $functionName, $subargument);
@@ -3461,6 +3678,13 @@ class formWidget
 	# Function to return the widget's (submitted but processed) value
 	function getValue () {
 		return $this->value;
+	}
+	
+	
+	# Function to determine if a widget is required but empty
+	function requiredButEmpty ()
+	{
+		return (($this->arguments['required']) && (strlen ($this->value) == 0));
 	}
 	
 	
@@ -3602,13 +3826,6 @@ class formWidget
 			}
 		}
 	}
-	
-	
-	# Function to determine if a widget is required but empty
-	function requiredButEmpty ()
-	{
-		return (($this->arguments['required']) && (strlen ($this->value) == 0));
-	}
 }
 
 
@@ -3630,16 +3847,13 @@ class formWidget
 #!# Add links to the id="$name" form elements in cases of USER errors (not for the templating mode though)
 #!# Need to prevent the form code itself being overwritable by uploads or CSV writing, by doing a check on the filenames
 #!# Not all $widgetHtml declarations have an id="" given (make sure it is $this>cleanId'd though)
-#!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/
+#!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/ ; checkbox & radiobutton have some infrastructure written (but commented out) already
 #!# Prevent insecure bcc:ing as per http://lists.evolt.org/harvest/detail.cgi?w=20050725&id=6342
 #!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp e.g. accept="list_of_mime_types" for type=file
 #!# Suggestions at http://www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
-#!# Ensure form isn't subject to an attack similar to the issue described at http://forum.hardened-php.net/viewtopic.php?id=20 due to PATH_INFO being on
-#!# Use htmlspecialchars instead of htmlentities - see http://www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
-#!# merge displayFormCompleteText and formCompleteText
 #!# merge autoCenturyConversionEnabled and autoCenturyConversionLastYear
-
-
+# Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
+# Enable specification of a validation function
 
 # Version 2 feature proposals
 #!# Full object orientation - change the form into a package of objects
@@ -3649,10 +3863,8 @@ class formWidget
 #!# Enable javascript as an option
 #!# 	Use ideas in http://www.sitepoint.com/article/1273/3 for having js-validation with an icon
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]
-#!# Add AJAX validation flag See: http://particletree.com/features/smart-validation-with-ajax (but modified version needed because this doesn't use Unobtrusive DHTML)
+#!# Add AJAX validation flag See: http://particletree.com/features/degradable-ajax-form-validation/ (but modified version needed because this doesn't use Unobtrusive DHTML - see also http://particletree.com/features/a-guide-to-unobtrusive-javascript-validation/ )
 #!# Self-creating form mode
 #!# Postponed files system
-
-# Enable specification of a validation function
 
 ?>

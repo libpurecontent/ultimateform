@@ -49,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
  * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.0.0
+ * @version 1.0.1
  */
 class form
 {
@@ -207,7 +207,8 @@ class form
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
 			'default'				=> '',		# Default value (optional)
-			'regexp'				=> '',		# Regular expression against which the submission must validate (optional) [ignored for e-mail type]
+			'regexp'				=> '',		# Regular expression against which the submission must validate
+			'disallow'				=> '',		# Regular expression against which the submission must not validate
 		);
 		
 		# Create a new form widget
@@ -326,7 +327,8 @@ class form
 			'cols'					=> 30,		# Number of columns (optional; defaults to 30)
 			'rows'					=> 5,		# Number of rows (optional; defaults to 30)
 			'default'				=> '',		# Default value (optional)
-			'regexp'				=> '',		# Regular expression(s) against which the submission must (all) validate (optional)
+			'regexp'				=> '',		# Regular expression(s) against which all lines of the submission must validate
+			'disallow'				=> '',		# Regular expression against which all lines of the submission must not validate
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 		);
@@ -354,8 +356,8 @@ class form
 		
 		$elementValue = $widget->getValue ();
 		
-		# Perform validity tests if anything has been submitted and regexp(s) are supplied
-		if ($elementValue && ($arguments['regexp'] || $arguments['mode'] == 'coordinates')) {
+		# Perform validity tests if anything has been submitted and regexp(s)/disallow are supplied
+		if ($elementValue && ($arguments['regexp'] || $arguments['disallow'] || $arguments['mode'] == 'coordinates')) {
 			
 			# Branch a copy of the data as an array, split by the newline and check it is complete
 			$lines = explode ("\n", $elementValue);
@@ -383,11 +385,24 @@ class form
 						continue;
 					}
 				}
+				
+				# If the line does not validate against a specified regexp, add the line to a list of lines containing a problem then move onto the next line
+				if ($arguments['disallow']) {
+					if (ereg ($arguments['disallow'], $line)) {
+						$disallowProblemLines[] = $i;
+						continue;
+					}
+				}
 			}
 			
 			# If any problem lines are found, construct the error message for this
 			if (isSet ($problemLines)) {
 				$elementProblems['failsRegexp'] = (count ($problemLines) > 1 ? 'Rows ' : 'Row ') . implode (', ', $problemLines) . (count ($problemLines) > 1 ? ' do not' : ' does not') . ' match a specified pattern required for this section' . (($arguments['mode'] == 'coordinates') ? ', ' . ((count ($arguments['regexp']) > 1) ? 'including' : 'namely' ) . ' the need for two co-ordinates per line' : '') . '.';
+			}
+			
+			# If any problem lines are found, construct the error message for this
+			if (isSet ($disallowProblemLines)) {
+				$elementProblems['failsDisallow'] = (count ($disallowProblemLines) > 1 ? 'Rows ' : 'Row ') . implode (', ', $disallowProblemLines) . (count ($disallowProblemLines) > 1 ? ' match' : ' matches') . ' a specified disallowed pattern for this section.';
 			}
 		}
 		
@@ -514,6 +529,8 @@ class form
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
+			'regexp'				=> '',		# Regular expression against which the submission must validate
+			'disallow'				=> '',		# Regular expression against which the submission must not validate
 			'width'					=> '100%',		# Width
 			'height'				=> '400px',		# Height
 			'default'				=> '',		# Default value (optional)
@@ -567,6 +584,9 @@ class form
 		
 		# Handle whitespace issues
 		$widget->handleWhiteSpace ();
+		
+		# Perform pattern checks
+		$widget->regexpCheck ();
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
@@ -3807,15 +3827,24 @@ class formWidget
 	
 	
 	# Perform regexp checks
+	#!# Should there be checking for clashes between disallow and regexp, i.e. so that the widget can never submit?
+	#!# Should there be checking of disallow and regexp when editable is false, i.e. so that the widget can never submit?
 	function regexpCheck ()
 	{
 		# End if the form is empty; strlen is used rather than a boolean check, as a submission of the string '0' will otherwise fail this check incorrectly
 		if (strlen ($this->value) == 0) {return;}
 		
 		# Regexp checks (for non-e-mail types)
-		if ($this->arguments['regexp'] && ($this->functionName != 'email')) {
+		if (strlen ($this->arguments['regexp'])) {
 			if (!ereg ($this->arguments['regexp'], $this->value)) {
-				$this->elementProblems['failsRegexp'] = 'The submitted information did not match a specific pattern required for this section.';
+				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for the {$this->arguments['name']} section.";
+			}
+		}
+		
+		# 'disallow' regexp checks (for text types)
+		if (strlen ($this->arguments['disallow'])) {
+			if (ereg ($this->arguments['disallow'], $this->value)) {
+				$this->elementProblems['failsDisallow'] = "The submitted information matched a disallowed pattern for the {$this->arguments['name']} section.";
 			}
 		}
 		

@@ -47,9 +47,9 @@
  * 
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
- * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge 2003-4
+ * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.0.1
+ * @version 1.0.2
  */
 class form
 {
@@ -441,9 +441,10 @@ class form
 			switch ($arguments['mode']) {
 					case 'coordinates':
 					
-					# For the raw components version, split by the newline then by the whitespace, presented as an array (x, y)
+					# For the raw components version, split by the newline then by the whitespace (ensuring that whitespace exists, to prevent undefined offsets), presented as an array (x, y)
 					$lines = explode ("\n", $this->form[$arguments['name']]);
 					foreach ($lines as $autonumber => $line) {
+						if (!substr_count ($line, ' ')) {$line .= ' ';}
 						list ($data['rawcomponents'][$autonumber]['x'], $data['rawcomponents'][$autonumber]['y']) = explode (' ', $line);
 						ksort ($data['rawcomponents'][$autonumber]);
 					}
@@ -861,22 +862,22 @@ class form
 			# Add a null field to the selection if in multiple mode and a value is required (for single fields, null is helpful; for multiple not required, some users may not know how to de-select a field)
 			#!# Creates error if formSetupErrors['selectNoValues'] thrown - shouldn't be getting this far
 			if (!$arguments['multiple'] || !$arguments['required']) {
-				$arguments['values'] = array ('' => $arguments['nullText']) + $arguments['values'];
+				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				if (isSet ($arguments['_valuesMultidimensional'])) {
-					$arguments['_valuesMultidimensional'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
+					$arguments['_valuesMultidimensionalWithNull'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
 				}
 			}
 			
 			# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
 			$widgetHtml = "\n\t\t\t<select name=\"" . $this->settings['name'] . "[{$arguments['name']}][]\"" . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
 			if (!isSet ($arguments['_valuesMultidimensional'])) {
-				foreach ($arguments['values'] as $value => $visible) {
+				foreach ($arguments['valuesWithNull'] as $value => $visible) {
 					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlspecialchars ($visible) . '</option>';
 				}
 			} else {
 				
 				# Multidimensional version, which adds optgroup labels
-				foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
+				foreach ($arguments['_valuesMultidimensionalWithNull'] as $key => $mainValue) {
 					if (is_array ($mainValue)) {
 						$widgetHtml .= "\n\t\t\t\t\t<optgroup label=\"$key\">";
 						foreach ($mainValue as $value => $visible) {
@@ -1046,6 +1047,7 @@ class form
 			
 			# If it's not a required field, add a null field to the selection
 			if (!$arguments['required']) {
+				#!# Does the 'withNull' fix made to version 1.0.2 need to be applied here?
 				$arguments['values'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				/* #!# Enable when implementing fieldset grouping
 				if (isSet ($arguments['_valuesMultidimensional'])) {
@@ -1918,7 +1920,7 @@ class form
 	 */
 	function mergeFilesIntoPost ()
 	{
-		# Loop through each upload widget set which has been submitted (even if empty)
+		# Loop through each upload widget set which has been submitted (even if empty); note that _FILES is arranged differently depending on whether you are using 'formname[elementname]' or just 'elementname' as the element name - see "HTML array feature" note at www.php.net/features.file-upload
 		foreach ($_FILES[$this->settings['name']]['name'] as $name => $subElements) {
 			
 			# Loop through each upload widget set's subelements (e.g. 4 items if there are 4 input tags within the widget set)

@@ -49,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.0.2
+ * @version 1.1.0
  */
 class form
 {
@@ -67,6 +67,7 @@ class form
 	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
 	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added
 	var $elementProblems = array ();			// Array of submitted element problems
+	var $databaseConnection = NULL;						// Database connection
 	
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
@@ -141,6 +142,8 @@ class form
 		'emailIntroductoryText'				=> '',								# Introductory text for e-mail output type
 		'confirmationEmailIntroductoryText'	=> '',								# Introductory text for confirmation e-mail output type
 		'callback'							=> false,							# Callback function (string name) (NB cannot be $this->methodname) with one integer parameter, so be called just before emitting form HTML - -1 is errors on form, 0 is blank form, 1 is result presentation if any (not called at all if form not displayed)
+		'databaseConnection'				=> false,							# Database connection (filename/array/object/resource)
+		'truncate'							=> false,							# Whether to truncate the visible part of a widget (global setting)
 	);
 	
 	
@@ -162,6 +165,9 @@ class form
 		foreach ($this->argumentDefaults as $argument => $defaultValue) {
 			$this->settings[$argument] = (isSet ($suppliedArguments[$argument]) ? $suppliedArguments[$argument] : $defaultValue);
 		}
+		
+		# Set up and check any database connection
+		$this->_setupDatabaseConnection ();
 		
 		# Define the submission location (as _SERVER cannot be set in a class variable declaration); PATH_INFO attacks (see: http://forum.hardened-php.net/viewtopic.php?id=20 ) are not relevant here for this form usage
 		if ($this->settings['submitTo'] === false) {$this->settings['submitTo'] = $_SERVER['REQUEST_URI'];}
@@ -209,6 +215,8 @@ class form
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression against which the submission must validate
 			'disallow'				=> '',		# Regular expression against which the submission must not validate
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
 		# Create a new form widget
@@ -234,9 +242,7 @@ class form
 		# Perform pattern checks
 		$widget->regexpCheck ();
 		
-		
 		$elementValue = $widget->getValue ();
-		
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 		if (!$this->formPosted) {$elementValue = $arguments['default'];}
@@ -246,17 +252,17 @@ class form
 		if ($functionName == 'email') {$restriction = 'Must be valid';}
 		if ($arguments['regexp'] && ($functionName != 'email')) {$restriction = 'A specific pattern is required';}
 		
-		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
 		} else {
-			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlspecialchars ($this->form[$arguments['name']]));
+			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
+			$hiddenInput = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= $hiddenInput;
 		}
 		
 		# Get the posted data
@@ -282,8 +288,13 @@ class form
 			'suitableAsEmailTarget' => ($functionName == 'email'),
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
-			'datatype' => "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
+		
+		#!# Temporary hacking to add hidden widgets when using the _hidden type in dataBinding
+		if (!$arguments['_visible--DONOTUSETHISFLAGEXTERNALLY']) {
+			$this->elements[$arguments['name']]['_visible--DONOTUSETHISFLAGEXTERNALLY'] = $hiddenInput;
+		}
 	}
 	
 	
@@ -331,6 +342,7 @@ class form
 			'disallow'				=> '',		# Regular expression against which all lines of the submission must not validate
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
 		# Create a new form widget
@@ -425,10 +437,10 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea name="' . $this->settings['name'] . "[{$arguments['name']}]\" id=\"" . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\">" . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea name="' . $this->settings['name'] . "[{$arguments['name']}]\" id=\"" . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
-			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlspecialchars ($this->form[$arguments['name']])));
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']])));
+			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Get the posted data
@@ -473,7 +485,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
-			'datatype' => "`{$arguments['name']}` " . 'BLOB' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -535,6 +547,7 @@ class form
 			'width'					=> '100%',		# Width
 			'height'				=> '400px',		# Height
 			'default'				=> '',		# Default value (optional)
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'editorBasePath'		=> '/_fckeditor/',	# Location of the editor files
 			'editorToolbarSet'		=> 'pureContent',	# Editor toolbar set
 			'editorConfig'				=> array (	# Editor configuration
@@ -612,7 +625,7 @@ class form
 			$widgetHtml = $editor->CreateHtml ();
 		} else {
 			$widgetHtml = $this->form[$arguments['name']];
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -638,7 +651,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
-			'datatype' => "`{$arguments['name']}` " . 'BLOB' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -765,6 +778,8 @@ class form
 			'default'				=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific select widget
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific select widget
 		);
 		
 		# Create a new form widget
@@ -785,6 +800,9 @@ class form
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		
+		# Apply truncation if necessary
+		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
 		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
 		if (application::isMultidimensionalArray ($arguments['values'])) {
@@ -871,8 +889,9 @@ class form
 			# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
 			$widgetHtml = "\n\t\t\t<select name=\"" . $this->settings['name'] . "[{$arguments['name']}][]\"" . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
 			if (!isSet ($arguments['_valuesMultidimensional'])) {
+				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				foreach ($arguments['valuesWithNull'] as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlspecialchars ($visible) . '</option>';
+					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible) . '</option>';
 				}
 			} else {
 				
@@ -881,11 +900,11 @@ class form
 					if (is_array ($mainValue)) {
 						$widgetHtml .= "\n\t\t\t\t\t<optgroup label=\"$key\">";
 						foreach ($mainValue as $value => $visible) {
-							$widgetHtml .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlspecialchars ($visible) . '</option>';
+							$widgetHtml .= "\n\t\t\t\t\t\t" . '<option value="' . htmlentities ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible) . '</option>';
 						}
 						$widgetHtml .= "\n\t\t\t\t\t</optgroup>";
 					} else {
-						$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . (in_array ($key, $elementValue) ? ' selected="selected"' : '') . '>' . htmlspecialchars ($mainValue) . '</option>';
+						$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($key) . '"' . (in_array ($key, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($mainValue) . '</option>';
 					}
 				}
 			}
@@ -905,7 +924,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlspecialchars ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($value) . '" />';
 				}
 			}
 			
@@ -958,7 +977,7 @@ class form
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'multiple' => $arguments['multiple'],
-			'datatype' => "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')" . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -982,6 +1001,7 @@ class form
 			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific select widget (if false, the master value is assumed)
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
 		# Create a new form widget
@@ -1062,8 +1082,8 @@ class form
 				$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				#$visible = str_replace ('†', '&dagger;', htmlspecialchars ($visible));
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->settings['name'] . "[{$arguments['name']}]\"" . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
+				#$visible = str_replace ('†', '&dagger;', htmlentities ($visible));
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->settings['name'] . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlentities ($visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1074,8 +1094,12 @@ class form
 			
 			# Set the widget HTML if any default is given
 			if ($arguments['default']) {
-				$widgetHtml  = htmlspecialchars ($arguments['values'][$elementValue]);
-				$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlspecialchars ($elementValue) . '" />';
+				foreach ($arguments['values'] as $value => $visible) {
+					if ($value == $elementValue) {	// This loop is done to prevent offsets which may still arise due to the 'defaultMissingFromValuesArray' error not resulting in further termination of widget production
+						$widgetHtml  = htmlentities ($arguments['values'][$elementValue]);
+						$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($elementValue) . '" />';
+					}
+				}
 			}
 		}
 		
@@ -1118,7 +1142,7 @@ class form
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
-			'datatype' => "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')" . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -1142,6 +1166,7 @@ class form
 			'default'			=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
 		# Create a new form widget
@@ -1214,7 +1239,7 @@ class form
 				}
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->settings['name'] . "[{$arguments['name']}][{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->settings['name'] . "[{$arguments['name']}][{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1317,7 +1342,7 @@ class form
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			#!# Not correct - needs multisplit into boolean
-			'datatype' => $datatype,
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : $datatype),
 		);
 	}
 	
@@ -1338,6 +1363,7 @@ class form
 			'required'				=> false,	# Whether required or not
 			'level'					=> 'date',	# Whether to show a 'datetime' or just 'date' widget set
 			'default'				=> '',		# Initial value - either 'timestamp' or an SQL string
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
 		# Load the date processing library
@@ -1484,7 +1510,7 @@ class form
 			
 			# Non-editable version
 			$widgetHtml  = datetime::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : '');
-			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlspecialchars ($arguments['default']) . '" />';
+			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($arguments['default']) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -1526,7 +1552,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
-			'datatype' => "`{$arguments['name']}` " . strtoupper ($arguments['level']) . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . strtoupper ($arguments['level'])) . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -1552,6 +1578,7 @@ class form
 			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required)
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
 		# Create a new form widget
@@ -1709,7 +1736,7 @@ class form
 			'output' => $arguments['output'],
 			'data' => NULL,	// Because the uploading can only be processed later, this is set to NULL
 			#!# Not finished
-#			'datatype' => "`{$arguments['name']}` " . 'VARCHAR (255)' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+#			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -1727,6 +1754,7 @@ class form
 			'output'				=> array (),		# Presentation format
 			'title'					=> 'Hidden data',	# Title (CURRENTLY UNDOCUMENTED)
 			'security'				=> true, 			# Whether to ignore posted data and use the internal values set, for security (only of relevance to non- self-processing forms); probably only switch off when using javascript to modify a value and submit that
+			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
 		# Create a new form widget
@@ -1781,7 +1809,7 @@ class form
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
 			#!# Not finished
-			#!# 'datatype' => "`{$arguments['name']}` " . 'VARCHAR (255)' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			#!# 'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	
@@ -2505,6 +2533,52 @@ class form
 	}
 	
 	
+	# Function to set up a database connection
+	function _setupDatabaseConnection ()
+	{
+		# Nothing to do if no connection supplied
+		if (!$this->settings['databaseConnection']) {return;}
+		
+		# Now that a database connection is confirmed required, set it to be false (rather than NULL) until overriden (this is important for later checking when using the connection)
+		$this->databaseConnection = false;
+		
+		# If the link is not a database resource/object but is an array or a file use open that and end
+		#!# Use of is_resource won't properly work yet
+		if (/*is_resource ($this->settings['databaseConnection']) || */ is_object ($this->settings['databaseConnection'])) {
+			$this->databaseConnection = $this->settings['databaseConnection'];
+			return true;
+		}
+		
+		# If it's an array type, assign the array directly
+		if (is_array ($this->settings['databaseConnection'])) {
+			$credentials = $this->settings['databaseConnection'];
+			
+		# If it's a file, open it and ensure there is a $credentials array given
+		} elseif (is_file ($this->settings['databaseConnection'])) {
+			if (!include ($this->settings['databaseConnection'])) {
+				$this->formSetupErrors['databaseCredentialsFileNotFound'] ('The database credentials file could not be open or does not exist.');
+				return false;
+			}
+			if (!isSet ($credentials)) {
+				$this->formSetupErrors['databaseCredentialsFileNoArray'] ('The database credentials file did not contain a $credentials array.');
+				return false;
+			}
+			
+		# If it's none of the above, throw an error
+		} else {
+			$this->formSetupErrors['databaseCredentialsUnsupported'] = 'The database credentials setting does not seem to be a supported type or is otherwise invalid.';
+			return false;
+		}
+		
+		# Create the connection using the credentials array now assigned
+		require_once ('database.php');
+		if (!$this->databaseConnection = new database ($credentials['hostname'], $credentials['username'], $credentials['password'])) {
+			$this->formSetupErrors['databaseCredentialsFile'] ('The database credentials file could not be open or does not exist.');
+			return false;
+		}
+	}
+	
+	
 	# Function to check templating
 	function setupTemplating ()
 	{
@@ -2718,6 +2792,17 @@ class form
 		$formHtml = '';
 		$hiddenHtml = "\n";
 		
+		# Determine whether to display the descriptions - display if on and any exist
+		$displayDescriptions = false;
+		if ($this->settings['displayDescriptions']) {
+			foreach ($elements as $name => $elementAttributes) {
+				if (!empty ($elementAttributes['description'])) {
+					$displayDescriptions = true;
+					break;
+				}
+			}
+		}
+		
 		# Loop through each of the elements to construct the form HTML
 		foreach ($elements as $name => $elementAttributes) {
 			
@@ -2733,6 +2818,13 @@ class form
 				*/
 				continue;
 			}
+			
+			# Special case (to be eradicated - 'hidden visible' fields due to _hidden in dataBinding)
+			if (array_key_exists ('_visible--DONOTUSETHISFLAGEXTERNALLY', $elementAttributes)) {
+				$hiddenHtml .= $elementAttributes['_visible--DONOTUSETHISFLAGEXTERNALLY'];
+				continue;
+			}
+			
 			
 			# If colons are set to show, add them
 			if ($this->settings['displayColons']) {$elementAttributes['title'] .= ':';}
@@ -2770,7 +2862,8 @@ class form
 							if ($displayRestriction) {$formHtml .= "<br /><span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ')</span>';}
 						}
 						$formHtml .= $elementAttributes['html'];
-						if ($this->settings['displayDescriptions']) {if ($elementAttributes['description']) {$formHtml .= "<br />\n<span class=\"description\">" . $elementAttributes['description'] . '</span>';}}
+						#!# Need to have looped through each $elementAttributes['description'] and remove that column if there are no descriptions at all
+						if ($displayDescriptions) {if ($elementAttributes['description']) {$formHtml .= "<br />\n<span class=\"description\">" . $elementAttributes['description'] . '</span>';}}
 						$formHtml .= "\n</p>";
 					}
 					break;
@@ -2793,7 +2886,7 @@ class form
 							}
 						}
 						$formHtml .= "\n\t<span class=\"data\">" . $elementAttributes['html'] . '</span>';
-						if ($this->settings['displayDescriptions']) {if ($elementAttributes['description']) {$formHtml .= "\n\t<span class=\"description\">" . $elementAttributes['description'] . '</span>';}}
+						if ($displayDescriptions) {if ($elementAttributes['description']) {$formHtml .= "\n\t<span class=\"description\">" . $elementAttributes['description'] . '</span>';}}
 					}
 						$formHtml .= "\n</div>";
 					break;
@@ -2810,7 +2903,7 @@ class form
 					$formHtml .= "\n\t" . '<tr class="' . $id . '"' . ($elementIsRequired ? " class=\"{$this->settings['requiredFieldClass']}\"" : '') . '>';
 					if ($elementAttributes['type'] == 'heading') {
 						# Start by determining the number of columns which will be needed for headings involving a colspan
-						$colspan = 1 + ($this->settings['displayTitles']) + ($this->settings['displayDescriptions']);
+						$colspan = 1 + ($this->settings['displayTitles']) + ($displayDescriptions);
 						$formHtml .= "\n\t\t<td colspan=\"$colspan\">" . $elementAttributes['html'] . '</td>';
 					} else {
 						$formHtml .= "\n\t\t";
@@ -2820,7 +2913,7 @@ class form
 							$formHtml .= '</td>';
 						}
 						$formHtml .= "\n\t\t<td class=\"data\">" . $elementAttributes['html'] . "</td>";
-						if ($this->settings['displayDescriptions']) {$formHtml .= "\n\t\t<td class=\"description\">" . ($elementAttributes['description'] == '' ? '&nbsp;' : $elementAttributes['description']) . '</td>';}
+						if ($displayDescriptions) {$formHtml .= "\n\t\t<td class=\"description\">" . ($elementAttributes['description'] == '' ? '&nbsp;' : $elementAttributes['description']) . '</td>';}
 					}
 					$formHtml .= "\n\t</tr>";
 			}
@@ -3294,7 +3387,7 @@ class form
 				
 				$html .= "\n\t" . '<tr>';
 				$html .= "\n\t\t" . "<td class=\"displayformat\"><em>$displayFormat</em></td>";
-				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . htmlspecialchars ($presentationMatrix[$type]['_descriptions'][$default]) . ']--></td>';
+				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . htmlentities ($presentationMatrix[$type]['_descriptions'][$default]) . ']--></td>';
 				$html .= "\n\t\t" . "<td>$others</td>";
 				$html .= "\n\t" . '</tr>';
 			}
@@ -3377,7 +3470,7 @@ class form
 			# Compile the HTML
 			$html .= "\n\t<tr>";
 			$html .= "\n\t\t" . '<td class="key">' . (isSet ($this->elements[$name]['title']) ? $this->elements[$name]['title'] : $name) . ':</td>';
-			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlspecialchars ($data))) . '</td>';
+			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data))) . '</td>';
 			$html .= "\n\t</tr>";
 		}
 		$html .= "\n" . '</table>';
@@ -3487,7 +3580,7 @@ class form
 		
 		# Confirm sending (or an error) for the confirmation e-mail type
 		if ($outputType == 'confirmationEmail') {
-			echo "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlspecialchars ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
+			echo "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
 		}
 	}
 	
@@ -3521,6 +3614,7 @@ class form
 	function outputDataDatabase ($presentedData)
 	{
 		# Connect to the database
+		#!# Refactor connectivity as it's now obsolete
 		if (! ($this->connection = @mysql_connect ($this->configureResultDatabaseDsn['hostname'], $this->configureResultDatabaseDsn['username'], $this->configureResultDatabaseDsn['password']) && @mysql_select_db ($this->configureResultDatabaseDsn['database']))) {die ('Could not connect: ' . mysql_error());}
 #!#		if (!$link = mysql_connect ($this->configureResultDatabaseDsn['hostname'], $this->configureResultDatabaseDsn['username'], $this->configureResultDatabaseDsn['password'])) {die ('Could not connect: ' . mysql_error());}
 		mysql_select_db ($this->configureResultDatabaseDsn['database']);
@@ -3650,6 +3744,187 @@ class form
 			$this->elements[$name]['data'] = $data;
 		}
 	}
+	
+	
+	# Generic function to generate proxy form widgets from an associated field specification and optional data
+	function dataBinding ($suppliedArguments = array ())
+	{
+		# Specify available arguments as defaults or as NULL (to represent a required argument)
+		$argumentDefaults = array (
+			'database' => NULL,
+			'table' => NULL,
+			'attributes' => array (),
+			'data' => array (),
+			'includeOnly' => array (),
+			'exclude' => array (),
+			'lookupFunction' => false,
+			'truncate' => 40,
+		);
+		
+		# Merge the arguments
+		$arguments = application::assignArguments ($this->formSetupErrors, $suppliedArguments, $argumentDefaults, __METHOD__);
+		foreach ($arguments as $key => $value) {
+			$$key = $value;
+		}
+		
+		# Ensure there is a database connection or exit here (errors will already have been thrown)
+		if (!$this->databaseConnection) {
+			if ($this->databaseConnection === NULL) {	// rather than === NULL, which means no connection requested
+				$this->formSetupErrors['dataBindingNoDatabaseConnection'] = 'Data binding has been requested, but no valid database connection has been set up in the main settings.';
+			}
+			return false;
+		}
+		
+		# Ensure any lookup function has been defined
+		#!# Enable class::method format too
+		if ($lookupFunction && !is_callable ($lookupFunction)) {
+			$this->formSetupErrors['dataBindingLookupFunctionInvalid'] = "You specified a lookup function ('<strong>{$lookupFunction}</strong>') for the data binding, but the function does not exist.";
+			return false;
+		}
+		
+		# Ensure the user has not set both include and exclude lists
+		if ($includeOnly && $exclude) {
+			$this->formSetupErrors['dataBindingIncludeExcludeClash'] = 'Values have been set for both includeOnly and exclude when data binding.';
+			return false;
+		}
+		
+		# Get the database fields
+		if (!$fields = $this->databaseConnection->getFields ($database, $table)) {
+			$this->formSetupErrors['dataBindingFieldRetrievalFailed'] = 'The database fields could not be retrieved. Please check that the database library you are using is supported.';
+			return false;
+		}
+		
+		# Loop through the fields in the data, to add widgets
+		foreach ($fields as $fieldName => $fieldAttributes) {
+			
+			# Skip if either: (i) explicitly excluded; (ii) not specifically included or (iii) marked as NULL in the overload array
+			if (is_array ($includeOnly) && $includeOnly && !in_array ($fieldName, $includeOnly)) {continue;}
+			if (is_array ($exclude) && $exclude && in_array ($fieldName, $exclude)) {continue;}
+			if (is_array ($attributes) && (array_key_exists ($fieldName, $attributes))) {
+				if ($attributes[$fieldName] === NULL) {continue;}
+			}
+			
+			# Lookup the value if given; NB this can also be supplied in the attribute overloading as defaults
+			$value = ((is_array ($data) && (array_key_exists ($fieldName, $data))) ? $data[$fieldName] : NULL);
+			
+			# Assign the title
+			$title = (isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : $fieldName);
+			
+			# Perform a lookup if necessary
+			$lookupValues = false;
+			if ($lookupFunction) {
+				list ($title, $lookupValues) = call_user_func ($lookupFunction, $this->databaseConnection, $fieldName, $fieldAttributes['Type']);
+			}
+			
+			# Define the standard attributes
+			$standardAttributes = array (
+				'name' => $fieldName,	// Internal widget name
+				'title' => $title,	// Visible name
+				'required' => ($fieldAttributes['Null'] != 'YES'),	// Whether a required field
+				'default' => ($value === '0' ? '' : $value),	// #!# Cheat for unassigned joins
+				'datatype' => $fieldAttributes['Type'],
+			);
+			
+			# Overload the attributes if any supplied
+			if (is_array ($attributes) && (array_key_exists ($fieldName, $attributes))) {
+				
+				# Convert to hidden type if forced
+				if ($attributes[$fieldName] === 'hidden') {
+					$fieldAttributes['Type'] = '_hidden';
+				}
+				
+				# Overload the attribute, if the attributes are an array
+				if (is_array ($attributes[$fieldName])) {
+					$standardAttributes = array_merge ($standardAttributes, $attributes[$fieldName]);
+				}
+			}
+			
+			/*
+			#!# This should be a configurable option, or activated only when doing a non-clone write using setOutputDatabase
+			# Make a primary key which has no supplied value non-editable
+			if (($fieldAttributes['Key'] == 'PRI') && $value) {
+				$standardAttributes += array (
+					'editable' => false,
+				);
+			}
+			*/
+			
+			# Deal with looked-up value sets specially
+			if ($lookupValues && $fieldAttributes['Type'] != '_hidden') {
+				$this->select ($standardAttributes + array (
+					'forceAssociative' => true,	// Force associative checking of defaults
+					#!# What should happen if there's no data generated from a lookup (i.e. empty database table)?
+					'values' => $lookupValues,
+					'output' => array ('processing' => 'compiled'),
+					'truncate' => $truncate,
+				));
+				continue;	// Don't enter the switch which follows
+			}
+			
+			# Take the type and convert it into a form widget type
+			$type = $fieldAttributes['Type'];
+			switch (true) {
+				
+				# Hidden fields - deny editability
+				case ($fieldAttributes['Type'] == '_hidden'):
+					$this->input ($standardAttributes + array (
+						'editable' => false,
+						'_visible--DONOTUSETHISFLAGEXTERNALLY' => false,
+					));
+					break;
+				
+				# VARCHAR (character) field
+				case (eregi ('varchar\(([0-9]+)\)', $type, $matches)):
+					$this->input ($standardAttributes + array (
+						'maxlength' => $matches[1],
+						# Truncate the size if a (numeric) value is given and the required size is greater than the truncation
+						#!# Move this or decouple $truncate from it
+						'size' => ($truncate && (is_numeric ($truncate)) && ((int) $matches[1] > $truncate) ? $truncate : $matches[1]),
+					));
+					break;
+				
+				# INT (numeric) field
+				case (eregi ('int\(([0-9]+)\)', $type, $matches)):
+					$this->input ($standardAttributes + array (
+						'enforceNumeric' => true,
+						'maxlength' => $matches[1],
+					));
+					break;
+				
+				# ENUM (selection) field - explode the matches and insert as values
+				case (eregi ('enum\(\'(.*)\'\)', $type, $matches)):
+					$values = explode ("','", $matches[1]);
+					$this->select ($standardAttributes + array (
+						'values' => $values,
+						'output' => array ('processing' => 'compiled'),
+					));
+					break;
+				
+				# DATE (date) field
+				case (strtolower ($type) == 'date'):
+				case (strtolower ($type) == 'datetime'):
+					$this->datetime ($standardAttributes + array (
+						'level' => $type,
+					));
+					break;
+				
+				# BLOB
+				case (strtolower ($type) == 'blob'):
+				case 'mediumtext':
+					$this->textarea ($standardAttributes + array (
+						'cols' => 50,
+						'rows' => 6,
+					));
+					break;
+				
+				#!# Add more here as they are found
+				
+				# Otherwise throw an error
+				default:
+					$this->formSetupErrors['dataBindingUnsupportedFieldType'] = "An unknown field type ('{$type}') was found while trying to create a form from the data and fields; as such the form could not be created.";
+			}
+		}
+	}
 }
 
 
@@ -3678,7 +3953,7 @@ class formWidget
 		$this->formSetupErrors =& $form->formSetupErrors;
 		
 		# Assign the arguments
-		$this->arguments = $this->assignArguments ($suppliedArguments, $argumentDefaults, $functionName, $subargument);
+		$this->arguments = application::assignArguments ($this->formSetupErrors, $suppliedArguments, $argumentDefaults, $functionName, $subargument);
 		
 		# Register the element name to enable duplicate checking
 		$form->registerElementName ($this->arguments['name']);
@@ -3717,45 +3992,6 @@ class formWidget
 		if ($problems) {$this->elementProblems += $problems;}
 		
 		return $this->elementProblems;
-	}
-	
-	
-	# Function to merge the arguments
-	function assignArguments ($suppliedArguments, $argumentDefaults, $functionName, $subargument = NULL)
-	{
-		# Merge the defaults: ensure that arguments with a non-null default value are set (throwing an error if not), or assign the default value if none is specified
-		foreach ($argumentDefaults as $argument => $defaultValue) {
-			if (is_null ($defaultValue)) {
-				if (!isSet ($suppliedArguments[$argument])) {
-					$this->formSetupErrors['absent' . ucfirst ($functionName) . ucfirst ($argument)] = "No '$argument' has been set for a specified $functionName field.";
-					$arguments[$argument] = $functionName;
-				} else {
-					$arguments[$argument] = $suppliedArguments[$argument];
-				}
-				
-			# If a subargument is supplied, deal with subarguments
-			} elseif ($subargument && ($argument == $subargument)) {
-				foreach ($defaultValue as $subArgument => $subDefaultValue) {
-					if (is_null ($subDefaultValue)) {
-						if (!isSet ($suppliedArguments[$argument][$subArgument])) {
-							$this->formSetupErrors['absent' . ucfirst ($fieldType) . ucfirst ($argument) . ucfirst ($subArgument)] = "No '$subArgument' has been set for a specified $argument argument in a specified $fieldType field.";
-							$arguments[$argument][$subArgument] = $fieldType;
-						} else {
-							$arguments[$argument][$subArgument] = $suppliedArguments[$argument][$subArgument];
-						}
-					} else {
-						$arguments[$argument][$subArgument] = (isSet ($suppliedArguments[$argument][$subArgument]) ? $suppliedArguments[$argument][$subArgument] : $subDefaultValue);
-					}
-				}
-				
-			# Otherwise assign argument as normal
-			} else {
-				$arguments[$argument] = (isSet ($suppliedArguments[$argument]) ? $suppliedArguments[$argument] : $defaultValue);
-			}
-		}
-		
-		# Return the arguments
-		return $arguments;
 	}
 	
 	
@@ -3828,6 +4064,19 @@ class formWidget
 	}
 	
 	
+	# Perform truncation on the visible part of an array
+	function truncate ($values)
+	{
+		# Loop through and truncating the value's numeric length if necessary
+		foreach ($values as $key => $value) {
+			$values[$key] = ($this->arguments['truncate'] && (is_numeric ($this->arguments['truncate'])) ? substr ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ...' : '') : $value);
+		}
+		
+		# Return the modified array
+		return $values;
+	}
+	
+	
 	# Perform regexp checks
 	#!# Should there be checking for clashes between disallow and regexp, i.e. so that the widget can never submit?
 	#!# Should there be checking of disallow and regexp when editable is false, i.e. so that the widget can never submit?
@@ -3873,7 +4122,6 @@ class formWidget
 #!# Enable locales, e.g. ordering month-date-year for US users
 #!# Consider language localisation (put error messages into a global array)
 #!# Add in <span>&#64;</span> for on-screen e-mail types
-#!# Add standalone database-writing
 #!# Apache setup needs to be carefully tested, in conjunction with php.net/ini-set and php.net/configuration.changes
 #!# Add links to the id="$name" form elements in cases of USER errors (not for the templating mode though)
 #!# Need to prevent the form code itself being overwritable by uploads or CSV writing, by doing a check on the filenames
@@ -3885,6 +4133,7 @@ class formWidget
 #!# merge autoCenturyConversionEnabled and autoCenturyConversionLastYear
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
 # Enable specification of a validation function
+# Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
 
 # Version 2 feature proposals
 #!# Full object orientation - change the form into a package of objects

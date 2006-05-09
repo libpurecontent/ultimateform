@@ -49,14 +49,14 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.1.0
+ * @version 1.1.1
  */
 class form
 {
 	## Prepare variables ##
 	
 	# Principal arrays
-	var $elements;					// Master array of form element setup
+	var $elements = array ();					// Master array of form element setup
 	var $form;						// Master array of posted form data
 	var $outputData;				// Master array of arranged data for output
 	var $outputMethods = array ();	// Master array of output methods
@@ -128,8 +128,6 @@ class form
 		'requiredFieldIndicator'			=> true,							# Whether the required field indicator is to be displayed (top / bottom/true / false) (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
 		'requiredFieldClass'				=> 'required',						# The CSS class used to mark a widget as required
 		'submitTo'							=> false,							# The form processing location if being overriden
-		'autoCenturyConversionEnabled'		=> true,							# Whether years entered as two digits should automatically be converted to four
-		'autoCenturyConversionLastYear'		=> 69,								# The last two figures of the last year where '20' is automatically prepended
 		'nullText'							=> 'Please select',					# The 'null' text for e.g. selection boxes
 		'opening'							=> false,							# Optional starting datetime as an SQL string
 		'closing'							=> false,							# Optional closing datetime as an SQL string
@@ -1364,6 +1362,7 @@ class form
 			'level'					=> 'date',	# Whether to show a 'datetime' or just 'date' widget set
 			'default'				=> '',		# Initial value - either 'timestamp' or an SQL string
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'autoCenturyConversion'	=> 69,								# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
 		);
 		
 		# Load the date processing library
@@ -1412,8 +1411,8 @@ class form
 				if (($elementValue['month'] > 0) && ($elementValue['month'] <= 12)) {$elementValue['month'] = sprintf ('%02s', $elementValue['month']);}
 				
 				# If automatic conversion is set and the year is two characters long, convert the date to four years by adding 19 or 20 as appropriate
-				if (($this->settings['autoCenturyConversionEnabled']) && (strlen ($elementValue['year']) == 2)) {
-					$elementValue['year'] = (($elementValue['year'] <= $this->settings['autoCenturyConversionLastYear']) ? '20' : '19') . $elementValue['year'];
+				if (($arguments['autoCenturyConversion']) && (strlen ($elementValue['year']) == 2)) {
+					$elementValue['year'] = (($elementValue['year'] <= $arguments['autoCenturyConversion']) ? '20' : '19') . $elementValue['year'];
 				}
 				
 				# Check that all parts have been completed
@@ -1442,7 +1441,7 @@ class form
 							
 						# If the year is numeric, ensure the year has been entered as a two or four digit amount
 						} else {
-							if ($this->settings['autoCenturyConversionEnabled']) {
+							if ($arguments['autoCenturyConversion']) {
 								if ((strlen ($elementValue['year']) != 2) && (strlen ($elementValue['year']) != 4)) {
 									$elementProblems['yearInvalid'] = 'The year part must be either two or four digits!';
 								}
@@ -3755,10 +3754,12 @@ class form
 			'table' => NULL,
 			'attributes' => array (),
 			'data' => array (),
+			'recordIsComplete'	 => false,	// Whether a supplied 'data' record is complete or partial
 			'includeOnly' => array (),
 			'exclude' => array (),
 			'lookupFunction' => false,
 			'truncate' => 40,
+			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
 		);
 		
 		# Merge the arguments
@@ -3776,9 +3777,8 @@ class form
 		}
 		
 		# Ensure any lookup function has been defined
-		#!# Enable class::method format too
 		if ($lookupFunction && !is_callable ($lookupFunction)) {
-			$this->formSetupErrors['dataBindingLookupFunctionInvalid'] = "You specified a lookup function ('<strong>{$lookupFunction}</strong>') for the data binding, but the function does not exist.";
+			$this->formSetupErrors['dataBindingLookupFunctionInvalid'] = "You specified a lookup function ('<strong>" . (is_array ($lookupFunction) ? implode ('::', $lookupFunction) : $lookupFunction) . "</strong>') for the data binding, but the function does not exist.";
 			return false;
 		}
 		
@@ -3804,8 +3804,20 @@ class form
 				if ($attributes[$fieldName] === NULL) {continue;}
 			}
 			
-			# Lookup the value if given; NB this can also be supplied in the attribute overloading as defaults
-			$value = ((is_array ($data) && (array_key_exists ($fieldName, $data))) ? $data[$fieldName] : NULL);
+			# By default, set the value to be the database field default value
+			$value = (isSet ($fields[$fieldName]['Default']) ? $fields[$fieldName]['Default'] : NULL);
+			
+			# Overwrite the value with the field specification default if one is supplied
+			if (is_array ($attributes) && (isSet ($attributes[$fieldName]) && is_array ($attributes[$fieldName]) && isSet ($attributes[$fieldName]['default']))) {
+				$value = $attributes[$fieldName]['default'];
+				unset ($attributes[$fieldName]['default']);
+			}
+			
+			# Overwrite the value with any supplied data
+			if ($recordIsComplete) {$value = NULL;}
+			if ($data && isSet ($data[$fieldName])) {
+				$value = $data[$fieldName];
+			}
 			
 			# Assign the title
 			$title = (isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : $fieldName);
@@ -3814,6 +3826,17 @@ class form
 			$lookupValues = false;
 			if ($lookupFunction) {
 				list ($title, $lookupValues) = call_user_func ($lookupFunction, $this->databaseConnection, $fieldName, $fieldAttributes['Type']);
+			}
+			
+			# Convert title from lowerCamelCase to Standard text if necessary
+			if ($changeCase) {
+				$title = $this->changeCase ($title);
+			}
+			
+			# Ensure a required-field widget is editable if no value has been supplied; this has to be done, otherwise the form will never complete
+			#!# Should this instead throw a setup error?
+			if (!$fieldAttributes['Null'] && !$value) {
+				$attributes[$fieldName]['editable'] = true;
 			}
 			
 			# Define the standard attributes
@@ -3924,6 +3947,36 @@ class form
 					$this->formSetupErrors['dataBindingUnsupportedFieldType'] = "An unknown field type ('{$type}') was found while trying to create a form from the data and fields; as such the form could not be created.";
 			}
 		}
+	}
+	
+	
+	# Function to convert camelCase to standard text
+	function changeCase ($string)
+	{
+		# Special case certain words
+		$replacements = array (
+			'url' => 'URL',
+			'email' => 'e-mail',
+		);
+		
+		# Perform the conversion; based on www.php.net/ucwords#49303
+		$string = ucfirst ($string);
+		$bits = preg_split ('/([A-Z])/', $string, false, PREG_SPLIT_DELIM_CAPTURE);
+		$words = array ();
+		array_shift ($bits);
+		for ($i = 0; $i < count ($bits); ++$i) {
+			if ($i % 2) {
+				$word = strtolower ($bits[$i - 1] . $bits[$i]);
+				$word = str_replace (array_keys ($replacements), array_values ($replacements), $word);
+				$words[] = $word;
+			}
+		}
+		
+		# Compile the words
+		$string = ucfirst (implode (' ', $words));
+		
+		# Return the string
+		return $string;
 	}
 }
 
@@ -4130,7 +4183,6 @@ class formWidget
 #!# Prevent insecure bcc:ing as per http://lists.evolt.org/harvest/detail.cgi?w=20050725&id=6342
 #!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp e.g. accept="list_of_mime_types" for type=file
 #!# Suggestions at http://www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
-#!# merge autoCenturyConversionEnabled and autoCenturyConversionLastYear
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
 # Enable specification of a validation function
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode

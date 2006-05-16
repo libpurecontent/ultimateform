@@ -49,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.1.1
+ * @version 1.1.2
  */
 class form
 {
@@ -341,6 +341,7 @@ class form
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'maxlength'				=> false,	# Maximum number of characters allowed
 		);
 		
 		# Create a new form widget
@@ -360,6 +361,9 @@ class form
 		
 		# Clean to numeric if required
 		$widget->cleanToNumeric ();
+		
+		# Enable maxlength checking
+		$widget->checkMaxLength ();
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
@@ -1682,11 +1686,6 @@ class form
 		# If any files have been uploaded, the user will need to re-select them.
 		if ($apparentlyUploadedFiles > 0) {
 			$this->elementProblems['generic']['reselectUploads'] = "You will need to reselect the $apparentlyUploadedFiles files you selected for uploading, because of problems elsewhere in the form. (Re-selection is a security requirement of your web browser.)";
-			/*
-			#!# Need a way to flag it in red but not be listed in "You didn't enter a value for the following required fields"
-			# The requiredButEmpty flag is triggered, even though the element may not be required
-			$requiredButEmpty = true;
-			*/
 		}
 		
 		# Check if the field is required (i.e. the minimum number of fields is greater than 0) and, if so, run further checks
@@ -2835,7 +2834,7 @@ class form
 			}
 			
 			# If the form has been posted AND the element has any problems or is empty, add the warning CSS class
-			if ($this->formPosted && (($elementAttributes['problems']) || ($elementAttributes['requiredButEmpty']))) {
+			if ($this->formPosted && (($elementAttributes['problems']) || ($elementAttributes['requiredButEmpty']) || (($elementAttributes['type'] == 'upload') && (isSet ($this->elementProblems['generic']) && isSet ($this->elementProblems['generic']['reselectUploads']))))) {
 				$elementAttributes['title'] = '<span class="warning">' . $elementAttributes['title'] . '</span>';
 			}
 			
@@ -3058,7 +3057,7 @@ class form
 		if (isSet ($incompleteFields)) {
 			
 			# If there are any incomplete fields, add it to the start of the problems array
-			$this->elementProblems['generic']['incompleteFields'] = "You didn't enter a value for the following required " . ((count ($incompleteFields) == 1) ? 'field' : 'fields') . ': <strong>' . implode ('</strong>, <strong>', $incompleteFields) . '</strong>.';
+			$this->elementProblems['generic']['incompleteFields'] = "You need to enter a value for the following required " . ((count ($incompleteFields) == 1) ? 'field' : 'fields') . ': <strong>' . implode ('</strong>, <strong>', $incompleteFields) . '</strong>.';
 			
 		} else {
 			# If there are no fields incomplete, remove the requirement to force upload(s) reselection
@@ -3671,7 +3670,11 @@ class form
 				#!# How can we deal with multiple files?
 				if ($arguments['forcedFileName']) {
 					#!# This is very hacky
-					$attributes['name'] = $_FILES[$this->settings['name']]['name'][$name][$key] = $arguments['forcedFileName'];
+					$file = basename ($_FILES[$this->settings['name']]['name'][$name][$key]);
+					if (strpos ($file, '.') !== true) {$file = 'NULL.' . $file;}
+					$fileExtension  = array_pop (explode ('.', $file));
+					$fileName = basename ($file, '.' . $fileExtension);
+					$attributes['name'] = $_FILES[$this->settings['name']]['name'][$name][$key] = $arguments['forcedFileName'] . '.' . $fileExtension;
 				}
 				
 				# Check whether a file already exists
@@ -3754,7 +3757,6 @@ class form
 			'table' => NULL,
 			'attributes' => array (),
 			'data' => array (),
-			'recordIsComplete'	 => false,	// Whether a supplied 'data' record is complete or partial
 			'includeOnly' => array (),
 			'exclude' => array (),
 			'lookupFunction' => false,
@@ -3804,20 +3806,8 @@ class form
 				if ($attributes[$fieldName] === NULL) {continue;}
 			}
 			
-			# By default, set the value to be the database field default value
-			$value = (isSet ($fields[$fieldName]['Default']) ? $fields[$fieldName]['Default'] : NULL);
-			
-			# Overwrite the value with the field specification default if one is supplied
-			if (is_array ($attributes) && (isSet ($attributes[$fieldName]) && is_array ($attributes[$fieldName]) && isSet ($attributes[$fieldName]['default']))) {
-				$value = $attributes[$fieldName]['default'];
-				unset ($attributes[$fieldName]['default']);
-			}
-			
-			# Overwrite the value with any supplied data
-			if ($recordIsComplete) {$value = NULL;}
-			if ($data && isSet ($data[$fieldName])) {
-				$value = $data[$fieldName];
-			}
+			# Lookup the value if given; NB this can also be supplied in the attribute overloading as defaults
+			$value = ((is_array ($data) && (array_key_exists ($fieldName, $data))) ? $data[$fieldName] : $fieldAttributes['Default']);
 			
 			# Assign the title
 			$title = (isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : $fieldName);
@@ -3831,12 +3821,6 @@ class form
 			# Convert title from lowerCamelCase to Standard text if necessary
 			if ($changeCase) {
 				$title = $this->changeCase ($title);
-			}
-			
-			# Ensure a required-field widget is editable if no value has been supplied; this has to be done, otherwise the form will never complete
-			#!# Should this instead throw a setup error?
-			if (!$fieldAttributes['Null'] && !$value) {
-				$attributes[$fieldName]['editable'] = true;
 			}
 			
 			# Define the standard attributes
@@ -4186,6 +4170,7 @@ class formWidget
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
 # Enable specification of a validation function
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
+# Option to return form HTML rather than echo it directly
 
 # Version 2 feature proposals
 #!# Full object orientation - change the form into a package of objects

@@ -49,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.1.2
+ * @version 1.1.3
  */
 class form
 {
@@ -1380,7 +1380,7 @@ class form
 		
 		# Convert the default if using the 'timestamp' keyword; cache a copy for later use
 		$isTimestamp = ($arguments['default'] == 'timestamp');
-		if ($isTimestamp) {$arguments['default'] = date ('Y-m-d' . (($arguments['level'] == 'datetime') ? ' H:i:s' : ''));}
+		if ($isTimestamp) {$arguments['default'] = date ('Y' . (($arguments['level'] != 'year') ? '-m-d' : '') . (($arguments['level'] == 'datetime') ? ' H:i:s' : ''));}
 		
 		# If the widget is not editable, fix the form value to the default
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = datetime::getDateTimeArray ($arguments['default']);}
@@ -1399,9 +1399,15 @@ class form
 		} else {
  			
 			# Check whether all fields are empty, starting with assuming all fields are not incomplete
+			#!# This section needs serious (switch-based?) refactoring
 			$allFieldsIncomplete = false;
 			if ($arguments['level'] == 'datetime') {
 				if ((empty ($elementValue['day'])) && (empty ($elementValue['month'])) && (empty ($elementValue['year'])) && (empty ($elementValue['time']))) {$allFieldsIncomplete = true;}
+			} else if ($arguments['level'] == 'year') {
+				if (empty ($elementValue['year'])) {$allFieldsIncomplete = true;}
+				# Emulate the day and month as being the first, to avoid branching the logic
+				$elementValue['day'] = 1;
+				$elementValue['month'] = 1;
 			} else {
 				if ((empty ($elementValue['day'])) && (empty ($elementValue['month'])) && (empty ($elementValue['year']))) {$allFieldsIncomplete = true;}
 			}
@@ -1411,13 +1417,13 @@ class form
 				if ($arguments['required']) {$requiredButEmpty = true;}
 			} else {
 				
-				# Deal with month conversion by adding leading zeros as required
-				if (($elementValue['month'] > 0) && ($elementValue['month'] <= 12)) {$elementValue['month'] = sprintf ('%02s', $elementValue['month']);}
-				
 				# If automatic conversion is set and the year is two characters long, convert the date to four years by adding 19 or 20 as appropriate
 				if (($arguments['autoCenturyConversion']) && (strlen ($elementValue['year']) == 2)) {
 					$elementValue['year'] = (($elementValue['year'] <= $arguments['autoCenturyConversion']) ? '20' : '19') . $elementValue['year'];
 				}
+				
+				# Deal with month conversion by adding leading zeros as required
+				if (($elementValue['month'] > 0) && ($elementValue['month'] <= 12)) {$elementValue['month'] = sprintf ('%02s', $elementValue['month']);}
 				
 				# Check that all parts have been completed
 				if ((empty ($elementValue['day'])) || (empty ($elementValue['month'])) || (empty ($elementValue['year'])) || (($arguments['level'] == 'datetime') && (empty ($elementValue['time'])))) {
@@ -1490,7 +1496,10 @@ class form
 		# Start to define the widget's core HTML
 		if ($arguments['editable']) {
 			#!# Add fieldsets to remaining form widgets or scrap
-			$widgetHtml = "\n\t\t\t<fieldset>";
+			$widgetHtml = '';
+			if ($arguments['level'] != 'year') {
+				$widgetHtml .= "\n\t\t\t<fieldset>";
+			}
 			
 			# Add in the time if required
 			if ($arguments['level'] == 'datetime') {
@@ -1498,20 +1507,26 @@ class form
 			}
 			
 			# Define the date, month and year input boxes; if the day or year are 0 then nothing will be displayed
-			$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . $this->settings['name'] . '[' . $arguments['name'] . '][day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
-			$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
-			$widgetHtml .= "\n\t\t\t\t" . '<select name="' . $this->settings['name'] . '[' . $arguments['name'] . '][month]">';
-			$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
-			$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
-			foreach ($months as $monthNumber => $monthName) {
-				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="' . sprintf ('%02s', $monthNumber) . '"' . (($elementValue['month'] == sprintf ('%02s', $monthNumber)) ? ' selected="selected"' : '') . '>' . $monthName . '</option>';
+			if ($arguments['level'] != 'year') {
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . $this->settings['name'] . '[' . $arguments['name'] . '][day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
+				$widgetHtml .= "\n\t\t\t\t" . '<select name="' . $this->settings['name'] . '[' . $arguments['name'] . '][month]">';
+				$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
+				foreach ($months as $monthNumber => $monthName) {
+					$widgetHtml .= "\n\t\t\t\t\t" . '<option value="' . sprintf ('%02s', $monthNumber) . '"' . (($elementValue['month'] == sprintf ('%02s', $monthNumber)) ? ' selected="selected"' : '') . '>' . $monthName . '</option>';
+				}
+				$widgetHtml .= "\n\t\t\t\t" . '</select>';
 			}
-			$widgetHtml .= "\n\t\t\t\t" . '</select>';
+			#!# Remove 'y:' if only in year format
 			$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">y:&nbsp;</span><input size="4" name="' . $this->settings['name'] . '[' . $arguments['name'] . '][year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
-			$widgetHtml .= "\n\t\t\t</fieldset>";
+			if ($arguments['level'] != 'year') {
+				$widgetHtml .= "\n\t\t\t</fieldset>";
+			}
 		} else {
 			
 			# Non-editable version
+			#!# If a default value is empty, this results in "mktime() expects parameter 4 to be long, string given in datetime.php on line 69"
 			$widgetHtml  = datetime::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : '');
 			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($arguments['default']) . '" />';
 		}
@@ -1523,6 +1538,10 @@ class form
 		if ($this->formPosted) {
 			
 			# Map the components directly and assemble the elements into a string
+			if ($arguments['level'] == 'year') {
+				unset ($this->form[$arguments['name']]['day']);
+				unset ($this->form[$arguments['name']]['month']);
+			}
 			$data['rawcomponents'] = $this->form[$arguments['name']];
 			
 			# Ensure there is a presented and a compiled version
@@ -1534,7 +1553,7 @@ class form
 			if (!application::allArrayElementsEmpty ($this->form[$arguments['name']])) {
 				
 				# Make the compiled version be in SQL DATETIME format, i.e. YYYY-MM-DD HH:MM:SS
-				$data['compiled'] = $this->form[$arguments['name']]['year'] . '-' . $this->form[$arguments['name']]['month'] . '-' . $this->form[$arguments['name']]['day'] . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : '');
+				$data['compiled'] = $this->form[$arguments['name']]['year'] . (($arguments['level'] == 'year') ? '' : '-' . $this->form[$arguments['name']]['month'] . '-' . $this->form[$arguments['name']]['day']) . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : '');
 				
 				# Make the presented version in english text
 				#!# date () corrupts dates after 2038; see php.net/date. Suggest not re-presenting it if year is too great.
@@ -3820,7 +3839,7 @@ class form
 			
 			# Convert title from lowerCamelCase to Standard text if necessary
 			if ($changeCase) {
-				$title = $this->changeCase ($title);
+				$title = application::changeCase ($title);
 			}
 			
 			# Define the standard attributes
@@ -3908,10 +3927,14 @@ class form
 					break;
 				
 				# DATE (date) field
+				case (eregi ('year\(([2|4])\)', $type, $matches)):
+					$type = 'year';
 				case (strtolower ($type) == 'date'):
 				case (strtolower ($type) == 'datetime'):
+				case (strtolower ($type) == 'timestamp'):
 					$this->datetime ($standardAttributes + array (
 						'level' => $type,
+						'editable' => (strtolower ($type) == 'timestamp'),
 					));
 					break;
 				
@@ -3931,36 +3954,6 @@ class form
 					$this->formSetupErrors['dataBindingUnsupportedFieldType'] = "An unknown field type ('{$type}') was found while trying to create a form from the data and fields; as such the form could not be created.";
 			}
 		}
-	}
-	
-	
-	# Function to convert camelCase to standard text
-	function changeCase ($string)
-	{
-		# Special case certain words
-		$replacements = array (
-			'url' => 'URL',
-			'email' => 'e-mail',
-		);
-		
-		# Perform the conversion; based on www.php.net/ucwords#49303
-		$string = ucfirst ($string);
-		$bits = preg_split ('/([A-Z])/', $string, false, PREG_SPLIT_DELIM_CAPTURE);
-		$words = array ();
-		array_shift ($bits);
-		for ($i = 0; $i < count ($bits); ++$i) {
-			if ($i % 2) {
-				$word = strtolower ($bits[$i - 1] . $bits[$i]);
-				$word = str_replace (array_keys ($replacements), array_values ($replacements), $word);
-				$words[] = $word;
-			}
-		}
-		
-		# Compile the words
-		$string = ucfirst (implode (' ', $words));
-		
-		# Return the string
-		return $string;
 	}
 }
 
@@ -4170,7 +4163,6 @@ class formWidget
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
 # Enable specification of a validation function
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
-# Option to return form HTML rather than echo it directly
 
 # Version 2 feature proposals
 #!# Full object orientation - change the form into a package of objects

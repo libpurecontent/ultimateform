@@ -48,8 +48,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright © 2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.1.3
+ * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
+ * @version 1.1.4
  */
 class form
 {
@@ -230,6 +230,9 @@ class form
 		
 		# Handle whitespace issues
 		$widget->handleWhiteSpace ();
+		
+		# Prevent multi-line submissions
+		$widget->preventMultilineSubmissions ();
 		
 		# Run maxlength checking
 		$widget->checkMaxLength ();
@@ -1084,7 +1087,7 @@ class form
 				$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				#$visible = str_replace ('†', '&dagger;', htmlentities ($visible));
+				#$visible = str_replace ('', '&dagger;', htmlentities ($visible));
 				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->settings['name'] . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlentities ($visible) . '</label>';
 				
 				# Add a line break if required
@@ -1922,7 +1925,7 @@ class form
 	function cleanId ($id)
 	{
 		# Define the replacements
-		$replacements = array (' ', ',', '†', '!', '(', ')', '[', ']',);
+		$replacements = array (' ', ',', '', '!', '(', ')', '[', ']',);
 		
 		# Perform the replacements
 		$id = str_replace ($replacements, '_', $id);
@@ -3852,11 +3855,21 @@ class form
 			);
 			
 			# Overload the attributes if any supplied
+			$forceType = false;
 			if (is_array ($attributes) && (array_key_exists ($fieldName, $attributes))) {
 				
 				# Convert to hidden type if forced
 				if ($attributes[$fieldName] === 'hidden') {
 					$fieldAttributes['Type'] = '_hidden';
+				}
+				
+				# Amend the type to a specific widget if set
+				if (isSet ($attributes[$fieldName]['type'])) {
+					if (method_exists ($this, $attributes[$fieldName]['type'])) {
+						$fieldAttributes['Type'] = $attributes[$fieldName]['type'];
+						$forceType = true;
+					}
+					unset ($attributes[$fieldName]['type']);
 				}
 				
 				# Overload the attribute, if the attributes are an array
@@ -3890,6 +3903,11 @@ class form
 			# Take the type and convert it into a form widget type
 			$type = $fieldAttributes['Type'];
 			switch (true) {
+				
+				# Force to a specified type if required
+				case ($forceType):
+					$this->$type ($standardAttributes);
+					break;
 				
 				# Hidden fields - deny editability
 				case ($fieldAttributes['Type'] == '_hidden'):
@@ -4047,6 +4065,16 @@ class formWidget
 			if (strlen ($this->value) > $this->arguments['maxlength']) {
 				$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . strlen ($this->value) . '</strong>) than are allowed (<strong>' . $this->arguments['maxlength'] . '</strong>).';
 			}
+		}
+	}
+	
+	
+	# Function to prevent multiline submissions in elements (e.g. input) which shouldn't allow line-breaks
+	function preventMultilineSubmissions ()
+	{
+		# Throw an error if an \n or \r line break is found
+		if (ereg ("([\n|\r]+)", $this->value)) {
+			$this->elementProblems['multilineSubmission'] = 'Line breaks are not allowed in field types that do not support these.';
 		}
 	}
 	

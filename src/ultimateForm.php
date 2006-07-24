@@ -49,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.1.4
+ * @version 1.1.5
  */
 class form
 {
@@ -2592,8 +2592,9 @@ class form
 		
 		# Create the connection using the credentials array now assigned
 		require_once ('database.php');
-		if (!$this->databaseConnection = new database ($credentials['hostname'], $credentials['username'], $credentials['password'])) {
-			$this->formSetupErrors['databaseCredentialsFile'] ('The database credentials file could not be open or does not exist.');
+		$this->databaseConnection = new database ($credentials['hostname'], $credentials['username'], $credentials['password']);
+		if (!$this->databaseConnection->connection) {
+			$this->formSetupErrors['databaseCredentialsFile'] = 'The database connection failed for some reason.';
 			return false;
 		}
 	}
@@ -3787,7 +3788,7 @@ class form
 		);
 		
 		# Merge the arguments
-		$arguments = application::assignArguments ($this->formSetupErrors, $suppliedArguments, $argumentDefaults, __METHOD__);
+		$arguments = application::assignArguments ($this->formSetupErrors, $suppliedArguments, $argumentDefaults, 'dataBinding');
 		foreach ($arguments as $key => $value) {
 			$$key = $value;
 		}

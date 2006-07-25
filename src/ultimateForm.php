@@ -49,7 +49,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.1.5
+ * @version 1.1.6
  */
 class form
 {
@@ -588,6 +588,7 @@ class form
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links (as made within the editing system) or false
 			'directoryIndex' => 'index.html',		// Default directory index name
 			'imageAlignmentByClass'	=> true,		// Replace align="foo" with class="foo" for images
+			'replacements' => array (),	// Regexp replacements to add before standard replacements are done
 		);
 		
 		# Create a new form widget
@@ -697,7 +698,7 @@ class form
 		}
 		
 		# Start an array of regexp replacements
-		$replacements = array ();
+		$replacements = $arguments['replacements'];	// By default an empty array
 		
 		# Protect e-mail spanning from later replacement in the main regexp block
 		if ($arguments['protectEmailAddresses']) {
@@ -2062,8 +2063,14 @@ class form
 		# Set the reply-to field if applicable
 		$this->configureResultEmailReplyTo = $this->_setReplyTo ($replyToField);
 		
-		# Assign the subject title
+		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
 		$this->configureResultEmailedSubjectTitle['email'] = $subjectTitle;
+		if (ereg ('\{([^\} ]+)\}', $subjectTitle, $matches)) {
+			$element = $matches[1];
+			if (isSet ($this->elements[$element]) && ($this->elements[$element]['type'] == 'input')) {
+				$this->configureResultEmailedSubjectTitle['email'] = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $subjectTitle);
+			}
+		}
 	}
 	
 	
@@ -2184,7 +2191,7 @@ class form
 	/**
 	 * Output a confirmation of the submitted results to the submitter
 	 */
-	function setOutputConfirmationEmail ($chosenelementName, $administrator = '', $includeAbuseNotice = true, $subjectTitle = 'Form submission results', $displayUnsubmitted = true)
+	function setOutputConfirmationEmail ($chosenelementName, $administrator = '', $subjectTitle = 'Form submission results', $includeAbuseNotice = true, $displayUnsubmitted = true)
 	{
 		# Flag that this method is required
 		$this->outputMethods['confirmationEmail'] = true;
@@ -2217,8 +2224,14 @@ class form
 		# Assign the administrator e-mail address
 		$this->configureResultConfirmationEmailAdministrator = ($administrator != '' ? $administrator : $_SERVER['SERVER_ADMIN']);
 		
-		# Assign the subject title
+		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
 		$this->configureResultEmailedSubjectTitle['confirmationEmail'] = $subjectTitle;
+		if (ereg ('\{([^\} ]+)\}', $subjectTitle, $matches)) {
+			$element = $matches[1];
+			if (isSet ($this->elements[$element]) && ($this->elements[$element]['type'] == 'input')) {
+				$this->configureResultEmailedSubjectTitle['confirmationEmail'] = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $subjectTitle);
+			}
+		}
 	}
 	
 	
@@ -4192,6 +4205,7 @@ class formWidget
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
 # Enable specification of a validation function
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
+# Multi-select combo box like at http://cross-browser.com/x/examples/xselect.php
 
 # Version 2 feature proposals
 #!# Full object orientation - change the form into a package of objects

@@ -21,6 +21,7 @@
  * - Regular expression hooks for various widget types
  * - Templating mechanism
  * - The ability to set elements as non-editable
+ * - Group validation rules to ensure that at least one field is completed, that all are the same or all are different
  * 
  * REQUIREMENTS:
  * - PHP4.1 or above
@@ -49,7 +50,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.1.6
+ * @version 1.2.0
  */
 class form
 {
@@ -57,9 +58,9 @@ class form
 	
 	# Principal arrays
 	var $elements = array ();					// Master array of form element setup
-	var $form;						// Master array of posted form data
-	var $outputData;				// Master array of arranged data for output
-	var $outputMethods = array ();	// Master array of output methods
+	var $form;									// Master array of posted form data
+	var $outputData;							// Master array of arranged data for output
+	var $outputMethods = array ();				// Master array of output methods
 	
 	# Main variables
 	var $name;									// The name of the form
@@ -67,12 +68,13 @@ class form
 	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
 	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added
 	var $elementProblems = array ();			// Array of submitted element problems
-	var $databaseConnection = NULL;						// Database connection
+	var $validationRules = array ();			// Array of validation rules
+	var $databaseConnection = NULL;				// Database connection
 	
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
 	var $formDisplayed = false;					// Flag for whether the form has been displayed
-	var $setupOk = false;					// Flag for whether the form has been set up OK
+	var $setupOk = false;						// Flag for whether the form has been set up OK
 	var $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
@@ -290,6 +292,7 @@ class form
 			'output' => $arguments['output'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'groupValidation' => ($functionName == 'password' ? 'compiled' : false),
 		);
 		
 		#!# Temporary hacking to add hidden widgets when using the _hidden type in dataBinding
@@ -984,6 +987,7 @@ class form
 			'values' => $arguments['values'],
 			'multiple' => $arguments['multiple'],
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'groupValidation' => 'compiled',
 		);
 	}
 	
@@ -1149,6 +1153,7 @@ class form
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'groupValidation' => 'compiled',
 		);
 	}
 	
@@ -1349,6 +1354,7 @@ class form
 			'values' => $arguments['values'],
 			#!# Not correct - needs multisplit into boolean
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : $datatype),
+			'groupValidation' => 'compiled',
 		);
 	}
 	
@@ -2555,6 +2561,9 @@ class form
 			$this->formSetupErrors['callback'] = 'You specified a callback function but no such function exists.';
 		}
 		
+		# Check group validation checks are valid
+		$this->_checkGroupValidations ();
+		
 		# If there are any form setup errors - a combination of those just defined and those assigned earlier in the form processing, show them
 		if (!empty ($this->formSetupErrors)) {echo application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, (count ($this->formSetupErrors) > 1 ? 'Various errors were' : 'An error was') . " found in the setup of the form. The website's administrator needs to correct the configuration before the form will work:");}
 		
@@ -3039,6 +3048,13 @@ class form
 			}
 		}
 		
+		# Next the group if any exist
+		if (isSet ($problems['group'])) {
+			foreach ($problems['group'] as $name => $groupProblem) {
+				$problemsList[] = $groupProblem;
+			}
+		}
+		
 		# Return a constructed list of problems (or empty string)
 		return $html = (($this->formPosted && $problemsList) ? application::showUserErrors ($problemsList, $parentTabLevel = 0, ($this->settings['warningMessage'] ? $this->settings['warningMessage'] : (count ($problemsList) > 1 ? 'Various problems were' : 'A problem was') . ' found with the form information you submitted, as detailed below; please make the necessary corrections and re-submit the form:')) : '');
 	}
@@ -3102,8 +3118,104 @@ class form
 			}
 		}
 		
+		# Run checks for multiple validation fields
+		$this->elementProblems['group'] = $this->_groupValidationChecks ();
+		
 		# Return a boolean of whether problems have been found or not
-		return $problemsFound = (!empty ($this->elementProblems['generic'])) || (!empty ($this->elementProblems['elements']));
+		#!# This needs to be made more generic, by looping through the first-level arrays to see if any second-level items exist; then new types of problems need not be registered here
+		return $problemsFound = (!empty ($this->elementProblems['generic'])) || (!empty ($this->elementProblems['elements']) || (!empty ($this->elementProblems['group'])));
+	}
+	
+	
+	# Function to register a group validation check
+	function validation ($type, $fields)
+	{
+		# Register the (now validated) validation rule
+		$this->validationRules[] = array ('type' => $type, 'fields' => $fields);
+	}
+	
+	
+	# Function to check the group validations are syntactically correct
+	function _checkGroupValidations ()
+	{
+		# End if no rules
+		if (!$this->validationRules) {return;}
+		
+		# Define the supported validation types and the error message (including a placeholder) which should appear if the check fails
+		$this->validationTypes = array (
+			'different' => 'The values for each of the sections %fields must be unique.',
+			'same'		=> 'The values for each of the sections %fields must be the same.',
+			'either'	=> 'At least one of the sections %fields must be completed.',
+		);
+		
+		# Loop through each registered rule
+		foreach ($this->validationRules as $validationRule) {
+			
+			# Ensure the validation is a valid type
+			if (!array_key_exists ($validationRule['type'], $this->validationTypes)) {
+				$this->formSetupErrors['validationTypeInvalid'] = "The group validation type '<strong>{$validationRule['type']}</strong>' is not supported.";
+				return;
+			}
+			
+			# Ensure the fields are an array and that there are at least two
+			if (!is_array ($validationRule['fields']) || (is_array ($validationRule['fields']) && (count ($validationRule['fields']) < 2))) {
+				$this->formSetupErrors['validationFieldsInvalid'] = 'An array of at least two fields must be specified for a group validation rule.';
+				return;
+			}
+			
+			# Ensure the specified fields exist
+			if ($missing = array_diff ($validationRule['fields'], array_keys ($this->elements))) {
+				$this->formSetupErrors['validationFieldsAbsent'] = 'The field ' . (count ($missing) > 1 ? 'names' : 'name') . " '<strong>" . implode ("</strong>', '<strong>", $missing) . "</strong>' " . (count ($missing) > 1 ? 'names' : 'was') . " specified for a validation rule, but no such " . (count ($missing) > 1 ? 'elements exist' : 'element exists') . '.';
+			}
+		}
+	}
+	
+	
+	# Function to run group validation checks
+	function _groupValidationChecks ()
+	{
+		# Don't do any processing if no rules exist
+		if (!$this->validationRules) {return array ();}
+		
+		# Perform each validation and build an array of problems
+		$problems = array ();
+		foreach ($this->validationRules as $index => $rule) {
+			
+			# Get the value of each field, using the presented value unless the widget specifies the value to be used
+			$values = array ();
+			foreach ($rule['fields'] as $name) {
+				$values[$name] = ((isSet ($this->elements[$name]['groupValidation']) && $this->elements[$name]['groupValidation']) ? $this->elements[$name]['data'][$this->elements[$name]['groupValidation']] : $this->elements[$name]['data']['presented']);
+			}
+			
+			# Check the rule
+			#!# Ideally refactor to avoid the same list of cases specified as $this->validationTypes
+			if (
+				(($rule['type'] == 'different') && (!application::allArrayElementsEmpty ($values)) && (count ($values) != count (array_unique ($values))))
+				|| (($rule['type'] == 'same')      && ((count ($values) > 1) && count (array_unique ($values)) != 1))
+				|| (($rule['type'] == 'either')    && (application::allArrayElementsEmpty ($values)))
+			) {
+				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace ('%fields', $this->_fieldListString ($rule['fields']), $this->validationTypes[$rule['type']]);
+			}
+		}
+		
+		# Return the problems
+		return $problems;
+	}
+	
+	
+	# Function to construct a field list string
+	function _fieldListString ($fields)
+	{
+		# Loop through each field name
+		foreach ($fields as $name) {
+			$names[$name] = ($this->elements[$name]['title'] != '' ? $this->elements[$name]['title'] : ucfirst ($name));
+		}
+		
+		# Construct the list
+		$fieldsList = '<strong>' . implode ('</strong> &amp; <strong>', $names) . '</strong>';
+		
+		# Return the list
+		return $fieldsList;
 	}
 	
 	
@@ -4218,5 +4330,6 @@ class formWidget
 #!# Add AJAX validation flag See: http://particletree.com/features/degradable-ajax-form-validation/ (but modified version needed because this doesn't use Unobtrusive DHTML - see also http://particletree.com/features/a-guide-to-unobtrusive-javascript-validation/ )
 #!# Self-creating form mode
 #!# Postponed files system
+
 
 ?>

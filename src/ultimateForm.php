@@ -50,7 +50,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.1
+ * @version 1.2.2
  */
 class form
 {
@@ -500,7 +500,7 @@ class form
 	
 	
 	/**
-	 * Create a rich text editor field based on FCKeditor 2.2
+	 * Create a rich text editor field based on FCKeditor 2.3.1
 	 * @param array $arguments Supplied arguments - see template
 	 */
 	 
@@ -508,36 +508,33 @@ class form
 	
 	# Note: make sure php_value file_uploads is on in the upload location!
 	
-	The following source code alterations must be made to FCKeditor 2.2
+	The following source code alterations must be made to FCKeditor 2.3.1
 	
 	1. Customised configurations which cannot go in the PHP at present
 	Add the supplied file /_fckeditor/fckconfig-customised.js
 	
-	2. Add in main fckconfig.js (NOT elsewhere) after DocType [see http://sourceforge.net/tracker/index.php?func=detail&aid=1199631&group_id=75348&atid=543653  and  https://sourceforge.net/tracker/index.php?func=detail&aid=1200670&group_id=75348&atid=543653 ]
-	// Prevent left-right scrollbars
-	FCKConfig.DocType = '' ;
+	2. More control for FCKeditor uploading
+	Apply the patch (or changed files) which someone has supplied at: http://sourceforge.net/tracker/index.php?func=detail&aid=1457770&group_id=75348&atid=543655
 	
 	3. Open editor/filemanager/browser/default/connectors/php/config.php and change:
 	$Config['Enabled'] = true ;
 	$Config['UserFilesPath'] = '/' ;
 	$Config['UserFilesAbsolutePath'] = $_SERVER['DOCUMENT_ROOT'];
-	
-	4. In editor/filemanager/browser/default/connectors/php/io.php: add at the start of GetUrlFromPath() and ServerMapFolder() the lines:
-	#MLS# Don't differentiate locations based on the resource type
-	$resourceType = '';
-	
-	5. In editor/filemanager/browser/default/connectors/php/io.php: add at the start of CreateServerFolder() the line: - see http://sourceforge.net/tracker/index.php?func=detail&aid=1386086&group_id=75348&atid=543655 for official patch request
-	#MLS# Ensure the folder path has no double-slashes, or mkdir may fail on certain platforms
-	while (strpos ($folderPath, '//') !== false) {$folderPath = str_replace ('//', '/', $folderPath);}
+	and optionally, for best practice filenames
+	$Config['Subdirectory']['File']	= '' ;
+	$Config['Regexp']['File']	= '^([-_a-zA-Z0-9]{1,25})$' ;
+	$Config['Subdirectory']['Image']	= '' ;
+	$Config['Regexp']['Image']	= '^([-_a-zA-Z0-9]{1,25})$' ;
 	
 	
-	The following are experienced deficiencies in FCKeditor 2.2:
-	- Auto-hyperlinking doesn't work in Firefox	http://sourceforge.net/tracker/index.php?func=detail&aid=1314815&group_id=75348&atid=543653
+	The following are experienced deficiencies in FCKeditor 2.3.1:
+	- Auto-hyperlinking doesn't work in Firefox	http://sourceforge.net/tracker/index.php?func=detail&aid=1314815&group_id=75348&atid=543656
 	- Minor problem: In a 'normal' paragraph, format box doesn't update to normal, but headings work fine
+	- Firefox has returns as <br /> not </p><p>
 	- CSS underlining inheritance seems wrong in Firefox See: http://sourceforge.net/tracker/?group_id=75348&atid=543653&func=detail&aid=1230485 and https://bugzilla.mozilla.org/show_bug.cgi?id=300358
-	- API deficiency: DocType = '' See: https://sourceforge.net/tracker/index.php?func=detail&aid=1386094&group_id=75348&atid=543653
 	- API deficiency: FormatIndentator = "\t"
-	- API deficiency: ToolbarSets all have to be set outside PHP
+	- API deficiency: ToolbarSets all have to be set in JS and cannot be done via PHP
+	- Can't set file browser startup folder; see http://sourceforge.net/tracker/index.php?func=detail&aid=1498629&group_id=75348&atid=543655
 	
 	*/
 	
@@ -4401,6 +4398,7 @@ class formWidget
 # Enable specification of a validation function
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
 # Multi-select combo box like at http://cross-browser.com/x/examples/xselect.php
+# Consider highlighting in red areas caught by >validation
 
 # Version 2 feature proposals
 #!# Self-creating form mode

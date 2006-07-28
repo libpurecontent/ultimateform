@@ -50,7 +50,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.0
+ * @version 1.2.1
  */
 class form
 {
@@ -144,6 +144,7 @@ class form
 		'callback'							=> false,							# Callback function (string name) (NB cannot be $this->methodname) with one integer parameter, so be called just before emitting form HTML - -1 is errors on form, 0 is blank form, 1 is result presentation if any (not called at all if form not displayed)
 		'databaseConnection'				=> false,							# Database connection (filename/array/object/resource)
 		'truncate'							=> false,							# Whether to truncate the visible part of a widget (global setting)
+		'listUnzippedFilesMaximum'			=> 5,								# When auto-unzipping an uploaded zip file, the maximum number of files contained that should be listed (beyond this, just 'x files' will be shown) in any visible result output
 	);
 	
 	
@@ -1611,6 +1612,8 @@ class form
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			#!# Consider a way of adding a checkbox to confirm on a per-widget basis; adds quite a few complications though
+			'unzip'					=> false,	# Whether to unzip a zip file on arrival, either true/false or the number of files (defaulting to $this->settings['listUnzippedFilesMaximum']) which should be listed in any visible result output
 		);
 		
 		# Create a new form widget
@@ -1623,6 +1626,12 @@ class form
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
 		
 		$elementValue = $widget->getValue ();
+		
+		# Check whether unzipping is supported
+		if ($arguments['unzip'] && !extension_loaded ('zip')) {
+			$this->formSetupErrors['uploadUnzipUnsupported'] = 'Unzipping of zip files upon upload was requested but the unzipping module is not available on this server.';
+			$arguments['unzip'] = false;
+		}
 		
 		# Cache the upload properties
 		$this->uploadProperties[$arguments['name']] = $arguments;
@@ -1744,6 +1753,9 @@ class form
 		if (!empty ($arguments['disallowedExtensions'])) {
 			$restrictions[] = 'Disallowed file extensions: ' . implode (',', $arguments['disallowedExtensions']);
 		}
+		if ($arguments['unzip']) {
+			$restrictions[] = 'Zip files will be automatically unzipped on arrival.';
+		}
 		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
 		
 		# Re-assign back the value
@@ -1764,6 +1776,7 @@ class form
 			'data' => NULL,	// Because the uploading can only be processed later, this is set to NULL
 			#!# Not finished
 #			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'unzip'	=> $arguments['unzip'],
 		);
 	}
 	
@@ -3858,6 +3871,15 @@ class form
 					# Create an array of any successful file uploads. For security reasons, if the filename is modified to prevent accidental overwrites, the original filename is not modified here
 					#!# There needs to be a differential between presented and actual data in cases where a different filename is actually written to the disk
 					$successes[$attributes['name']] = $attributes;
+					
+					# Unzip the file if required
+					if ($arguments['unzip'] && substr (strtolower ($attributes['name']), -4) == '.zip') {
+						if ($unzippedFiles = $this->_unzip ($attributes['name'], $arguments['directory'], $deleteAfterUnzipping = true)) {
+							$listUnzippedFilesMaximum = (is_numeric ($arguments['unzip']) ? $arguments['unzip'] : $this->settings['listUnzippedFilesMaximum']);
+							$totalUnzippedFiles = count ($unzippedFiles);
+							$successes[$attributes['name']]['name'] .= " [automatically unpacked and containing {$totalUnzippedFiles} " . ($totalUnzippedFiles == 1 ? 'file' : 'files') . ($totalUnzippedFiles > $listUnzippedFilesMaximum ? '' : ': ' . implode (', ', $unzippedFiles)) . ']';
+						}
+					}
 				}
 			}
 			
@@ -3872,8 +3894,8 @@ class form
 				
 				# Add each of the files to the master array, appending the location for each
 				foreach ($successes as $success => $attributes) {
-					$filenames[] = $success;
-					$data['compiled'][] = $arguments['directory'] . $success;
+					$filenames[] = $attributes['name'];
+					$data['compiled'][] = $arguments['directory'] . $attributes['name'];
 				}
 				
 				# For the compiled version, give the number of files uploaded and their names
@@ -3895,6 +3917,68 @@ class form
 		}
 	}
 	
+	
+	# Private function to unzip a file on landing
+	function _unzip ($file, $directory, $deleteAfterUnzipping = true, $archiveOverwritableFiles = true)
+	{
+		# Open the zip
+		if (!$zip = zip_open ($directory . $file)) {return false;}
+		
+		# Loop through each file
+		$unzippedFiles = array ();
+		while ($zipEntry = zip_read ($zip)) {
+			if (!zip_entry_open ($zip, $zipEntry, 'r')) {continue;}
+			
+			# Read the contents
+			$contents = zip_entry_read ($zipEntry, zip_entry_filesize ($zipEntry));
+			
+			# Determine the zip entry name
+			$zipEntryName = zip_entry_name ($zipEntry);
+			
+			# Ensure the directory exists
+			$targetDirectory = dirname ($directory . $zipEntryName) . '/';
+			if (!is_dir ($targetDirectory)) {
+				umask (0007);
+				if (!mkdir ($targetDirectory, 0777, true)) {
+					$deleteAfterUnzipping = false;	// Don't delete the source file if this fails
+					continue;
+				}
+			}
+			
+			# Skip if the entry itself is a directory (the contained file will have a directory created for it)
+			if (substr ($zipEntryName, -1) == '/') {continue;}
+			
+			# Archive (by appending a timestamp) an existing file if it exists and is different
+			$filename = $directory . $zipEntryName;
+			if ($archiveOverwritableFiles && file_exists ($filename)) {
+				if (md5_file ($filename) != md5 ($contents)) {
+					$timestamp = date ('Ymd-Hms');
+					rename ($filename, $filename . '.replaced-' . $timestamp);
+				}
+			}
+			
+			# (Over-)write the new file
+			file_put_contents ($filename, $contents);
+			
+			# Close the zip entry
+			zip_entry_close ($zipEntry);
+			
+			# Increment the counter
+			$unzippedFiles[$filename] = basename ($filename);
+		}
+		
+		# Close the zip
+		zip_close ($zip);
+		
+		# Delete the submitted file if required
+		if ($deleteAfterUnzipping) {
+			unlink ($directory . $file);
+		}
+		
+		# Sort and return the list of unzipped files
+		natsort ($unzippedFiles);
+		return $unzippedFiles;
+	}
 	
 	# Generic function to generate proxy form widgets from an associated field specification and optional data
 	function dataBinding ($suppliedArguments = array ())
@@ -4311,15 +4395,15 @@ class formWidget
 #!# Need to prevent the form code itself being overwritable by uploads or CSV writing, by doing a check on the filenames
 #!# Not all $widgetHtml declarations have an id="" given (make sure it is $this>cleanId'd though)
 #!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/ ; checkbox & radiobutton have some infrastructure written (but commented out) already
-#!# Prevent insecure bcc:ing as per http://lists.evolt.org/harvest/detail.cgi?w=20050725&id=6342
 #!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp e.g. accept="list_of_mime_types" for type=file
-#!# Suggestions at http://www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
+#!# Number validation: validate numbers with strval() and intval() or floatval() - www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
 # Enable specification of a validation function
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
 # Multi-select combo box like at http://cross-browser.com/x/examples/xselect.php
 
 # Version 2 feature proposals
+#!# Self-creating form mode
 #!# Full object orientation - change the form into a package of objects
 #!#		Change each input type to an object, with a series of possible checks that can be implemented - class within a class?
 #!# 	Change the output methods to objects
@@ -4328,7 +4412,6 @@ class formWidget
 #!# 	Use ideas in http://www.sitepoint.com/article/1273/3 for having js-validation with an icon
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]
 #!# Add AJAX validation flag See: http://particletree.com/features/degradable-ajax-form-validation/ (but modified version needed because this doesn't use Unobtrusive DHTML - see also http://particletree.com/features/a-guide-to-unobtrusive-javascript-validation/ )
-#!# Self-creating form mode
 #!# Postponed files system
 
 

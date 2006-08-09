@@ -50,7 +50,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.2
+ * @version 1.2.3
  */
 class form
 {
@@ -215,7 +215,7 @@ class form
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression against which the submission must validate
-			'disallow'				=> '',		# Regular expression against which the submission must not validate
+			'disallow'				=> false,		# Regular expression against which the submission must not validate
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
@@ -344,7 +344,7 @@ class form
 			'rows'					=> 5,		# Number of rows (optional; defaults to 30)
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression(s) against which all lines of the submission must validate
-			'disallow'				=> '',		# Regular expression against which all lines of the submission must not validate
+			'disallow'				=> false,		# Regular expression against which all lines of the submission must not validate
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
@@ -409,7 +409,13 @@ class form
 				
 				# If the line does not validate against a specified regexp, add the line to a list of lines containing a problem then move onto the next line
 				if ($arguments['disallow']) {
-					if (ereg ($arguments['disallow'], $line)) {
+					$disallowRegexp = $arguments['disallow'];
+					if (is_array ($arguments['disallow'])) {
+						foreach ($arguments['disallow'] as $disallowRegexp => $disallowErrorMessage) {
+							break;
+						}
+					}
+					if (ereg ($disallowRegexp, $line)) {
 						$disallowProblemLines[] = $i;
 						continue;
 					}
@@ -423,7 +429,7 @@ class form
 			
 			# If any problem lines are found, construct the error message for this
 			if (isSet ($disallowProblemLines)) {
-				$elementProblems['failsDisallow'] = (count ($disallowProblemLines) > 1 ? 'Rows ' : 'Row ') . implode (', ', $disallowProblemLines) . (count ($disallowProblemLines) > 1 ? ' match' : ' matches') . ' a specified disallowed pattern for this section.';
+				$elementProblems['failsDisallow'] = (isSet ($disallowErrorMessage) ? $disallowErrorMessage : (count ($disallowProblemLines) > 1 ? 'Rows ' : 'Row ') . implode (', ', $disallowProblemLines) . (count ($disallowProblemLines) > 1 ? ' match' : ' matches') . ' a specified disallowed pattern for this section.');
 			}
 		}
 		
@@ -549,7 +555,7 @@ class form
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'regexp'				=> '',		# Regular expression against which the submission must validate
-			'disallow'				=> '',		# Regular expression against which the submission must not validate
+			'disallow'				=> false,		# Regular expression against which the submission must not validate
 			'width'					=> '100%',		# Width
 			'height'				=> '400px',		# Height
 			'default'				=> '',		# Default value (optional)
@@ -722,6 +728,7 @@ class form
 			"<td"	=> "\t\t<td",	// Double-indent level-three tags
 			" href=\"{$arguments['editorBasePath']}editor/"	=> ' href=\"',	// Workaround for Editor basepath bug
 			' href="([^"]*)/' . $arguments['directoryIndex'] . '"'	=> ' href="\1/"',	// Chop off directory index links
+			'<br /></h1>' => '</h1>',	// Remove breaks before an H1 closing tag
 		);
 		
 		# Obfuscate e-mail addresses
@@ -4351,6 +4358,7 @@ class formWidget
 		if (strlen ($this->value) == 0) {return;}
 		
 		# Regexp checks (for non-e-mail types)
+		#!# Allow flexible array ($regexp => $errorMessage) syntax, as with disallow
 		if (strlen ($this->arguments['regexp'])) {
 			if (!ereg ($this->arguments['regexp'], $this->value)) {
 				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for the {$this->arguments['name']} section.";
@@ -4358,9 +4366,21 @@ class formWidget
 		}
 		
 		# 'disallow' regexp checks (for text types)
-		if (strlen ($this->arguments['disallow'])) {
-			if (ereg ($this->arguments['disallow'], $this->value)) {
-				$this->elementProblems['failsDisallow'] = "The submitted information matched a disallowed pattern for the {$this->arguments['name']} section.";
+		if ($this->arguments['disallow'] !== false) {
+			
+			# If the disallow text is presented as an array, convert the key and value to the disallow patterns and descriptive text; otherwise 
+			if (is_array ($this->arguments['disallow'])) {
+				foreach ($this->arguments['disallow'] as $disallowRegexp => $disallowErrorMessage) {
+					break;
+				}
+			} else {
+				$disallowRegexp = $this->arguments['disallow'];
+				$disallowErrorMessage = "The submitted information matched a disallowed pattern for the {$this->arguments['name']} section.";
+			}
+			
+			# Perform the check
+			if (ereg ($disallowRegexp, $this->value)) {
+				$this->elementProblems['failsDisallow'] = $disallowErrorMessage;
 			}
 		}
 		
@@ -4395,7 +4415,7 @@ class formWidget
 #!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp e.g. accept="list_of_mime_types" for type=file
 #!# Number validation: validate numbers with strval() and intval() or floatval() - www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
-# Enable specification of a validation function
+# Enable specification of a validation function (i.e. callback for checking a value against a database)
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
 # Multi-select combo box like at http://cross-browser.com/x/examples/xselect.php
 # Consider highlighting in red areas caught by >validation

@@ -50,7 +50,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.3
+ * @version 1.2.4
  */
 class form
 {
@@ -590,6 +590,7 @@ class form
 				#!# Consider finding a way of getting the new MCPUK browser working - the hard-coded paths in the default browser which have to be hacked is far from ideal
 				'LinkBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Connector=connectors/php/connector.php',
 				'ImageBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Type=Image&Connector=connectors/php/connector.php',
+				// 'PreserveSessionOnFileBrowser' => true,
 			),
 			'protectEmailAddresses' => true,	// Whether to obfuscate e-mail addresses
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links (as made within the editing system) or false
@@ -672,6 +673,13 @@ class form
 	# Function to clean the content
 	function richtextClean ($content, &$arguments)
 	{
+		# Cache wanted characters stripped by tidy's 'bare' option
+		$cache = array (
+			'&ndash;' => '__NDASH',
+			'&mdash;' => '__MDASH',
+		);
+		$content = str_replace (array_keys ($cache), array_values ($cache), $content);
+		
 		# If the tidy extension is not available (e.g. PHP4), perform cleaning with the Tidy API
 		if (function_exists ('tidy_parse_string')) {
 			
@@ -695,7 +703,7 @@ class form
 				'wrap'	=> 0,
 				'fix-backslash'	=> false,
 				'force-output'	=> true,
-				'bare'	=> true,
+				'bare'	=> true,	// Note: this replaces &ndash; and &mdash; hence they are cached above
 			);
 			
 			# Tidy up the output; see http://www.zend.com/php5/articles/php5-tidy.php for a tutorial
@@ -703,6 +711,9 @@ class form
 			tidy_clean_repair ($content);
 			$content = tidy_get_output ($content);
 		}
+		
+		# Resubstitute the cached items
+		$content = str_replace (array_values ($cache), array_keys ($cache), $content);
 		
 		# Start an array of regexp replacements
 		$replacements = $arguments['replacements'];	// By default an empty array
@@ -3850,7 +3861,7 @@ class form
 						
 						# If version control is enabled, move the old file, appending the date; if the file really cannot be renamed, append the date to the new file instead
 						if ($arguments['enableVersionControl']) {
-							$timestamp = date ('Ymd-Hms');
+							$timestamp = date ('Ymd-His');
 							if (!@rename ($existingFileName, $existingFileName . '.replaced-' . $timestamp)) {
 								$_FILES[$this->settings['name']]['name'][$name][$key] .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
 							}
@@ -3858,7 +3869,7 @@ class form
 						/* # If version control is not enabled, give a new name to the new file to prevent the old one being overwritten accidentally
 						} else {
 							# If a file of the same name but a different checksum exists, append the date and time to the proposed filename
-							$_FILES[$this->settings['name']]['name'][$name][$key] .= date ('.Ymd-Hms');
+							$_FILES[$this->settings['name']]['name'][$name][$key] .= date ('.Ymd-His');
 							*/
 						}
 					}
@@ -3956,7 +3967,7 @@ class form
 			$filename = $directory . $zipEntryName;
 			if ($archiveOverwritableFiles && file_exists ($filename)) {
 				if (md5_file ($filename) != md5 ($contents)) {
-					$timestamp = date ('Ymd-Hms');
+					$timestamp = date ('Ymd-His');
 					rename ($filename, $filename . '.replaced-' . $timestamp);
 				}
 			}
@@ -4419,6 +4430,8 @@ class formWidget
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
 # Multi-select combo box like at http://cross-browser.com/x/examples/xselect.php
 # Consider highlighting in red areas caught by >validation
+# Optgroup setting to allow multiple appearances of the same item
+#!# Deal with encoding problems - see http://skew.org/xml/misc/xml_vs_http/#troubleshooting
 
 # Version 2 feature proposals
 #!# Self-creating form mode
@@ -4430,7 +4443,6 @@ class formWidget
 #!# 	Use ideas in http://www.sitepoint.com/article/1273/3 for having js-validation with an icon
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]
 #!# Add AJAX validation flag See: http://particletree.com/features/degradable-ajax-form-validation/ (but modified version needed because this doesn't use Unobtrusive DHTML - see also http://particletree.com/features/a-guide-to-unobtrusive-javascript-validation/ )
-#!# Postponed files system
 
 
 ?>

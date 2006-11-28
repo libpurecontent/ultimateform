@@ -21,6 +21,7 @@
  * - Regular expression hooks for various widget types
  * - Templating mechanism
  * - The ability to set elements as non-editable
+ * - Ability to generate form widgets automatically by reading a database structure (dataBinding facility)
  * - Group validation rules to ensure that at least one field is completed, that all are the same or all are different
  * 
  * REQUIREMENTS:
@@ -50,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.4
+ * @version 1.2.5
  */
 class form
 {
@@ -802,13 +803,13 @@ class form
 			'size'			=> 5,		# Number of rows visible in multiple mode (optional; defaults to 1)
 			'default'				=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
-			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific select widget
+			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
-			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific select widget
+			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 		);
 		
 		# Create a new form widget
-		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
+		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = false);
 		
 		$arguments = $widget->getArguments ();
 		
@@ -1026,12 +1027,13 @@ class form
 			'default'				=> array (),# Pre-selected item
 			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
-			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific select widget (if false, the master value is assumed)
+			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget (if false, the master value is assumed)
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 		);
 		
 		# Create a new form widget
-		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
+		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = true);
 		
 		$arguments = $widget->getArguments ();
 		
@@ -1054,6 +1056,9 @@ class form
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		
+		# Apply truncation if necessary
+		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
 		/* #!# Enable when implementing fieldset grouping
 		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
@@ -1194,10 +1199,11 @@ class form
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 		);
 		
 		# Create a new form widget
-		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
+		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = true);
 		
 		$arguments = $widget->getArguments ();
 		
@@ -1211,6 +1217,9 @@ class form
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		
+		# Apply truncation if necessary
+		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
 		/* #!# Enable when implementing fieldset grouping
 		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
@@ -1234,17 +1243,17 @@ class form
 		# Start a tally to check the number of checkboxes checked
 		$checkedTally = 0;
 		
-		# Loop through each element subname and construct HTML
+		# Loop through each pre-defined element subname to construct the HTML
 		$widgetHtml = '';
 		if ($arguments['editable']) {
 			/* #!# Write branching code around here which uses _valuesMultidimensional, when implementing fieldset grouping */
 			$subwidgetIndex = 1;
 			foreach ($arguments['values'] as $value => $visible) {
 				
-				# Define the element ID, which must be unique	
+				# Construct the element ID, which must be unique	
 				$elementId = $this->cleanId ("{$this->settings['name']}__{$arguments['name']}__{$value}");
 				
-				# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
+				# If the form is not posted, assign the initial value (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 				if (!$this->formPosted) {
 					if (in_array ($value, $arguments['default'])) {
 						$elementValue[$value] = true;
@@ -1515,6 +1524,15 @@ class form
 				}
 			}
 		}
+		
+/*	Not sufficiently tested - results in 31st November 20xx when all set to 0
+		# Prevent mktime parameter problems in date processing
+		foreach ($elementValue as $key => $value) {
+			if ($value === '') {
+				$elementValue[$key] = 0;
+			}
+		}
+*/
 		
 		# Describe restrictions on the widget
 		if ($arguments['level'] == 'datetime') {$restriction = 'Time can be entered flexibly';}
@@ -2971,7 +2989,7 @@ class form
 				# Tables
 				case 'tables':
 				default:
-					$formHtml .= "\n\t" . '<tr class="' . $id . '"' . ($elementIsRequired ? " class=\"{$this->settings['requiredFieldClass']}\"" : '') . '>';
+					$formHtml .= "\n\t" . '<tr class="' . $id . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '">';
 					if ($elementAttributes['type'] == 'heading') {
 						# Start by determining the number of columns which will be needed for headings involving a colspan
 						$colspan = 1 + ($this->settings['displayTitles']) + ($displayDescriptions);
@@ -3212,6 +3230,7 @@ class form
 			# Get the value of each field, using the presented value unless the widget specifies the value to be used
 			$values = array ();
 			foreach ($rule['fields'] as $name) {
+				#!# Value is always being added even if nothing submitted - for 'different' at least, that is wrong
 				$values[$name] = ((isSet ($this->elements[$name]['groupValidation']) && $this->elements[$name]['groupValidation']) ? $this->elements[$name]['data'][$this->elements[$name]['groupValidation']] : $this->elements[$name]['data']['presented']);
 			}
 			
@@ -3768,8 +3787,8 @@ class form
 		# Assemble the data into CSV format
 		list ($headerLine, $dataLine) = application::arrayToCsv ($presentedData);
 		
-		# Compile the data, adding in the header if the file doesn't already exist, and writing a newline after each line
-		$data = (filesize ($this->configureResultFileFilename) == 0 ? $headerLine : '') . $dataLine;
+		# Compile the data, adding in the header if the file doesn't already exist or is empty, and writing a newline after each line
+		$data = ((!file_exists ($this->configureResultFileFilename) || filesize ($this->configureResultFileFilename) == 0) ? $headerLine : '') . $dataLine;
 		
 		#!# A check is needed to ensure the file being written to doesn't previously contain headings related to a different configuration
 		
@@ -4009,6 +4028,7 @@ class form
 			'lookupFunction' => false,
 			'truncate' => 40,
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
+			'commentsAsDescription' => false,	// Whether to use column comments for the description field rather than for the title field
 		);
 		
 		# Merge the arguments
@@ -4057,7 +4077,7 @@ class form
 			$value = ((is_array ($data) && (array_key_exists ($fieldName, $data))) ? $data[$fieldName] : $fieldAttributes['Default']);
 			
 			# Assign the title
-			$title = (isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : $fieldName);
+			$title = (!$commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : $fieldName);
 			
 			# Perform a lookup if necessary
 			$lookupValues = false;
@@ -4077,6 +4097,7 @@ class form
 				'required' => ($fieldAttributes['Null'] != 'YES'),	// Whether a required field
 				'default' => ($value === '0' ? '' : $value),	// #!# Cheat for unassigned joins
 				'datatype' => $fieldAttributes['Type'],
+				'description' => ($commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : ''),
 			);
 			
 			# Overload the attributes if any supplied
@@ -4113,9 +4134,13 @@ class form
 			}
 			*/
 			
-			# Deal with looked-up value sets specially
+			# Deal with looked-up value sets specially, defaulting to select unless the type is forced
 			if ($lookupValues && $fieldAttributes['Type'] != '_hidden') {
-				$this->select ($standardAttributes + array (
+				$lookupType = 'select';
+				if ($forceType && ($fieldAttributes['Type'] == 'checkboxes' || $fieldAttributes['Type'] == 'radiobuttons')) {
+					$lookupType = $fieldAttributes['Type'];
+				}
+				$this->$lookupType ($standardAttributes + array (
 					'forceAssociative' => true,	// Force associative checking of defaults
 					#!# What should happen if there's no data generated from a lookup (i.e. empty database table)?
 					'values' => $lookupValues,
@@ -4177,7 +4202,8 @@ class form
 				case (strtolower ($type) == 'timestamp'):
 					$this->datetime ($standardAttributes + array (
 						'level' => $type,
-						'editable' => (strtolower ($type) == 'timestamp'),
+						#!# Disabled as seemingly incorrect
+						/* 'editable' => (strtolower ($type) == 'timestamp'), */
 					));
 					break;
 				
@@ -4211,10 +4237,11 @@ class formWidget
 	var $value;
 	var $elementProblems = array ();
 	var $functionName;
+	var $arrayType;
 	
 	
 	# Constructor
-	function formWidget (&$form, $suppliedArguments, $argumentDefaults, $functionName, $subargument = NULL) {
+	function formWidget (&$form, $suppliedArguments, $argumentDefaults, $functionName, $subargument = NULL, $arrayType = false) {
 		
 		# Inherit the settings
 		$this->settings =& $form->settings;
@@ -4230,11 +4257,19 @@ class formWidget
 		
 		# Register the element name to enable duplicate checking
 		$form->registerElementName ($this->arguments['name']);
+		
+		# Set whether the widget is an array type
+		$this->arrayType = $arrayType;
 	}
 	
 	
 	# Function to set the widget's (submitted) value
-	function setValue ($value) {
+	function setValue ($value)
+	{
+		# If an array type, ensure the value is an array, converting where necessary
+		#if ($this->arrayType) {$value = application::ensureArray ($value);}
+		
+		# Set the value
 		$this->value = $value;
 	}
 	
@@ -4432,6 +4467,7 @@ class formWidget
 # Consider highlighting in red areas caught by >validation
 # Optgroup setting to allow multiple appearances of the same item
 #!# Deal with encoding problems - see http://skew.org/xml/misc/xml_vs_http/#troubleshooting
+#!# $resultLines[] should have the [techName] optional
 
 # Version 2 feature proposals
 #!# Self-creating form mode

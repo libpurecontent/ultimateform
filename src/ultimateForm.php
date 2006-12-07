@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.5
+ * @version 1.2.6
  */
 class form
 {
@@ -809,7 +809,7 @@ class form
 		);
 		
 		# Create a new form widget
-		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = false);
+		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = true);
 		
 		$arguments = $widget->getArguments ();
 		
@@ -1033,7 +1033,7 @@ class form
 		);
 		
 		# Create a new form widget
-		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = true);
+		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = false);
 		
 		$arguments = $widget->getArguments ();
 		
@@ -1128,7 +1128,7 @@ class form
 				foreach ($arguments['values'] as $value => $visible) {
 					if ($value == $elementValue) {	// This loop is done to prevent offsets which may still arise due to the 'defaultMissingFromValuesArray' error not resulting in further termination of widget production
 						$widgetHtml  = htmlentities ($arguments['values'][$elementValue]);
-						$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($elementValue) . '" />';
+						$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($elementValue) . '" />';
 					}
 				}
 			}
@@ -1406,7 +1406,7 @@ class form
 		
 		# Load the date processing library
 		#!# Ideally this really should be higher up in the class, e.g. in the setup area
-		require_once ('datetime.php');
+		require_once ('timedate.php');
 		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
@@ -1418,7 +1418,7 @@ class form
 		if ($isTimestamp) {$arguments['default'] = date ('Y' . (($arguments['level'] != 'year') ? '-m-d' : '') . (($arguments['level'] == 'datetime') ? ' H:i:s' : ''));}
 		
 		# If the widget is not editable, fix the form value to the default
-		if (!$arguments['editable']) {$this->form[$arguments['name']] = datetime::getDateTimeArray ($arguments['default']);}
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = timedate::getDateTimeArray ($arguments['default']);}
 		
 		# Obtain the value of the form submission (which may be empty)  (ensure that a full date and time array exists to prevent undefined offsets in case an incomplete set has been posted)
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ('year' => '', 'month' => '', 'day' => '', 'time' => ''));
@@ -1430,7 +1430,7 @@ class form
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 		if (!$this->formPosted) {
-			$elementValue = datetime::getDateTimeArray ($arguments['default']);
+			$elementValue = timedate::getDateTimeArray ($arguments['default']);
 		} else {
  			
 			# Check whether all fields are empty, starting with assuming all fields are not incomplete
@@ -1513,7 +1513,7 @@ class form
 					if (!empty ($elementValue['time'])) {
 						
 						# If the time parsing passes, substitute the submitted version with the parsed and corrected version
-						if ($time = datetime::parseTime ($elementValue['time'])) {
+						if ($time = timedate::parseTime ($elementValue['time'])) {
 							$elementValue['time'] = $time;
 						} else {
 							
@@ -1570,8 +1570,8 @@ class form
 		} else {
 			
 			# Non-editable version
-			#!# If a default value is empty, this results in "mktime() expects parameter 4 to be long, string given in datetime.php on line 69"
-			$widgetHtml  = datetime::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : '');
+			#!# If a default value is empty, this results in "mktime() expects parameter 4 to be long, string given in timedate.php on line 69"
+			$widgetHtml  = timedate::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : '');
 			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($arguments['default']) . '" />';
 		}
 		
@@ -1601,7 +1601,7 @@ class form
 				
 				# Make the presented version in english text
 				#!# date () corrupts dates after 2038; see php.net/date. Suggest not re-presenting it if year is too great.
-				$data['presented'] = datetime::presentDateFromArray ($this->form[$arguments['name']], $arguments['level']);
+				$data['presented'] = timedate::presentDateFromArray ($this->form[$arguments['name']], $arguments['level']);
 			}
 		}
 		
@@ -4267,7 +4267,7 @@ class formWidget
 	function setValue ($value)
 	{
 		# If an array type, ensure the value is an array, converting where necessary
-		#if ($this->arrayType) {$value = application::ensureArray ($value);}
+		if ($this->arrayType) {$value = application::ensureArray ($value);}
 		
 		# Set the value
 		$this->value = $value;

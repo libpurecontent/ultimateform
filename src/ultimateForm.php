@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.6
+ * @version 1.2.7
  */
 class form
 {
@@ -1597,7 +1597,7 @@ class form
 			if (!application::allArrayElementsEmpty ($this->form[$arguments['name']])) {
 				
 				# Make the compiled version be in SQL DATETIME format, i.e. YYYY-MM-DD HH:MM:SS
-				$data['compiled'] = $this->form[$arguments['name']]['year'] . (($arguments['level'] == 'year') ? '' : '-' . $this->form[$arguments['name']]['month'] . '-' . $this->form[$arguments['name']]['day']) . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : '');
+				$data['compiled'] = $this->form[$arguments['name']]['year'] . (($arguments['level'] == 'year') ? '' : '-' . $this->form[$arguments['name']]['month'] . '-' . sprintf ('%02s', $this->form[$arguments['name']]['day'])) . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : '');
 				
 				# Make the presented version in english text
 				#!# date () corrupts dates after 2038; see php.net/date. Suggest not re-presenting it if year is too great.

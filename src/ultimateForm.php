@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.2.7
+ * @version 1.3.0
  */
 class form
 {
@@ -98,7 +98,7 @@ class form
 	
 	# Constants
 	var $timestamp;
-	var $minimumPhpVersion = 4.3;	// md5_file requires 4.2+; file_get_contents is 4.3+
+	var $minimumPhpVersion = 4.3;	// md5_file requires 4.2+; file_get_contents and is 4.3+
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
 	
 	# Specify available arguments as defaults or as NULL (to represent a required argument)
@@ -146,6 +146,7 @@ class form
 		'databaseConnection'				=> false,							# Database connection (filename/array/object/resource)
 		'truncate'							=> false,							# Whether to truncate the visible part of a widget (global setting)
 		'listUnzippedFilesMaximum'			=> 5,								# When auto-unzipping an uploaded zip file, the maximum number of files contained that should be listed (beyond this, just 'x files' will be shown) in any visible result output
+		'fixMailHeaders'					=> false,							# Whether to add additional mail headers, for use with a server that fails to add Message-Id/Date/Return-Path; set as (bool) true or (str) application name
 	);
 	
 	
@@ -217,6 +218,7 @@ class form
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression against which the submission must validate
 			'disallow'				=> false,		# Regular expression against which the submission must not validate
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
@@ -292,6 +294,7 @@ class form
 			'requiredButEmpty' => $widget->requiredButEmpty (),
 			'suitableAsEmailTarget' => ($functionName == 'email'),
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => ($functionName == 'password' ? 'compiled' : false),
@@ -346,6 +349,7 @@ class form
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression(s) against which all lines of the submission must validate
 			'disallow'				=> false,		# Regular expression against which all lines of the submission must not validate
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
@@ -409,6 +413,8 @@ class form
 				}
 				
 				# If the line does not validate against a specified regexp, add the line to a list of lines containing a problem then move onto the next line
+				#!# Merge this with formWidget::regexpCheck ()
+				#!# Consider allowing multiple disallows, even though a regexp can deal with that anyway
 				if ($arguments['disallow']) {
 					$disallowRegexp = $arguments['disallow'];
 					if (is_array ($arguments['disallow'])) {
@@ -500,6 +506,7 @@ class form
 			'requiredButEmpty' => $requiredButEmpty,
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
@@ -557,6 +564,7 @@ class form
 			'required'				=> false,	# Whether required or not
 			'regexp'				=> '',		# Regular expression against which the submission must validate
 			'disallow'				=> false,		# Regular expression against which the submission must not validate
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'width'					=> '100%',		# Width
 			'height'				=> '400px',		# Height
 			'default'				=> '',		# Default value (optional)
@@ -665,6 +673,7 @@ class form
 			'requiredButEmpty' => $requiredButEmpty,
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
@@ -804,6 +813,7 @@ class form
 			'default'				=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 		);
@@ -1000,6 +1010,7 @@ class form
 			'requiredButEmpty' => $requiredButEmpty,
 			'suitableAsEmailTarget' => $this->_suitableAsEmailTarget (array_keys ($arguments['values']), $arguments),
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'multiple' => $arguments['multiple'],
@@ -1028,6 +1039,7 @@ class form
 			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget (if false, the master value is assumed)
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 		);
@@ -1171,6 +1183,7 @@ class form
 			'requiredButEmpty' => $requiredButEmpty,
 			'suitableAsEmailTarget' => $arguments['required'],
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
@@ -1198,6 +1211,7 @@ class form
 			'default'			=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 		);
@@ -1375,6 +1389,7 @@ class form
 			#!# Apply $this->_suitableAsEmailTarget () to checkboxes possibly
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			#!# Not correct - needs multisplit into boolean
@@ -1400,6 +1415,7 @@ class form
 			'required'				=> false,	# Whether required or not
 			'level'					=> 'date',	# Whether to show a 'datetime' or just 'date' widget set
 			'default'				=> '',		# Initial value - either 'timestamp' or an SQL string
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'autoCenturyConversion'	=> 69,								# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
 		);
@@ -1617,6 +1633,7 @@ class form
 			'requiredButEmpty' => $requiredButEmpty,
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . strtoupper ($arguments['level'])) . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
@@ -1644,6 +1661,7 @@ class form
 			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required)
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
+			'discard'				=> false,	# Whether to process the input but then discard it in the results; note that the file will still be uploaded
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			#!# Consider a way of adding a checkbox to confirm on a per-widget basis; adds quite a few complications though
 			'unzip'					=> false,	# Whether to unzip a zip file on arrival, either true/false or the number of files (defaulting to $this->settings['listUnzippedFilesMaximum']) which should be listed in any visible result output
@@ -1672,6 +1690,12 @@ class form
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
 		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
 		$arguments['allowedExtensions'] = application::ensureArray ($arguments['allowedExtensions']);
+		
+		# Ensure zip files can be uploaded if unzipping is enabled
+		#!# Allowing zip files but having a list of allowed extensions means that people can zip up a non-allowed extension
+		if ($arguments['unzip'] && !in_array ('zip', $arguments['allowedExtensions'])) {
+			$arguments['allowedExtensions'][] = 'zip';
+		}
 		
 		# Determine whether a file extension must be included - this is if * is the only value for $arguments['allowedExtensions']; if so, also clear the array
 		$extensionRequired = false;
@@ -1806,6 +1830,7 @@ class form
 			'requiredButEmpty' => (isSet ($requiredButEmpty) ? $requiredButEmpty : false),
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => NULL,	// Because the uploading can only be processed later, this is set to NULL
 			#!# Not finished
 #			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
@@ -1827,6 +1852,7 @@ class form
 			'output'				=> array (),		# Presentation format
 			'title'					=> 'Hidden data',	# Title (CURRENTLY UNDOCUMENTED)
 			'security'				=> true, 			# Whether to ignore posted data and use the internal values set, for security (only of relevance to non- self-processing forms); probably only switch off when using javascript to modify a value and submit that
+			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
@@ -1880,6 +1906,7 @@ class form
 			'requiredButEmpty' => false,
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
 			#!# Not finished
 			#!# 'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
@@ -1921,6 +1948,7 @@ class form
 			'requiredButEmpty' => false,
 			'suitableAsEmailTarget' => false,
 			'output' => array (),	// The output specification must always be array
+			'discard' => false,
 			'data' => (isSet ($data) ? $data : NULL),
 		);
 	}
@@ -2439,10 +2467,19 @@ class form
 	
 	## Main processing ##
 	
+	
+	# Compatibility name
+	#!# DEPRECATED - remove in future
+	function processForm ()
+	{
+		return $this->process ();
+	}
+	
+	
 	/**
 	 * Process/display the form (main wrapper function)
 	 */
-	function processForm ()
+	function process ()
 	{
 		# Open the surrounding <div> if relevant
 		if ($this->settings['div']) {echo "\n\n<div class=\"{$this->settings['div']}\">";}
@@ -3114,6 +3151,11 @@ class form
 	{
 		# Loop through each element, whether submitted or not (otherwise gaps may be left, e.g. in the CSV writing)
 		foreach ($this->elements as $name => $elementAttributes) {
+			
+			# Discard if required; note that all the processing will have been done on each element; this is useful for e.g. a Captcha, where the submitted data merely needs to validate but is not used
+			if ($elementAttributes['discard']) {continue;}
+			
+			# Add submitted items
 			if ($this->elements[$name]['data']) {
 				$outputData[$name] = $this->elements[$name]['data'];
 			}
@@ -3482,7 +3524,7 @@ class form
 			'upload' => array (
 				'_descriptions' => array (
 					'rawcomponents'	=> 'An array with every defined element being assigned as autonumber => filename',
-					'compiled'		=> 'An array with every successful element being assigned as autonumber => filename',
+					'compiled'		=> 'An array with every successful element being assigned as filename => attributes',
 					'presented'		=> 'Submitted files (and failed uploads) as a human-readable string with the original filenames in brackets',
 				),
 				'file'				=> array ('rawcomponents', 'presented'),
@@ -3750,7 +3792,8 @@ class form
 		}
 		
 		# Define the additional headers
-		$additionalHeaders  = 'From: Website feedback <' . ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator) . ">\r\n";
+		$sender = ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator);
+		$additionalHeaders  = 'From: Website feedback <' . $sender . ">\r\n";
 		if (isSet ($this->configureResultEmailCc)) {$additionalHeaders .= 'Cc: ' . implode (', ', $this->configureResultEmailCc) . "\r\n";}
 		
 		# Add the reply-to if it is set and is not empty and that it has been completed (e.g. in the case of a non-required field)
@@ -3761,6 +3804,9 @@ class form
 				}
 			}
 		}
+		
+		# Define additional mail headers for compatibility
+		$additionalHeaders .= $this->fixMailHeaders ($sender);
 		
 		# Send the e-mail
 		#!# Add an @ and a message if sending fails (marking whether the info has been logged in other ways)
@@ -3775,6 +3821,36 @@ class form
 		if ($outputType == 'confirmationEmail') {
 			echo "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
 		}
+	}
+	
+	
+	# Function to write additional mailheaders, for when using a mailserver that fails to add key headers
+	function fixMailHeaders ($sender)
+	{
+		# Return an empty string if this functionality is not required
+		if (!$this->settings['fixMailHeaders']) {return '';}
+		
+		# Construct the date, as 'RFC-2822-formatted-date (Timezone)'
+		$realDate = date ('r (T)');
+		$headers  = "Date: {$realDate}\r\n";
+		
+		# Construct a message ID, using the application name, defaulting to the current class name
+		$applicationName = strtoupper ($this->settings['fixMailHeaders'] === true ? __CLASS__ : $this->settings['fixMailHeaders']);
+		$date = date ('YmdHis');
+		$randomNumber = mt_rand ();
+		if (!isSet ($this->messageIdSequence)) {
+			$this->messageIdSequence = 0;
+		}
+		$this->messageIdSequence++;
+		$hostname = $_SERVER['SERVER_NAME'];
+		$messageid = "<{$applicationName}.{$date}.{$randomNumber}.{$this->messageIdSequence}@{$hostname}>";
+		$headers .= "Message-Id: {$messageid}\r\n";
+		
+		# Add the return path, being the same as the main sender
+		$headers .= "Return-Path: <{$sender}>\r\n";
+		
+		# Return the headers
+		return $headers;
 	}
 	
 	
@@ -3857,6 +3933,7 @@ class form
 			# Create arrays of successes and failures
 			$successes = array ();
 			$failures = array ();
+			$actualUploadedFiles = array ();
 			
 			# Loop through each sub-element
 			foreach ($this->form[$name] as $key => $attributes) {
@@ -3881,7 +3958,8 @@ class form
 						# If version control is enabled, move the old file, appending the date; if the file really cannot be renamed, append the date to the new file instead
 						if ($arguments['enableVersionControl']) {
 							$timestamp = date ('Ymd-His');
-							if (!@rename ($existingFileName, $existingFileName . '.replaced-' . $timestamp)) {
+							# Rename the file, altering the filename reference (using .= )
+							if (!@rename ($existingFileName, $existingFileName .= '.replaced-' . $timestamp)) {
 								$_FILES[$this->settings['name']]['name'][$name][$key] .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
 							}
 							
@@ -3911,13 +3989,26 @@ class form
 						if ($unzippedFiles = $this->_unzip ($attributes['name'], $arguments['directory'], $deleteAfterUnzipping = true)) {
 							$listUnzippedFilesMaximum = (is_numeric ($arguments['unzip']) ? $arguments['unzip'] : $this->settings['listUnzippedFilesMaximum']);
 							$totalUnzippedFiles = count ($unzippedFiles);
-							$successes[$attributes['name']]['name'] .= " [automatically unpacked and containing {$totalUnzippedFiles} " . ($totalUnzippedFiles == 1 ? 'file' : 'files') . ($totalUnzippedFiles > $listUnzippedFilesMaximum ? '' : ': ' . implode (', ', $unzippedFiles)) . ']';
+							
+							# Add the directory location into each key name
+							$actualUploadedFiles = array ();
+							$unzippedFilesListPreRenaming = array ();
+							foreach ($unzippedFiles as $unzippedFileName => $unzippedFileAttributes) {
+								$unzippedFileLocation = $unzippedFileAttributes['_location'];
+								unset ($unzippedFileAttributes['_location']);
+								$actualUploadedFiles[$unzippedFileLocation] = $unzippedFileAttributes;
+								$unzippedFilesListPreRenaming[] = (isSet ($unzippedFileAttributes['original']) ? $unzippedFileAttributes['original'] : $unzippedFileAttributes['name']);
+							}
+							
+							# Add the (described) zip file to the list of successes
+							$successes[$attributes['name']]['name'] .= " [automatically unpacked and containing {$totalUnzippedFiles} " . ($totalUnzippedFiles == 1 ? 'file' : 'files') . ($totalUnzippedFiles > $listUnzippedFilesMaximum ? '' : ': ' . implode (', ', $unzippedFilesListPreRenaming)) . ']';
 						}
+					} else {
+						# Add the directory location into the key name
+						$actualUploadedFiles[$arguments['directory'] . $attributes['name']] = $attributes;
 					}
 				}
 			}
-			
-			#!# Consider putting more info into the results (e.g. file size and type)
 			
 			# Start the compiled result
 			$data['presented'] = '';
@@ -3927,13 +4018,16 @@ class form
 			if ($successes) {
 				
 				# Add each of the files to the master array, appending the location for each
-				foreach ($successes as $success => $attributes) {
-					$filenames[] = $attributes['name'];
-					$data['compiled'][] = $arguments['directory'] . $attributes['name'];
+				foreach ($actualUploadedFiles as $actualUploadedFileLocation => $attributes) {
+					$data['compiled'][$actualUploadedFileLocation] = $attributes;
 				}
 				
 				# For the compiled version, give the number of files uploaded and their names
 				$totalSuccesses = count ($successes);
+				# Add each of the files to the master array, appending the location for each
+				foreach ($successes as $success => $attributes) {
+					$filenames[] = $attributes['name'];
+				}
 				$data['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode (', ', $filenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
 			}
 			
@@ -3956,7 +4050,7 @@ class form
 	function _unzip ($file, $directory, $deleteAfterUnzipping = true, $archiveOverwritableFiles = true)
 	{
 		# Open the zip
-		if (!$zip = zip_open ($directory . $file)) {return false;}
+		if (!$zip = @zip_open ($directory . $file)) {return false;}
 		
 		# Loop through each file
 		$unzippedFiles = array ();
@@ -3984,10 +4078,13 @@ class form
 			
 			# Archive (by appending a timestamp) an existing file if it exists and is different
 			$filename = $directory . $zipEntryName;
+			$originalIsRenamed = false;
 			if ($archiveOverwritableFiles && file_exists ($filename)) {
 				if (md5_file ($filename) != md5 ($contents)) {
 					$timestamp = date ('Ymd-His');
-					rename ($filename, $filename . '.replaced-' . $timestamp);
+					# Rename the file, altering the filename reference (using .= )
+					$originalIsRenamed = $filename;
+					rename ($filename, $filename .= '.replaced-' . $timestamp);
 				}
 			}
 			
@@ -3997,8 +4094,20 @@ class form
 			# Close the zip entry
 			zip_entry_close ($zipEntry);
 			
-			# Increment the counter
-			$unzippedFiles[$filename] = basename ($filename);
+			# Assign the files to the master array, emulating a native upload
+			$baseFilename = basename ($filename);
+			$unzippedFiles[$baseFilename] = array (
+				'name' => $baseFilename,
+				'type' => (function_exists ('finfo_file') ? finfo_file (finfo_open (FILEINFO_MIME), $filename) : NULL),	// finfo_file is unfortunately a replacement for mime_content_type which is now deprecated
+				'tmp_name' => $file,
+				'size' => filesize ($filename),
+				'_location' => $filename,
+			);
+			
+			# If the original has been renamed, add that
+			if ($originalIsRenamed) {
+				$unzippedFiles[$baseFilename]['original'] = basename ($originalIsRenamed);
+			}
 		}
 		
 		# Close the zip
@@ -4009,8 +4118,10 @@ class form
 			unlink ($directory . $file);
 		}
 		
+		# Natsort by key
+		$unzippedFiles = application::knatsort ($unzippedFiles);
+		
 		# Sort and return the list of unzipped files
-		natsort ($unzippedFiles);
 		return $unzippedFiles;
 	}
 	
@@ -4166,6 +4277,18 @@ class form
 						'_visible--DONOTUSETHISFLAGEXTERNALLY' => false,
 					));
 					break;
+				
+/*
+				# FLOAT (numeric with decimal point) field
+				case (eregi ('float\([0-9]+)\\.?([0-9]{0,2})\)', $type, $matches)):
+					$this->input ($standardAttributes + array (
+						'maxlength' => ((int) $matches[1] + 1),
+						# Truncate the size if a (numeric) value is given and the required size is greater than the truncation
+						#!# Move this or decouple $truncate from it
+						'size' => ($truncate && (is_numeric ($truncate)) && ((int) $matches[1] > $truncate) ? $truncate : $matches[1]),
+					));
+					break;
+*/
 				
 				# VARCHAR (character) field
 				case (eregi ('varchar\(([0-9]+)\)', $type, $matches)):
@@ -4468,6 +4591,7 @@ class formWidget
 # Optgroup setting to allow multiple appearances of the same item
 #!# Deal with encoding problems - see http://skew.org/xml/misc/xml_vs_http/#troubleshooting
 #!# $resultLines[] should have the [techName] optional
+# Antispam Captcha option
 
 # Version 2 feature proposals
 #!# Self-creating form mode

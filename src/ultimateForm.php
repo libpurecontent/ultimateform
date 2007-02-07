@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.3.0
+ * @version 1.3.1
  */
 class form
 {
@@ -1691,9 +1691,9 @@ class form
 		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
 		$arguments['allowedExtensions'] = application::ensureArray ($arguments['allowedExtensions']);
 		
-		# Ensure zip files can be uploaded if unzipping is enabled
+		# Ensure zip files can be uploaded if unzipping is enabled, by adding it to the list of allowed extensions if such a list is defined
 		#!# Allowing zip files but having a list of allowed extensions means that people can zip up a non-allowed extension
-		if ($arguments['unzip'] && !in_array ('zip', $arguments['allowedExtensions'])) {
+		if ($arguments['unzip'] && $arguments['allowedExtensions'] && !in_array ('zip', $arguments['allowedExtensions'])) {
 			$arguments['allowedExtensions'][] = 'zip';
 		}
 		
@@ -3523,15 +3523,15 @@ class form
 			
 			'upload' => array (
 				'_descriptions' => array (
-					'rawcomponents'	=> 'An array with every defined element being assigned as autonumber => filename',
-					'compiled'		=> 'An array with every successful element being assigned as filename => attributes',
+					'rawcomponents'	=> 'An array with every defined element being assigned as autonumber => filename; this will not show files unzipped but only list the main file with a string description of unzipped files for each main file',
+					'compiled'		=> 'An array with every successful element being assigned as filename => attributes; this will include any files automatically unzipped if that was requested',
 					'presented'		=> 'Submitted files (and failed uploads) as a human-readable string with the original filenames in brackets',
 				),
 				'file'				=> array ('rawcomponents', 'presented'),
 				'email'				=> array ('presented', 'compiled'),
 				'confirmationEmail'	=> array ('presented'),
 				'screen'			=> array ('presented'),
-				'processing'		=> array ('compiled', 'rawcomponents', 'presented'),
+				'processing'		=> array ('rawcomponents', 'compiled', 'presented'),
 				'database'			=> array ('presented'),
 			),
 		);
@@ -4010,9 +4010,10 @@ class form
 				}
 			}
 			
-			# Start the compiled result
+			# Start results
 			$data['presented'] = '';
 			$data['compiled'] = array ();
+			$filenames = array ();
 			
 			# If there were any succesful uploads, assign the compiled output
 			if ($successes) {
@@ -4037,8 +4038,8 @@ class form
 				$data['presented'] .= ($successes ? ' ' : '') . $totalFailures . ($totalFailures > 1 ? ' files' : ' file') . ' (' . implode (', ', array_keys ($failures)) . ') unfortunately failed to copy over for some unspecified reason.';
 			}
 			
-			# The raw component array out with empty fields upto the number of created subfields
-			$data['rawcomponents'] = array_pad ($data['compiled'], $arguments['subfields'], false);
+			# The raw component array out with empty fields upto the number of created subfields; note this HAS to use the original filenames, because an unzipped version could overrun
+			$data['rawcomponents'] = array_pad ($filenames, $arguments['subfields'], false);
 			
 			# Assign the output data
 			$this->elements[$name]['data'] = $data;

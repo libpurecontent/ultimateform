@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.3.1
+ * @version 1.4.0
  */
 class form
 {
@@ -71,6 +71,7 @@ class form
 	var $elementProblems = array ();			// Array of submitted element problems
 	var $validationRules = array ();			// Array of validation rules
 	var $databaseConnection = NULL;				// Database connection
+	var $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
 	
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
@@ -2090,27 +2091,30 @@ class form
 	function showDebuggingInformation ()
 	{
 		# Start the debugging HTML
-		echo "\n\n" . '<div class="debug">';
-		echo "\n\n<h2>Debugging information</h2>";
-		echo "\n\n<ul>";
-		echo "\n\n\t" . '<li><a href="#configured">Configured form elements - $this->elements</a></li>';
-		if ($this->formPosted) {echo "\n\n\t" . '<li><a href="#submitted">Submitted form elements - $this->form</a></li>';}
-		echo "\n\n\t" . '<li><a href="#remainder">Any form setup errors; then: Remainder of form</a></li>';
-		echo "\n\n</ul>";
+		$html  = "\n\n" . '<div class="debug">';
+		$html .= "\n\n<h2>Debugging information</h2>";
+		$html .= "\n\n<ul>";
+		$html .= "\n\n\t" . '<li><a href="#configured">Configured form elements - $this->elements</a></li>';
+		if ($this->formPosted) {$html .= "\n\n\t" . '<li><a href="#submitted">Submitted form elements - $this->form</a></li>';}
+		$html .= "\n\n\t" . '<li><a href="#remainder">Any form setup errors; then: Remainder of form</a></li>';
+		$html .= "\n\n</ul>";
 		
 		# Show configured form elements
-		echo "\n\n" . '<h3 id="configured">Configured form elements - $this->elements :</h3>';
-		$this->dumpData ($this->elements);
+		$html .= "\n\n" . '<h3 id="configured">Configured form elements - $this->elements :</h3>';
+		$html .= $this->dumpData ($this->elements, false, true);
 		
 		# Show submitted form elements, if the form has been submitted
 		if ($this->formPosted) {
-			echo "\n\n" . '<h3 id="submitted">Submitted form elements - $this->form :</h3>';
-			$this->dumpData ($this->form);
+			$html .= "\n\n" . '<h3 id="submitted">Submitted form elements - $this->form :</h3>';
+			$html .= $this->dumpData ($this->form, false, true);
 		}
 		
 		# End the debugging HTML
-		echo "\n\n" . '<a name="remainder"></a>';
-		echo "\n</div>";
+		$html .= "\n\n" . '<a name="remainder"></a>';
+		$html .= "\n</div>";
+		
+		# Add the HTML to the master array
+		$this->html .= $html;
 	}
 	
 	
@@ -2454,7 +2458,7 @@ class form
 				return true;
 			} */
 			if (array_key_exists ($this->settings['user'], $csvData)) {
-				echo "\n" . '<p class="warning">You appear to have already made a submission. If you believe this is not the case, please contact the webmaster to resolve the situation.</p>';
+				$this->html .= "\n" . '<p class="warning">You appear to have already made a submission. If you believe this is not the case, please contact the webmaster to resolve the situation.</p>';
 				return true;
 			}
 		}
@@ -2479,28 +2483,50 @@ class form
 	/**
 	 * Process/display the form (main wrapper function)
 	 */
-	function process ()
+	function process (&$html = NULL)
 	{
+		# Determine whether the HTML is shown directly
+		$showHtmlDirectly = ($html === NULL);
+		
+		# Prepend the supplied HTML to the main HTML
+		if ($html) {$this->html = $html . $this->html;}
+		
 		# Open the surrounding <div> if relevant
-		if ($this->settings['div']) {echo "\n\n<div class=\"{$this->settings['div']}\">";}
+		if ($this->settings['div']) {$this->html .= "\n\n<div class=\"{$this->settings['div']}\">";}
 		
 		# Show the presentation matrix if required (this is allowed to bypass the form setup so that the administrator can see what corrections are needed)
 		if ($this->settings['displayPresentationMatrix']) {$this->displayPresentationMatrix ();}
 		
 		# Check if the form and PHP environment has been set up OK
-		if (!$this->_setupOk ()) {return false;}
+		if (!$this->_setupOk ()) {
+			if ($showHtmlDirectly) {echo $this->html;}
+			$html = $this->html;
+			return false;
+		}
 		
 		# Show debugging information firstly if required
 		if ($this->settings['debug']) {$this->showDebuggingInformation ();}
 		
 		# Check whether the user is a valid user (must be before the setupOk check)
-		if (!$this->validUser ()) {return false;}
+		if (!$this->validUser ()) {
+			if ($showHtmlDirectly) {echo $this->html;}
+			$html = $this->html;
+			return false;
+		}
 		
 		# Check whether the facility is open
-		if (!$this->facilityIsOpen ()) {return false;}
+		if (!$this->facilityIsOpen ()) {
+			if ($showHtmlDirectly) {echo $this->html;}
+			$html = $this->html;
+			return false;
+		}
 		
 		# Validate hidden security fields
-		if ($this->hiddenSecurityFieldSubmissionInvalid ()) {return false;}
+		if ($this->hiddenSecurityFieldSubmissionInvalid ()) {
+			if ($showHtmlDirectly) {echo $this->html;}
+			$html = $this->html;
+			return false;
+		}
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		if (!$this->formPosted || $this->getElementProblems ()) {
@@ -2511,8 +2537,10 @@ class form
 			}
 			
 			# Display the form and any problems then end
-			echo $this->constructFormHtml ($this->elements, $this->elementProblems);
-			if ($this->settings['div']) {echo "\n</div>";}
+			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
+			if ($this->settings['div']) {$this->html .= "\n</div>";}
+			if ($showHtmlDirectly) {echo $this->html;}
+			$html = $this->html;
 			return false;
 		}
 		
@@ -2523,7 +2551,7 @@ class form
 		$this->outputData = $this->prepareData ();
 		
 		# If required, display a summary confirmation of the result
-		if ($this->settings['formCompleteText']) {echo "\n" . '<p class="completion">' . $this->settings['formCompleteText'] . ' </p>';}
+		if ($this->settings['formCompleteText']) {$this->html .= "\n" . '<p class="completion">' . $this->settings['formCompleteText'] . ' </p>';}
 		
 		# Loop through each of the processing methods and output it based on the requested method
 		foreach ($this->outputMethods as $outputType => $required) {
@@ -2531,12 +2559,17 @@ class form
 		}
 		
 		# If required, display a link to reset the page
-		if ($this->settings['formCompleteText']) {echo "\n" . '<p><a href="' . $_SERVER['REQUEST_URI'] . '">Click here to reset the page.</a></p>';}
+		if ($this->settings['formCompleteText']) {$this->html .= "\n" . '<p><a href="' . $_SERVER['REQUEST_URI'] . '">Click here to reset the page.</a></p>';}
 		
 		# Close the surrounding <div> if relevant
-		if ($this->settings['div']) {echo "\n\n</div>";}
+		if ($this->settings['div']) {
+			$this->html .= "\n\n</div>";
+		}
 		
-		# Return the data
+		# Return the data, again showing directly if required
+		if ($showHtmlDirectly) {echo $this->html;}
+		$html = $this->html;
+		// $html;	// Nothing is done with $html - it was passed by reference, if at all
 		return $this->outputData ('processing');
 	}
 	
@@ -2549,7 +2582,7 @@ class form
 		# Check that the opening time has passed, if one is specified, ensuring that the date is correctly specified
 		if ($this->settings['opening']) {
 			if (time () < strtotime ($this->settings['opening'] . ' GMT')) {
-				echo '<p class="warning">This facility is not yet open. Please return later.</p>';
+				$this->html .= '<p class="warning">This facility is not yet open. Please return later.</p>';
 				return false;
 			}
 		}
@@ -2557,7 +2590,7 @@ class form
 		# Check that the closing time has passed
 		if ($this->settings['closing']) {
 			if (time () > strtotime ($this->settings['closing'] . ' GMT')) {
-				echo '<p class="warning">This facility is now closed.</p>';
+				$this->html .= '<p class="warning">This facility is now closed.</p>';
 				return false;
 			}
 		}
@@ -2580,7 +2613,7 @@ class form
 		if (in_array ($this->settings['user'], $this->settings['validUsers'])) {return true;}
 		
 		# Otherwise state that the user is not in the list and return false
-		echo "\n" . '<p class="warning">You do not appear to be in the list of valid users. If you believe you should be, please contact the webmaster to resolve the situation.</p>';
+		$this->html .= "\n" . '<p class="warning">You do not appear to be in the list of valid users. If you believe you should be, please contact the webmaster to resolve the situation.</p>';
 		return false;
 	}
 	
@@ -2648,7 +2681,7 @@ class form
 		$this->_checkGroupValidations ();
 		
 		# If there are any form setup errors - a combination of those just defined and those assigned earlier in the form processing, show them
-		if (!empty ($this->formSetupErrors)) {echo application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, (count ($this->formSetupErrors) > 1 ? 'Various errors were' : 'An error was') . " found in the setup of the form. The website's administrator needs to correct the configuration before the form will work:");}
+		if (!empty ($this->formSetupErrors)) {$this->html .= application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, (count ($this->formSetupErrors) > 1 ? 'Various errors were' : 'An error was') . " found in the setup of the form. The website's administrator needs to correct the configuration before the form will work:");}
 		
 		# Set that the form has effectively been displayed
 		$this->formDisplayed = true;
@@ -3630,7 +3663,7 @@ class form
 		}
 		
 		# Show the result
-		echo $html;
+		$this->html .= $html;
 	}
 	
 	
@@ -3711,7 +3744,7 @@ class form
 		$html .= "\n" . '</table>';
 		
 		# Show the constructed HTML
-		echo $html;
+		$this->html .= $html;
 	}
 	
 	
@@ -3748,7 +3781,7 @@ class form
 		#!# This should be moved up so that a confirmation e-mail widget is a required field
 		if ($outputType == 'confirmationEmail') {
 			if (empty ($this->configureResultConfirmationEmailRecipient)) {
-				echo "\n\n" . '<p class="error">A confirmation e-mail could not be sent as no address was given.</p>';
+				$this->html .= "\n\n" . '<p class="error">A confirmation e-mail could not be sent as no address was given.</p>';
 				return false;
 			}
 		}
@@ -3819,7 +3852,7 @@ class form
 		
 		# Confirm sending (or an error) for the confirmation e-mail type
 		if ($outputType == 'confirmationEmail') {
-			echo "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
+			$this->html .= "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
 		}
 	}
 	
@@ -3870,7 +3903,7 @@ class form
 		
 		# Write the data or handle the error
 		if (!application::writeDataToFile ($data, $this->configureResultFileFilename)) {
-			echo "\n\n" . '<p class="error">There was a problem writing the information you submitted to a file. It is likely this problem is temporary - please wait a short while then press the refresh button.</p>';
+			$this->html .= "\n\n" . '<p class="error">There was a problem writing the information you submitted to a file. It is likely this problem is temporary - please wait a short while then press the refresh button.</p>';
 		}
 	}
 	

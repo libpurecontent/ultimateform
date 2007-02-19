@@ -50,8 +50,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-6, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.0
+ * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
+ * @version 1.4.1
  */
 class form
 {
@@ -4170,6 +4170,7 @@ class form
 			'data' => array (),
 			'includeOnly' => array (),
 			'exclude' => array (),
+			'ordering' => array (),
 			'lookupFunction' => false,
 			'truncate' => 40,
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
@@ -4206,6 +4207,23 @@ class form
 		if (!$fields = $this->databaseConnection->getFields ($database, $table)) {
 			$this->formSetupErrors['dataBindingFieldRetrievalFailed'] = 'The database fields could not be retrieved. Please check that the database library you are using is supported.';
 			return false;
+		}
+		
+		# Reorder if required
+		if ($ordering) {
+			$ordering = application::ensureArray ($ordering);
+			foreach ($ordering as $field) {
+				if (array_key_exists ($field, $fields)) {
+					
+					# Move fields if set
+					$newFields[$field] = $fields[$field];
+					unset ($fields[$field]);
+				}
+			}
+			
+			# Merge the new fields and the old, with new taking precedence, and remove the old fields
+			$fields = array_merge ($newFields, $fields);
+			unset ($newFields);
 		}
 		
 		# Loop through the fields in the data, to add widgets
@@ -4252,15 +4270,16 @@ class form
 				# Convert to hidden type if forced
 				if ($attributes[$fieldName] === 'hidden') {
 					$fieldAttributes['Type'] = '_hidden';
-				}
-				
-				# Amend the type to a specific widget if set
-				if (isSet ($attributes[$fieldName]['type'])) {
-					if (method_exists ($this, $attributes[$fieldName]['type'])) {
-						$fieldAttributes['Type'] = $attributes[$fieldName]['type'];
-						$forceType = true;
+				} else {
+					
+					# Amend the type to a specific widget if set
+					if (isSet ($attributes[$fieldName]['type'])) {
+						if (method_exists ($this, $attributes[$fieldName]['type'])) {
+							$fieldAttributes['Type'] = $attributes[$fieldName]['type'];
+							$forceType = true;
+						}
+						unset ($attributes[$fieldName]['type']);
 					}
-					unset ($attributes[$fieldName]['type']);
 				}
 				
 				# Overload the attribute, if the attributes are an array

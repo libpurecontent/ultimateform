@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.1
+ * @version 1.4.2
  */
 class form
 {
@@ -4279,6 +4279,13 @@ class form
 							$forceType = true;
 						}
 						unset ($attributes[$fieldName]['type']);
+					}
+				}
+				
+				# Add any headings (which will appear before creating the widget); In the unlikely event that multiple of the same level are needed, '' => "<h2>Foo</h2>\n<h2>Bar</h2>" would have to be used, or the dataBinding will have to split into multiple dataBinding calls
+				if (isSet ($attributes[$fieldName]['heading']) && is_array ($attributes[$fieldName]['heading'])) {
+					foreach ($attributes[$fieldName]['heading'] as $level => $title) {
+						$this->heading ($level, $title);
 					}
 				}
 				

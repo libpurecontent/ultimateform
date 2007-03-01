@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.2
+ * @version 1.4.3
  */
 class form
 {
@@ -120,6 +120,7 @@ class form
 		'displayColons'						=> true,							# Whether to show colons after the initial description
 		'whiteSpaceTrimSurrounding'			=> true,							# Whether to trim surrounding white space in any forms which are submitted
 		'whiteSpaceCheatAllowed'			=> false,							# Whether to allow people to cheat submitting whitespace only in required fields
+		'reappear'							=> false,							# Whether to keep the form visible after successful submission (useful for search forms, etc., that should reappear)
 		'formCompleteText'					=> 'Many thanks for your input.',	# The form completion text (or false if not to display it at all)
 		'submitButtonAtEnd'					=> true,							# Whether the submit button appears at the end or the start of the form
 		'submitButtonText'					=> 'Submit!',						# The form submit button text
@@ -2529,7 +2530,8 @@ class form
 		}
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
-		if (!$this->formPosted || $this->getElementProblems ()) {
+		$elementProblems = $this->getElementProblems ();
+		if (!$this->formPosted || $elementProblems || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
 			
 			# Run the callback function if one is set
 			if ($this->settings['callback']) {
@@ -2538,10 +2540,12 @@ class form
 			
 			# Display the form and any problems then end
 			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
-			if ($this->settings['div']) {$this->html .= "\n</div>";}
-			if ($showHtmlDirectly) {echo $this->html;}
-			$html = $this->html;
-			return false;
+			if (!$this->formPosted || $elementProblems) {
+				if ($this->settings['div']) {$this->html .= "\n</div>";}
+				if ($showHtmlDirectly) {echo $this->html;}
+				$html = $this->html;
+				return false;
+			}
 		}
 		
 		# Process any form uploads

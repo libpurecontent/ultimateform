@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.3
+ * @version 1.4.4
  */
 class form
 {
@@ -4038,7 +4038,7 @@ class form
 							}
 							
 							# Add the (described) zip file to the list of successes
-							$successes[$attributes['name']]['name'] .= " [automatically unpacked and containing {$totalUnzippedFiles} " . ($totalUnzippedFiles == 1 ? 'file' : 'files') . ($totalUnzippedFiles > $listUnzippedFilesMaximum ? '' : ': ' . implode (', ', $unzippedFilesListPreRenaming)) . ']';
+							$successes[$attributes['name']]['name'] .= " [automatically unpacked and containing {$totalUnzippedFiles} " . ($totalUnzippedFiles == 1 ? 'file' : 'files') . ($totalUnzippedFiles > $listUnzippedFilesMaximum ? '' : ': ' . implode ('; ', $unzippedFilesListPreRenaming)) . ']';
 						}
 					} else {
 						# Add the directory location into the key name
@@ -4066,13 +4066,13 @@ class form
 				foreach ($successes as $success => $attributes) {
 					$filenames[] = $attributes['name'];
 				}
-				$data['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode (', ', $filenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
+				$data['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode ('; ', $filenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
 			}
 			
 			# If there were any failures, list them also
 			if ($failures) {
 				$totalFailures = count ($failures);
-				$data['presented'] .= ($successes ? ' ' : '') . $totalFailures . ($totalFailures > 1 ? ' files' : ' file') . ' (' . implode (', ', array_keys ($failures)) . ') unfortunately failed to copy over for some unspecified reason.';
+				$data['presented'] .= ($successes ? ' ' : '') . $totalFailures . ($totalFailures > 1 ? ' files' : ' file') . ' (' . implode ('; ', array_keys ($failures)) . ') unfortunately failed to copy over for some unspecified reason.';
 			}
 			
 			# The raw component array out with empty fields upto the number of created subfields; note this HAS to use the original filenames, because an unzipped version could overrun
@@ -4213,7 +4213,8 @@ class form
 			return false;
 		}
 		
-		# Reorder if required
+		# Reorder if required (explicitly, or implicitly via includeOnly)
+		if ($includeOnly && !$ordering) {$ordering = $includeOnly;}
 		if ($ordering) {
 			$ordering = application::ensureArray ($ordering);
 			foreach ($ordering as $field) {
@@ -4243,18 +4244,23 @@ class form
 			# Lookup the value if given; NB this can also be supplied in the attribute overloading as defaults
 			$value = ((is_array ($data) && (array_key_exists ($fieldName, $data))) ? $data[$fieldName] : $fieldAttributes['Default']);
 			
-			# Assign the title
-			$title = (!$commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : $fieldName);
+			# Assign the title to be the fieldname by default
+			$title = $fieldName;
 			
 			# Perform a lookup if necessary
 			$lookupValues = false;
 			if ($lookupFunction) {
-				list ($title, $lookupValues) = call_user_func ($lookupFunction, $this->databaseConnection, $fieldName, $fieldAttributes['Type']);
+				list ($title, $lookupValues) = call_user_func ($lookupFunction, $this->databaseConnection, $title, $fieldAttributes['Type']);
 			}
 			
 			# Convert title from lowerCamelCase to Standard text if necessary
 			if ($changeCase) {
 				$title = application::changeCase ($title);
+			}
+			
+			# If using table fields comment assign an existent comment as the title, overwriting any amendments to the title already made
+			if (!$commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment']) {
+				$title = $fieldAttributes['Comment'];
 			}
 			
 			# Define the standard attributes
@@ -4293,7 +4299,7 @@ class form
 					}
 				}
 				
-				# Overload the attribute, if the attributes are an array
+				# Finally, perform the actual overloading the attribute, if the attributes are an array
 				if (is_array ($attributes[$fieldName])) {
 					$standardAttributes = array_merge ($standardAttributes, $attributes[$fieldName]);
 				}

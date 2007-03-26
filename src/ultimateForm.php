@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.4
+ * @version 1.4.5
  */
 class form
 {
@@ -1369,6 +1369,7 @@ class form
 			# Separate the compiled/presented items by a comma-newline
 			$data['compiled'] = implode (",\n", $checked);
 			$data['presented'] = implode (",\n", $checkedPresented);
+			/* $data['special'] = implode (',', $checked); */
 		}
 		
 		# Compile the datatype
@@ -3420,12 +3421,13 @@ class form
 					'rawcomponents'	=> 'Array with every defined element being assigned as itemName => boolean true/false',
 					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
+					'special'		=> 'Chosen items only, listed comma separated with no quote marks',
 				),
 				'file'				=> array ('rawcomponents', 'compiled', 'presented'),
 				'email'				=> array ('compiled', 'rawcomponents', 'presented'),
 				'confirmationEmail'	=> array ('presented', 'compiled'),
 				'screen'			=> array ('presented', 'compiled'),
-				'processing'		=> array ('rawcomponents', 'compiled', 'presented'),
+				'processing'		=> array ('rawcomponents', 'compiled', 'presented',/* 'special'*/),
 				'database'			=> array ('compiled'),
 			),
 			
@@ -4163,6 +4165,7 @@ class form
 		return $unzippedFiles;
 	}
 	
+	
 	# Generic function to generate proxy form widgets from an associated field specification and optional data
 	function dataBinding ($suppliedArguments = array ())
 	{
@@ -4217,6 +4220,7 @@ class form
 		if ($includeOnly && !$ordering) {$ordering = $includeOnly;}
 		if ($ordering) {
 			$ordering = application::ensureArray ($ordering);
+			$newFields = array ();
 			foreach ($ordering as $field) {
 				if (array_key_exists ($field, $fields)) {
 					
@@ -4385,6 +4389,22 @@ class form
 						'values' => $values,
 						'output' => array ('processing' => 'compiled'),
 					));
+					break;
+				
+				# SET (multiple item) field - explode the matches and insert as values
+				case (eregi ('set\(\'(.*)\'\)', $type, $matches)):
+					$values = explode ("','", $matches[1]);
+					$setSupportMax = 64;	// MySQL supports max 64 values for SET; #!# This value should be changeable in settings as different database vendor might be in use
+					$setSupportSupplied = count ($values);
+					if ($setSupportSupplied > $setSupportMax) {
+						$this->formSetupErrors['DatabindingSetExcessive'] = "{$setSupportSupplied} values were supplied for the {$fieldName} dataBinding 'SET' field but a maximum of only {$setSupportMax} are supported.";
+					} else {
+						$this->checkboxes (array_merge ($standardAttributes, array (
+							'values' => $values,
+							'output' => array ('processing' => 'compiled' /*'special'*/),
+							'default' => (is_array ($value) ? $value : explode (',', $value)),	// Value from getData will just be item1,item2,item3
+						)));
+					}
 					break;
 				
 				# DATE (date) field
@@ -4662,6 +4682,7 @@ class formWidget
 #!# Deal with encoding problems - see http://skew.org/xml/misc/xml_vs_http/#troubleshooting
 #!# $resultLines[] should have the [techName] optional
 # Antispam Captcha option
+# Support for select::regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
 
 # Version 2 feature proposals
 #!# Self-creating form mode

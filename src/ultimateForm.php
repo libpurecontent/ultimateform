@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.5
+ * @version 1.4.6
  */
 class form
 {
@@ -530,7 +530,7 @@ class form
 	Add the supplied file /_fckeditor/fckconfig-customised.js
 	
 	2. More control for FCKeditor uploading
-	Apply the patch (or changed files) which someone has supplied at: http://sourceforge.net/tracker/index.php?func=detail&aid=1457770&group_id=75348&atid=543655
+	Apply the patch (or changed files) which someone has supplied at: http://dev.fckeditor.net/ticket/306
 	
 	3. Open editor/filemanager/browser/default/connectors/php/config.php and change:
 	$Config['Enabled'] = true ;
@@ -544,12 +544,10 @@ class form
 	
 	
 	The following are experienced deficiencies in FCKeditor 2.3.1:
-	- Auto-hyperlinking doesn't work in Firefox	http://sourceforge.net/tracker/index.php?func=detail&aid=1314815&group_id=75348&atid=543656
-	- Minor problem: In a 'normal' paragraph, format box doesn't update to normal, but headings work fine
-	- Firefox has returns as <br /> not </p><p>
-	- CSS underlining inheritance seems wrong in Firefox See: http://sourceforge.net/tracker/?group_id=75348&atid=543653&func=detail&aid=1230485 and https://bugzilla.mozilla.org/show_bug.cgi?id=300358
-	- API deficiency: FormatIndentator = "\t"
-	- API deficiency: ToolbarSets all have to be set in JS and cannot be done via PHP
+	- Auto-hyperlinking doesn't work in Firefox - see http://dev.fckeditor.net/ticket/302
+	- API deficiency: ToolbarSets all have to be set in JS and cannot be done via PHP - see http://dev.fckeditor.net/ticket/30
+	- API deficiency: FormatIndentator = "\t" - has to be set at JS level - see http://dev.fckeditor.net/ticket/304
+	- CSS underlining inheritance seems wrong in Firefox See: http://dev.fckeditor.net/ticket/303
 	- Can't set file browser startup folder; see http://sourceforge.net/tracker/index.php?func=detail&aid=1498629&group_id=75348&atid=543655
 	
 	*/
@@ -582,22 +580,8 @@ class form
 				'GeckoUseSPAN'			=> false,	#!# Even in .js version this seems to have no effect
 				'StartupFocus'			=> false,
 				'ToolbarCanCollapse'	=> false,
-				// 'DocType' => '',	// Prevent left-right scrollbars	// Has to go in the main config file (not customised file or PHP constructor)
 				// 'FormatIndentator'		=> "\t",
-				/* Doesn't (and theoretically shouldn't) work: */
-				#!# Try to get Javascript Array Literal syntax to work (firstly in config.js then here as a string) - see http://www.devhood.com/tutorials/tutorial_details.aspx?tutorial_id=729
-				#'ToolbarSets' => array ('pureContent' => array (	// Syntax as given at  http://www.heygrady.com/tutorials/example-2b2.php.txt
-				#	array ('Source'),
-				#	array ('Cut','Copy','Paste','PasteText','PasteWord','-'/*,'SpellCheck'*/),
-				#	array ('Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'),
-				#	array ('Bold','Italic','StrikeThrough','-','Subscript','Superscript'),
-				#	array ('OrderedList','UnorderedList','-','Outdent','Indent'),
-				#	array ('Link','Unlink','Anchor'),
-				#	array ('Image','Table','Rule','SpecialChar'/*,'UniversalKey'*/),
-				#	/* array ('Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden'),*/
-				#	array (/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-'),
-				#	array ('About'),
-				#)),
+				// "ToolbarSets['pureContent']" => "[ ['Source'], ['Cut','Copy','Paste','PasteText','PasteWord','-','SpellCheck'], ['Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'], ['Bold','Italic','StrikeThrough','-','Subscript','Superscript'], ['OrderedList','UnorderedList','-','Outdent','Indent'], ['Link','Unlink','Anchor'], ['Image','Table','Rule','SpecialChar'/*,'ImageManager','UniversalKey'*/], /*['Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden']*/ [/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-'], ['Print','About'] ] ;",
 				#!# Consider finding a way of getting the new MCPUK browser working - the hard-coded paths in the default browser which have to be hacked is far from ideal
 				'LinkBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Connector=connectors/php/connector.php',
 				'ImageBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Type=Image&Connector=connectors/php/connector.php',
@@ -4352,17 +4336,13 @@ class form
 					));
 					break;
 				
-/*
 				# FLOAT (numeric with decimal point) field
-				case (eregi ('float\([0-9]+)\\.?([0-9]{0,2})\)', $type, $matches)):
+				case (eregi ('float\(([0-9]+),([0-9]+)\)', $type, $matches)):
 					$this->input ($standardAttributes + array (
-						'maxlength' => ((int) $matches[1] + 1),
-						# Truncate the size if a (numeric) value is given and the required size is greater than the truncation
-						#!# Move this or decouple $truncate from it
-						'size' => ($truncate && (is_numeric ($truncate)) && ((int) $matches[1] > $truncate) ? $truncate : $matches[1]),
+						'maxlength' => ((int) $matches[1] + 1),	// FLOAT(M,D) means "up to M digits in total, of which D digits may be after the decimal point", so maxlength is M + 1 (for the decimal point)
+						'regexp' => '^([0-9]+)(\.?)([0-9]{0,' . $matches[2] . '})$',
 					));
 					break;
-*/
 				
 				# VARCHAR (character) field
 				case (eregi ('varchar\(([0-9]+)\)', $type, $matches)):

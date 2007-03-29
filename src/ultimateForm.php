@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.6
+ * @version 1.4.7
  */
 class form
 {
@@ -957,26 +957,31 @@ class form
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
-		# Get the posted data; there is no need to clear null submissions because it will just get ignored, not being in the values list
+		# Get the posted data; there is no need to clear null or fake submissions because it will just get ignored, not being in the values list
 		if ($this->formPosted) {
 			
-			# For the component array, loop through each defined element name and assign the boolean value for it
+			# Loop through each defined element name
+			$chosenValues = array ();
+			$chosenVisible = array ();
 			foreach ($arguments['values'] as $value => $visible) {
-				#!# $submittableValues is defined above and is similar: refactor to remove these lines
-				$data['rawcomponents'][$value] = (in_array ($value, $this->form[$arguments['name']]));
-			}
-			
-			# For the compiled version, separate the compiled items by a comma-space
-			$data['compiled'] = implode (",\n", $this->form[$arguments['name']]);
-			
-			# For the presented version, substitute the visible text version used for the actual value if necessary
-			$chosen = array ();
-			foreach ($this->form[$arguments['name']] as /*$key =>*/ $value) {
-				if (isSet ($arguments['values'][$value])) {
-					$chosen[] = $arguments['values'][$value];
+				
+				# Determine if the value has been submitted
+				$isSubmitted = (in_array ($value, $this->form[$arguments['name']]));
+				
+				# rawcomponents is 'An array with every defined element being assigned as itemName => boolean true/false'
+				$data['rawcomponents'][$value] = $isSubmitted;
+				
+				# compiled is 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3'
+				# presented is 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value'
+				if ($isSubmitted) {
+					$chosenValues[] = $value;
+					$chosenVisible[] = $visible;
 				}
 			}
-			$data['presented'] = implode (",\n", $chosen);
+			
+			# Assemble the compiled and presented versions
+			$data['compiled'] = implode (",\n", $chosenValues);
+			$data['presented'] = implode (",\n", $chosenVisible);
 		}
 		
 		# Compile the datatype
@@ -1138,7 +1143,7 @@ class form
 		# Get the posted data; there is no need to clear null submissions because it will just get ignored, not being in the values list
 		if ($this->formPosted) {
 			
-			# For the rawcomponents version, create an array with every defined element being assigned as itemName => boolean
+			# For the rawcomponents version, create An array with every defined element being assigned as itemName => boolean true/false
 			$data['rawcomponents'] = array ();
 			foreach ($arguments['values'] as $value => $visible) {
 				$data['rawcomponents'][$value] = ($this->form[$arguments['name']] == $value);
@@ -1330,29 +1335,31 @@ class form
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
-		# Get the posted data
+		# Get the posted data; there is no need to clear null or fake submissions because it will just get ignored, not being in the values list
 		if ($this->formPosted) {
 			
-			# For the component array, create an array with every defined element being assigned as itemName => boolean; checking is done against the available values rather than the posted values to prevent offsets
+			# Loop through each defined element name
+			$chosenValues = array ();
+			$chosenVisible = array ();
 			foreach ($arguments['values'] as $value => $visible) {
-				$data['rawcomponents'][$value] = (isSet ($this->form[$arguments['name']][$value]) && $this->form[$arguments['name']][$value] == 'true');
-			}
-			
-			# Make an array of those items checked, starting with an empty array in case none are checked
-			$checked = array ();
-			$checkedPresented = array ();
-			foreach ($data['rawcomponents'] as $key => $value) {
-				if ($value) {
-					$checked[] = $key;
-					
-					# For the presented version, substitute the index name with the presented name
-					$checkedPresented[] = $arguments['values'][$key];
+				
+				# Determine if the value has been submitted
+				$isSubmitted = (isSet ($this->form[$arguments['name']][$value]) && $this->form[$arguments['name']][$value] == 'true');
+				
+				# rawcomponents is 'An array with every defined element being assigned as itemName => boolean true/false'
+				$data['rawcomponents'][$value] = $isSubmitted;
+				
+				# compiled is 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3'
+				# presented is 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value'
+				if ($isSubmitted) {
+					$chosenValues[] = $value;
+					$chosenVisible[] = $visible;
 				}
 			}
 			
-			# Separate the compiled/presented items by a comma-newline
-			$data['compiled'] = implode (",\n", $checked);
-			$data['presented'] = implode (",\n", $checkedPresented);
+			# Assemble the compiled and presented versions
+			$data['compiled'] = implode (",\n", $chosenValues);
+			$data['presented'] = implode (",\n", $chosenVisible);
 			/* $data['special'] = implode (',', $checked); */
 		}
 		
@@ -2542,6 +2549,9 @@ class form
 		# If required, display a summary confirmation of the result
 		if ($this->settings['formCompleteText']) {$this->html .= "\n" . '<p class="completion">' . $this->settings['formCompleteText'] . ' </p>';}
 		
+		# Determine presentation format for each element
+		$this->mergeInPresentationDefaults ();
+		
 		# Loop through each of the processing methods and output it based on the requested method
 		foreach ($this->outputMethods as $outputType => $required) {
 			$this->outputData ($outputType);
@@ -2634,29 +2644,27 @@ class form
 		# If there are any duplicated keys, list each duplicated key in bold with a comma between (but not after) each
 		if ($this->duplicatedElementNames) {$this->formSetupErrors['duplicatedElementNames'] = 'The following field ' . (count (array_unique ($this->duplicatedElementNames)) == 1 ? 'name has' : 'names have been') . ' been duplicated in the form setup: <strong>' . implode ('</strong>, <strong>', array_unique ($this->duplicatedElementNames)) .  '</strong>.';}
 		
-		# Validate the output format syntax items, looping through each and adding it to an array of items if an mispelt/unsupported item is found
-		#!# Move this into a new widget object's constructor
+		# Validate the output format syntax items, looping through each defined element that has an output configuration defined
+		#!# Move this block into a new widget object's constructor
 		$formatSyntaxInvalidElements = array ();
-		foreach ($this->elements as $name => $elementAttributes) {
-			if (!$this->outputFormatSyntaxValid ($elementAttributes['output'])) {
-				$formatSyntaxInvalidElements[$name] = true;
-			}
-		}
-		if (!empty ($formatSyntaxInvalidElements)) {$this->formSetupErrors['outputFormatMismatch'] = 'The following field ' . (count ($formatSyntaxInvalidElements) == 1 ? 'name has' : 'names have') . ' an incorrectly set up output format specification in the form setup: <strong>' . implode ('</strong>, <strong>', array_keys ($formatSyntaxInvalidElements)) .  '</strong>; the administrator should switch on the \'displayPresentationMatrix\' option in the settings to check the syntax.';}
-		
-		# Check that the output format for each item against each output type is valid
-		#!# This could probably do with refactoring to a separate function once the functionality is moved into the new widget object's constructor
-		$formatUnsupportedElements = array ();
 		$availableOutputFormats = $this->presentationDefaults ($returnFullAvailabilityArray = true, $includeDescriptions = false);
-		foreach ($this->elements as $name => $elementAttributes) {  // Loop through each administrators's setup
-			$widgetType = $this->elements[$name]['type'];
-			foreach ($elementAttributes['output'] as $outputFormat => $setting) {  // Loop through each of the output formats specified in the administrators's setup
-				if (!in_array ($setting, $availableOutputFormats[$widgetType][$outputFormat])) {
-					$formatUnsupportedElements[$name] = true;
+		foreach ($this->elements as $name => $elementAttributes) {
+			if (!$elementAttributes['output']) {continue;}
+			
+			# Define the supported formats for this type of element
+			$supportedFormats = $availableOutputFormats[$elementAttributes['type']];
+			
+			# Loop through each output type specified in the form setup
+			foreach ($elementAttributes['output'] as $outputFormatType => $outputFormatValue) {
+				
+				# Check that the type and value are both supported
+				if (!array_key_exists ($outputFormatType, $supportedFormats) || !in_array ($outputFormatValue, $supportedFormats[$outputFormatType])) {
+					$formatSyntaxInvalidElements[$name] = true;
+					break;
 				}
 			}
 		}
-		if (!empty ($formatUnsupportedElements)) {$this->formSetupErrors['outputFormatUnsupported'] = 'The following field ' . (count ($formatSyntaxInvalidElements) == 1 ? 'name has' : 'names have') . ' been allocated an output specification which is unsupported for the required output format(s) in the form setup: <strong>' . implode ('</strong>, <strong>', array_keys ($formatUnsupportedElements)) .  '</strong>; switching on the \'displayPresentationMatrix\' option in the settings will display the available types.';}
+		if ($formatSyntaxInvalidElements) {$this->formSetupErrors['outputFormatMismatch'] = 'The following field ' . (count ($formatSyntaxInvalidElements) == 1 ? 'name has' : 'names have') . " an incorrect 'output' setting: <strong>" . implode ('</strong>, <strong>', array_keys ($formatSyntaxInvalidElements)) .  '</strong>; the administrator should switch on the \'displayPresentationMatrix\' option in the settings to check the syntax.';}
 		
 		# Check templating in template mode
 		$this->setupTemplating ();
@@ -2800,29 +2808,6 @@ class form
 		if ($missingElements) {
 			$this->formSetupErrors['templateElementsNotFound'] = 'The following element ' . ((count ($missingElements) == 1) ? 'string was' : 'strings were') . ' not present once only in the template you specified: ' . implode (', ', $missingElements);
 		}
-	}
-	
-	
-	/**
-	 * Function to validate the output format syntax
-	 * @access private
-	 */
-	function outputFormatSyntaxValid ($elementOutputSpecificationArray)
-	{
-		# Define the supported types and values
-		$supportedValues = array ('presented', 'compiled', 'rawcomponents');
-		
-		# If the element output specification array includes some items, check that the types and values are within the list of supported types and values
-		if (!empty ($elementOutputSpecificationArray)) {
-			foreach ($elementOutputSpecificationArray as $type => $value) {
-				if ((!in_array ($type, $this->supportedTypes)) || (!in_array ($value, $supportedValues))) {
-					return false;
-				}
-			}
-		}
-		
-		# Otherwise return true
-		return true;
 	}
 	
 	
@@ -3336,9 +3321,6 @@ class form
 	 */
 	function outputData ($outputType)
 	{
-		# Determine presentation format for each element
-		$this->mergeInPresentationDefaults ();
-		
 		# Assign the presented data according to the output type
 		foreach ($this->outputData as $name => $data) {
 			$presentedData[$name] = $data[$this->elements[$name]['output'][$outputType]];
@@ -3367,24 +3349,25 @@ class form
 		# Loop through each element
 		foreach ($this->elements as $element => $attributes) {
 			
-			# If the presentation matrix has a specification for the element (only heading should not do so), merge the setup-assigned output formats over the defaults in the presentation matrix
-			if (isSet ($presentationDefaults[$attributes['type']])) {
-				$this->elements[$element]['output'] = array_merge ($presentationDefaults[$attributes['type']], $attributes['output']);
-				
-				# Slightly hacky special case: for a select type, if in multiple mode, use the multiple output format instead
-				if ($attributes['type'] == 'select') {
-					foreach ($this->elements[$element]['output'] as $outputType => $outputFormat) {
-						$indicatorLength = 0 - strlen ($indicator = " [when in 'multiple' mode]");
-						if (substr ($outputType, $indicatorLength) == $indicator) {
-							$replacementType = substr ($outputType, 0, $indicatorLength);
-							if ($this->elements[$element]['multiple']) {
-								$this->elements[$element]['output'][$replacementType] = $presentationDefaults[$attributes['type']][$outputType];
-							}
-							unset ($this->elements[$element]['output'][$outputType]);
-						}
+			# Skip if the presentation matrix has no specification for the element (only heading should not do so)
+			if (!isSet ($presentationDefaults[$attributes['type']])) {continue;}
+			
+			# Assign the defaults on a per-element basis
+			$defaults = $presentationDefaults[$attributes['type']];
+			
+			# Slightly hacky special case: for a select type in multiple mode, replace in the defaults the multiple output format instead
+			if (($attributes['type'] == 'select') && ($attributes['multiple'])) {
+				foreach ($defaults as $outputType => $outputFormat) {
+					if (ereg ("^([a-z]+) \[when in 'multiple' mode\]$", $outputType, $matches)) {
+						$replacementType = $matches[1];
+						$defaults[$replacementType] = $defaults[$outputType];
+						unset ($defaults[$outputType]);
 					}
 				}
 			}
+			
+			# Merge the setup-assigned output formats over the defaults in the presentation matrix
+			$this->elements[$element]['output'] = array_merge ($defaults, $attributes['output']);
 		}
 	}
 	
@@ -3402,10 +3385,10 @@ class form
 			
 			'checkboxes' => array (
 				'_descriptions' => array (
-					'rawcomponents'	=> 'Array with every defined element being assigned as itemName => boolean true/false',
+					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean true/false',
 					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
-					'special'		=> 'Chosen items only, listed comma separated with no quote marks',
+					/* 'special'		=> 'Chosen items only, listed comma separated with no quote marks', */
 				),
 				'file'				=> array ('rawcomponents', 'compiled', 'presented'),
 				'email'				=> array ('compiled', 'rawcomponents', 'presented'),
@@ -3484,7 +3467,7 @@ class form
 			
 			'radiobuttons' => array (
 				'_descriptions' => array (
-					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean',
+					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean true/false',
 					'compiled'		=> 'The (single) chosen item, if any',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
@@ -3510,7 +3493,7 @@ class form
 			
 			'select' => array (
 				'_descriptions' => array (
-					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean',
+					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean true/false',
 					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
@@ -4635,7 +4618,6 @@ class formWidget
 
 #!# Make the file specification of the form more user-friendly (e.g. specify / or ./ options)
 #!# Do a single error check that the number of posted elements matches the number defined; this is useful for checking that e.g. hidden fields are being posted
-#!# Need to add basic protection for ensuring that form sub-elements submitted (in selectable types) are in the list of available values; this has already been achieved for checkboxes, relatively easily
 #!# Add form setup checking validate input types like cols= is numeric, etc.
 #!# Add a warnings flag in the style of the errors flagging to warn of changes which have been made silently
 #!# Need to add configurable option (enabled by default) to add headings to new CSV when created

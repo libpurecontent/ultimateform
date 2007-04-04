@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.7
+ * @version 1.4.8
  */
 class form
 {
@@ -149,6 +149,8 @@ class form
 		'truncate'							=> false,							# Whether to truncate the visible part of a widget (global setting)
 		'listUnzippedFilesMaximum'			=> 5,								# When auto-unzipping an uploaded zip file, the maximum number of files contained that should be listed (beyond this, just 'x files' will be shown) in any visible result output
 		'fixMailHeaders'					=> false,							# Whether to add additional mail headers, for use with a server that fails to add Message-Id/Date/Return-Path; set as (bool) true or (str) application name
+		'cols'								=> 30,								# Global setting for textarea cols - number of columns
+		'rows'								=> 5,								# Global setting for textarea cols - number of rows
 	);
 	
 	
@@ -346,8 +348,8 @@ class form
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false)
-			'cols'					=> 30,		# Number of columns (optional; defaults to 30)
-			'rows'					=> 5,		# Number of rows (optional; defaults to 30)
+			'cols'					=> $this->settings['cols'],		# Number of columns (optional; defaults to 30)
+			'rows'					=> $this->settings['rows'],		# Number of rows (optional; defaults to 5)
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression(s) against which all lines of the submission must validate
 			'disallow'				=> false,		# Regular expression against which all lines of the submission must not validate
@@ -1360,7 +1362,7 @@ class form
 			# Assemble the compiled and presented versions
 			$data['compiled'] = implode (",\n", $chosenValues);
 			$data['presented'] = implode (",\n", $chosenVisible);
-			/* $data['special'] = implode (',', $checked); */
+			$data['special-setdatatype'] = implode (',', $chosenValues);
 		}
 		
 		# Compile the datatype
@@ -3388,13 +3390,13 @@ class form
 					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean true/false',
 					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
-					/* 'special'		=> 'Chosen items only, listed comma separated with no quote marks', */
+					'special-setdatatype'		=> 'Chosen items only, listed comma separated with no quote marks',
 				),
 				'file'				=> array ('rawcomponents', 'compiled', 'presented'),
 				'email'				=> array ('compiled', 'rawcomponents', 'presented'),
 				'confirmationEmail'	=> array ('presented', 'compiled'),
 				'screen'			=> array ('presented', 'compiled'),
-				'processing'		=> array ('rawcomponents', 'compiled', 'presented',/* 'special'*/),
+				'processing'		=> array ('rawcomponents', 'compiled', 'presented', 'special-setdatatype'),
 				'database'			=> array ('compiled'),
 			),
 			
@@ -4329,6 +4331,8 @@ class form
 				
 				# VARCHAR (character) field
 				case (eregi ('varchar\(([0-9]+)\)', $type, $matches)):
+				#!# Temporary assignment of time to input
+				case (strtolower ($type) == 'time'):
 					$this->input ($standardAttributes + array (
 						'maxlength' => $matches[1],
 						# Truncate the size if a (numeric) value is given and the required size is greater than the truncation
@@ -4364,8 +4368,8 @@ class form
 					} else {
 						$this->checkboxes (array_merge ($standardAttributes, array (
 							'values' => $values,
-							'output' => array ('processing' => 'compiled' /*'special'*/),
-							'default' => (is_array ($value) ? $value : explode (',', $value)),	// Value from getData will just be item1,item2,item3
+							'output' => array ('processing' => 'special-setdatatype'),
+							'default' => ($value ? (is_array ($value) ? $value : explode (',', $value)) : array ()),	// Value from getData will just be item1,item2,item3
 						)));
 					}
 					break;
@@ -4385,10 +4389,11 @@ class form
 				
 				# BLOB
 				case (strtolower ($type) == 'blob'):
-				case 'mediumtext':
+				case (strtolower ($type) == 'mediumtext'):
+				case (strtolower ($type) == 'text'):
 					$this->textarea ($standardAttributes + array (
-						'cols' => 50,
-						'rows' => 6,
+						// 'cols' => 50,
+						// 'rows' => 6,
 					));
 					break;
 				

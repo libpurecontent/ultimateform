@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.8
+ * @version 1.4.9
  */
 class form
 {
@@ -3281,14 +3281,21 @@ class form
 			# Get the value of each field, using the presented value unless the widget specifies the value to be used
 			$values = array ();
 			foreach ($rule['fields'] as $name) {
-				#!# Value is always being added even if nothing submitted - for 'different' at least, that is wrong
 				$values[$name] = ((isSet ($this->elements[$name]['groupValidation']) && $this->elements[$name]['groupValidation']) ? $this->elements[$name]['data'][$this->elements[$name]['groupValidation']] : $this->elements[$name]['data']['presented']);
+			}
+			
+			# Make an array of non-empty values for use with the 'different' check
+			$nonEmptyValues = array ();
+			foreach ($values as $value) {
+				if (!empty ($value)) {
+					$nonEmptyValues[] = $value;
+				}
 			}
 			
 			# Check the rule
 			#!# Ideally refactor to avoid the same list of cases specified as $this->validationTypes
 			if (
-				(($rule['type'] == 'different') && (!application::allArrayElementsEmpty ($values)) && (count ($values) != count (array_unique ($values))))
+				(($rule['type'] == 'different') && ($nonEmptyValues) && (count ($nonEmptyValues) != count (array_unique ($nonEmptyValues))))
 				|| (($rule['type'] == 'same')      && ((count ($values) > 1) && count (array_unique ($values)) != 1))
 				|| (($rule['type'] == 'either')    && (application::allArrayElementsEmpty ($values)))
 			) {

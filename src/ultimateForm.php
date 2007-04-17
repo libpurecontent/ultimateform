@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.9
+ * @version 1.4.10
  */
 class form
 {
@@ -906,7 +906,7 @@ class form
 			if (!$arguments['multiple'] || !$arguments['required']) {
 				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				if (isSet ($arguments['_valuesMultidimensional'])) {
-					$arguments['_valuesMultidimensionalWithNull'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
+					$arguments['_valuesMultidimensional'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
 				}
 			}
 			
@@ -920,7 +920,7 @@ class form
 			} else {
 				
 				# Multidimensional version, which adds optgroup labels
-				foreach ($arguments['_valuesMultidimensionalWithNull'] as $key => $mainValue) {
+				foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
 					if (is_array ($mainValue)) {
 						$widgetHtml .= "\n\t\t\t\t\t<optgroup label=\"$key\">";
 						foreach ($mainValue as $value => $visible) {
@@ -1409,11 +1409,19 @@ class form
 			'description'			=> '',		# Description text
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
-			'level'					=> 'date',	# Whether to show a 'datetime' or just 'date' widget set
+			'level'					=> 'date',	# Whether to show 'datetime' / 'date' / 'time' / 'year' widget set
 			'default'				=> '',		# Initial value - either 'timestamp' or an SQL string
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
-			'autoCenturyConversion'	=> 69,								# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
+			'autoCenturyConversion'	=> 69,		# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
+		);
+		
+		# Define the supported levels
+		$levels = array (
+			'time'		=> 'H:i:s',
+			'datetime'	=> 'Y-m-d H:i:s',
+			'date'		=> 'Y-m-d',
+			'year'		=> 'Y',
 		);
 		
 		# Load the date processing library
@@ -1425,12 +1433,21 @@ class form
 		
 		$arguments = $widget->getArguments ();
 		
-		# Convert the default if using the 'timestamp' keyword; cache a copy for later use
+		# Check the level is supported
+		if (!array_key_exists ($arguments['level'], $levels)) {
+			$this->formSetupErrors['levelInvalid'] = "An invalid 'level' (" . htmlentities ($arguments['level']) . ') was specified in a datetime widget.';
+			#!# Really this should end at this point rather than adding a fake reassignment
+			$arguments['level'] = 'datetime';
+		}
+		
+		# Convert the default if using the 'timestamp' keyword; cache a copy for later use; add a null date for the time version
 		$isTimestamp = ($arguments['default'] == 'timestamp');
-		if ($isTimestamp) {$arguments['default'] = date ('Y' . (($arguments['level'] != 'year') ? '-m-d' : '') . (($arguments['level'] == 'datetime') ? ' H:i:s' : ''));}
+		if ($isTimestamp) {
+			$arguments['default'] = date ($levels[$arguments['level']]);
+		}
 		
 		# If the widget is not editable, fix the form value to the default
-		if (!$arguments['editable']) {$this->form[$arguments['name']] = timedate::getDateTimeArray ($arguments['default']);}
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = timedate::getDateTimeArray ((($arguments['level'] == 'time') ? '0000-00-00 ' : '') . $arguments['default']);}
 		
 		# Obtain the value of the form submission (which may be empty)  (ensure that a full date and time array exists to prevent undefined offsets in case an incomplete set has been posted)
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ('year' => '', 'month' => '', 'day' => '', 'time' => ''));
@@ -1442,7 +1459,7 @@ class form
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 		if (!$this->formPosted) {
-			$elementValue = timedate::getDateTimeArray ($arguments['default']);
+			$elementValue = timedate::getDateTimeArray ((($arguments['level'] == 'time') ? '0000-00-00 ' : '') . $arguments['default']);
 		} else {
  			
 			# Check whether all fields are empty, starting with assuming all fields are not incomplete
@@ -1455,6 +1472,8 @@ class form
 				# Emulate the day and month as being the first, to avoid branching the logic
 				$elementValue['day'] = 1;
 				$elementValue['month'] = 1;
+			} else if ($arguments['level'] == 'time') {
+				if (empty ($elementValue['time'])) {$allFieldsIncomplete = true;}
 			} else {
 				if ((empty ($elementValue['day'])) && (empty ($elementValue['month'])) && (empty ($elementValue['year']))) {$allFieldsIncomplete = true;}
 			}
@@ -1464,62 +1483,66 @@ class form
 				if ($arguments['required']) {$requiredButEmpty = true;}
 			} else {
 				
-				# If automatic conversion is set and the year is two characters long, convert the date to four years by adding 19 or 20 as appropriate
-				if (($arguments['autoCenturyConversion']) && (strlen ($elementValue['year']) == 2)) {
-					$elementValue['year'] = (($elementValue['year'] <= $arguments['autoCenturyConversion']) ? '20' : '19') . $elementValue['year'];
-				}
-				
-				# Deal with month conversion by adding leading zeros as required
-				if (($elementValue['month'] > 0) && ($elementValue['month'] <= 12)) {$elementValue['month'] = sprintf ('%02s', $elementValue['month']);}
-				
-				# Check that all parts have been completed
-				if ((empty ($elementValue['day'])) || (empty ($elementValue['month'])) || (empty ($elementValue['year'])) || (($arguments['level'] == 'datetime') && (empty ($elementValue['time'])))) {
-					$elementProblems['notAllComplete'] = "Not all parts have been completed!";
-				} else {
+				# Do date-based checks
+				if ($arguments['level'] != 'time') {
 					
-					# Check that a valid month (01-12, corresponding to Jan-Dec respectively) has been submitted
-					if ($elementValue['month'] > 12) {
-						$elementProblems['monthFieldInvalid'] = 'The month part is invalid!';
+					# If automatic conversion is set and the year is two characters long, convert the date to four years by adding 19 or 20 as appropriate
+					if (($arguments['autoCenturyConversion']) && (strlen ($elementValue['year']) == 2)) {
+						$elementValue['year'] = (($elementValue['year'] <= $arguments['autoCenturyConversion']) ? '20' : '19') . $elementValue['year'];
 					}
 					
-					# Check that the day and year fields are numeric
-					if ((!is_numeric ($elementValue['day'])) && (!is_numeric ($elementValue['year']))) {
-						$elementProblems['dayYearFieldsNotNumeric'] = 'Both the day and year part must be numeric!';
+					# Deal with month conversion by adding leading zeros as required
+					if (($elementValue['month'] > 0) && ($elementValue['month'] <= 12)) {$elementValue['month'] = sprintf ('%02s', $elementValue['month']);}
+					
+					# Check that all parts have been completed
+					if ((empty ($elementValue['day'])) || (empty ($elementValue['month'])) || (empty ($elementValue['year'])) || (($arguments['level'] == 'datetime') && (empty ($elementValue['time'])))) {
+						$elementProblems['notAllComplete'] = "Not all parts have been completed!";
 					} else {
 						
-						# Check that the day is numeric
-						if (!is_numeric ($elementValue['day'])) {
-							$elementProblems['dayFieldNotNumeric'] = 'The day part must be numeric!';
+						# Check that a valid month (01-12, corresponding to Jan-Dec respectively) has been submitted
+						if ($elementValue['month'] > 12) {
+							$elementProblems['monthFieldInvalid'] = 'The month part is invalid!';
 						}
 						
-						# Check that the year is numeric
-						if (!is_numeric ($elementValue['year'])) {
-							$elementProblems['yearFieldNotNumeric'] = 'The year part must be numeric!';
-							
-						# If the year is numeric, ensure the year has been entered as a two or four digit amount
+						# Check that the day and year fields are numeric
+						if ((!is_numeric ($elementValue['day'])) && (!is_numeric ($elementValue['year']))) {
+							$elementProblems['dayYearFieldsNotNumeric'] = 'Both the day and year part must be numeric!';
 						} else {
-							if ($arguments['autoCenturyConversion']) {
-								if ((strlen ($elementValue['year']) != 2) && (strlen ($elementValue['year']) != 4)) {
-									$elementProblems['yearInvalid'] = 'The year part must be either two or four digits!';
-								}
+							
+							# Check that the day is numeric
+							if (!is_numeric ($elementValue['day'])) {
+								$elementProblems['dayFieldNotNumeric'] = 'The day part must be numeric!';
+							}
+							
+							# Check that the year is numeric
+							if (!is_numeric ($elementValue['year'])) {
+								$elementProblems['yearFieldNotNumeric'] = 'The year part must be numeric!';
+								
+							# If the year is numeric, ensure the year has been entered as a two or four digit amount
 							} else {
-								if (strlen ($elementValue['year']) != 4) {
-									$elementProblems['yearInvalid'] = 'The year part must be four digits!';
+								if ($arguments['autoCenturyConversion']) {
+									if ((strlen ($elementValue['year']) != 2) && (strlen ($elementValue['year']) != 4)) {
+										$elementProblems['yearInvalid'] = 'The year part must be either two or four digits!';
+									}
+								} else {
+									if (strlen ($elementValue['year']) != 4) {
+										$elementProblems['yearInvalid'] = 'The year part must be four digits!';
+									}
 								}
 							}
 						}
-					}
-					
-					# If all date parts have been entered correctly, check whether the date is valid
-					if (!isSet ($elementProblems)) {
-						if (!checkdate (($elementValue['month']), $elementValue['day'], $elementValue['year'])) {
-							$elementProblems['dateInvalid'] = 'An invalid date has been entered!';
+						
+						# If all date parts have been entered correctly, check whether the date is valid
+						if (!isSet ($elementProblems)) {
+							if (!checkdate (($elementValue['month']), $elementValue['day'], $elementValue['year'])) {
+								$elementProblems['dateInvalid'] = 'An invalid date has been entered!';
+							}
 						}
 					}
 				}
 				
 				# If the time is required in addition to the date, parse the time field, allowing flexible input syntax
-				if ($arguments['level'] == 'datetime') {
+				if (($arguments['level'] == 'datetime') || ($arguments['level'] == 'time')) {
 					
 					# Only do time processing if the time field isn't empty
 					if (!empty ($elementValue['time'])) {
@@ -1547,43 +1570,45 @@ class form
 */
 		
 		# Describe restrictions on the widget
-		if ($arguments['level'] == 'datetime') {$restriction = 'Time can be entered flexibly';}
+		if (($arguments['level'] == 'datetime') || ($arguments['level'] == 'time')) {$restriction = 'Time can be entered flexibly';}
 		
 		# Start to define the widget's core HTML
 		if ($arguments['editable']) {
-			#!# Add fieldsets to remaining form widgets or scrap
 			$widgetHtml = '';
-			if ($arguments['level'] != 'year') {
-				$widgetHtml .= "\n\t\t\t<fieldset>";
+			
+			# Start with the time if required
+			if (substr_count ($arguments['level'], 'time')) {	// datetime or time
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span>';
+				$widgetHtml .= '<input name="' . $this->settings['name'] . '[' . $arguments['name'] . '][time]" type="text" size="10" value="' . $elementValue['time'] . '" />';
 			}
 			
-			# Add in the time if required
-			if ($arguments['level'] == 'datetime') {
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span><input name="' . $this->settings['name'] . '[' . $arguments['name'] . '][time]" type="text" size="10" value="' . $elementValue['time'] . '" />';
-			}
-			
-			# Define the date, month and year input boxes; if the day or year are 0 then nothing will be displayed
-			if ($arguments['level'] != 'year') {
+			# Add the Define the date and month input boxes; if the day or year are 0 then nothing will be displayed
+			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . $this->settings['name'] . '[' . $arguments['name'] . '][day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
 				$widgetHtml .= "\n\t\t\t\t" . '<select name="' . $this->settings['name'] . '[' . $arguments['name'] . '][month]">';
-				$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
 				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
+				$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
 				foreach ($months as $monthNumber => $monthName) {
 					$widgetHtml .= "\n\t\t\t\t\t" . '<option value="' . sprintf ('%02s', $monthNumber) . '"' . (($elementValue['month'] == sprintf ('%02s', $monthNumber)) ? ' selected="selected"' : '') . '>' . $monthName . '</option>';
 				}
 				$widgetHtml .= "\n\t\t\t\t" . '</select>';
 			}
-			#!# Remove 'y:' if only in year format
-			$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">y:&nbsp;</span><input size="4" name="' . $this->settings['name'] . '[' . $arguments['name'] . '][year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
-			if ($arguments['level'] != 'year') {
-				$widgetHtml .= "\n\t\t\t</fieldset>";
+			
+			# Add the year box
+			if ($arguments['level'] != 'time') {
+				$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
+				$widgetHtml .= '<input size="4" name="' . $this->settings['name'] . '[' . $arguments['name'] . '][year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
+			}
+			
+			# Surround with a fieldset if necessary
+			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
+				$widgetHtml  = "\n\t\t\t<fieldset>" . $widgetHtml . "\n\t\t\t</fieldset>";
 			}
 		} else {
 			
 			# Non-editable version
-			#!# If a default value is empty, this results in "mktime() expects parameter 4 to be long, string given in timedate.php on line 69"
-			$widgetHtml  = timedate::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') . ')</span>' : '');
+			$widgetHtml  = timedate::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">' . (($arguments['level'] != 'time') ? '(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') : '(Current time') . ')' . '</span>' : '');
 			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($arguments['default']) . '" />';
 		}
 		
@@ -1608,8 +1633,8 @@ class form
 			#!# This needs to be ALWAYS assigned in case $data['compiled'] and $data['presented'] are referred to later
 			if (!application::allArrayElementsEmpty ($this->form[$arguments['name']])) {
 				
-				# Make the compiled version be in SQL DATETIME format, i.e. YYYY-MM-DD HH:MM:SS
-				$data['compiled'] = $this->form[$arguments['name']]['year'] . (($arguments['level'] == 'year') ? '' : '-' . $this->form[$arguments['name']]['month'] . '-' . sprintf ('%02s', $this->form[$arguments['name']]['day'])) . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : '');
+				# Make the compiled version be in SQL format, i.e. YYYY-MM-DD HH:MM:SS
+				$data['compiled'] = (($arguments['level'] == 'time') ? $this->form[$arguments['name']]['time'] : $this->form[$arguments['name']]['year'] . (($arguments['level'] == 'year') ? '' : '-' . $this->form[$arguments['name']]['month'] . '-' . sprintf ('%02s', $this->form[$arguments['name']]['day'])) . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : ''));
 				
 				# Make the presented version in english text
 				#!# date () corrupts dates after 2038; see php.net/date. Suggest not re-presenting it if year is too great.
@@ -4338,8 +4363,6 @@ class form
 				
 				# VARCHAR (character) field
 				case (eregi ('varchar\(([0-9]+)\)', $type, $matches)):
-				#!# Temporary assignment of time to input
-				case (strtolower ($type) == 'time'):
 					$this->input ($standardAttributes + array (
 						'maxlength' => $matches[1],
 						# Truncate the size if a (numeric) value is given and the required size is greater than the truncation
@@ -4384,11 +4407,12 @@ class form
 				# DATE (date) field
 				case (eregi ('year\(([2|4])\)', $type, $matches)):
 					$type = 'year';
+				case (strtolower ($type) == 'time'):
 				case (strtolower ($type) == 'date'):
 				case (strtolower ($type) == 'datetime'):
 				case (strtolower ($type) == 'timestamp'):
 					$this->datetime ($standardAttributes + array (
-						'level' => $type,
+						'level' => strtolower ($type),
 						#!# Disabled as seemingly incorrect
 						/* 'editable' => (strtolower ($type) == 'timestamp'), */
 					));

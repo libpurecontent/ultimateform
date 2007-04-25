@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.10
+ * @version 1.4.11
  */
 class form
 {
@@ -2869,7 +2869,7 @@ class form
 			} else {
 				
 				# If file uploads are being allowed, check that upload_max_filesize and post_max_size are valid
-				if ((!preg_match ('/^(\d+)([bkm]*)$/i', ini_get ('upload_max_filesize'))) || (!preg_match ('/^(\d+)([bkm]*)$/i', ini_get ('post_max_size')))) {
+				if ((!preg_match ('/^(\d+)([bkm]*)$/iD', ini_get ('upload_max_filesize'))) || (!preg_match ('/^(\d+)([bkm]*)$/iD', ini_get ('post_max_size')))) {
 					$this->formSetupErrors['environmentFileUploads'] = 'The PHP configuration setting upload_max_filesize/post_max_size must both be valid.';
 				} else {
 					
@@ -4180,7 +4180,9 @@ class form
 			'exclude' => array (),
 			'ordering' => array (),
 			'lookupFunction' => false,
+			'lookupFunctionParameters' => array (),
 			'truncate' => 40,
+			'size' => 40,
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
 			'commentsAsDescription' => false,	// Whether to use column comments for the description field rather than for the title field
 		);
@@ -4255,7 +4257,8 @@ class form
 			# Perform a lookup if necessary
 			$lookupValues = false;
 			if ($lookupFunction) {
-				list ($title, $lookupValues) = call_user_func ($lookupFunction, $this->databaseConnection, $title, $fieldAttributes['Type']);
+				$parameters = array_merge (array ($this->databaseConnection, $title, $fieldAttributes['Type']), application::ensureArray ($lookupFunctionParameters));
+				list ($title, $lookupValues) = call_user_func_array ($lookupFunction, $parameters);
 			}
 			
 			# Convert title from lowerCamelCase to Standard text if necessary
@@ -4365,9 +4368,8 @@ class form
 				case (eregi ('varchar\(([0-9]+)\)', $type, $matches)):
 					$this->input ($standardAttributes + array (
 						'maxlength' => $matches[1],
-						# Truncate the size if a (numeric) value is given and the required size is greater than the truncation
-						#!# Move this or decouple $truncate from it
-						'size' => ($truncate && (is_numeric ($truncate)) && ((int) $matches[1] > $truncate) ? $truncate : $matches[1]),
+						# Set the size if a (numeric) value is given and the required size is greater than the size specified
+						'size' => ($size && (is_numeric ($size)) && ((int) $matches[1] > $size) ? $size : $matches[1]),
 					));
 					break;
 				
@@ -4681,6 +4683,7 @@ class formWidget
 #!# $resultLines[] should have the [techName] optional
 # Antispam Captcha option
 # Support for select::regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
+# Consider issue of null bytes in ereg - http://uk.php.net/manual/en/ref.regex.php#74258
 
 # Version 2 feature proposals
 #!# Self-creating form mode

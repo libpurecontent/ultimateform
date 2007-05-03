@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.11
+ * @version 1.4.12
  */
 class form
 {
@@ -673,6 +673,8 @@ class form
 	{
 		# Cache wanted characters stripped by tidy's 'bare' option
 		$cache = array (
+			'&#8211;' => '__NDASH',
+			'&#8212;' => '__MDASH',
 			'&ndash;' => '__NDASH',
 			'&mdash;' => '__MDASH',
 		);
@@ -727,6 +729,7 @@ class form
 		$replacements += array (
 			'<\?xml:namespace([^>]*)>' => '',	// Remove Word XML namespace tags
 			'<o:p> </o:p>'	=> '',	// WordHTML characters
+			'<o:p></o:p>'	=> '',	// WordHTML characters
 			'<span>([^<]*)</span>' => '<TEMP2span>\\1</TEMP2span>',	// Protect FIR-style spans
 			"</?span([^>]*)>"	=> '',	// Remove other spans
 			'[[:space:]]*<h([1-6]{1})([^>]*)>[[:space:]]</h([1-6]{1})>[[:space:]]*' => '',	// Headings containing only whitespace
@@ -736,7 +739,7 @@ class form
 			"<(li|tr|/tr|tbody|/tbody)"	=> "\t<\\1",	// Indent level-two tags
 			"<td"	=> "\t\t<td",	// Double-indent level-three tags
 			" href=\"{$arguments['editorBasePath']}editor/"	=> ' href=\"',	// Workaround for Editor basepath bug
-			' href="([^"]*)/' . $arguments['directoryIndex'] . '"'	=> ' href="\1/"',	// Chop off directory index links
+			' href="([^("|/)]*)/' . $arguments['directoryIndex'] . '"'	=> ' href="\1/"',	// Chop off directory index links
 			'<br /></h1>' => '</h1>',	// Remove breaks before an H1 closing tag
 		);
 		
@@ -745,10 +748,10 @@ class form
 			$replacements += array (
 				'<TEMPspan>@</TEMPspan>' => '<span>&#64;</span>',
 				'<TEMP2span>([^<]*)</TEMP2span>' => '<span>\\1</span>',	// Replace FIR-style spans back
-				'<a href="([^@]*)@([^"]*)">' => '<a href="mailto:\1@\2">',	// Initially catch badly formed HTML versions that miss out mailto: (step 1)
+				'<a([^>]*) href="([^("|@)]+)@([^"]+)"([^>]*)>' => '<a\1 href="mailto:\2@\3"\4>',	// Initially catch badly formed HTML versions that miss out mailto: (step 1)
 				'<a href="mailto:mailto:' => '<a href="mailto:',	// Initially catch badly formed HTML versions that miss out mailto: (step 2)
-				'<a href="mailto:([^@]*)@([^"]*)">([^@]*)@([^"]*)</a>' => '\3<span>&#64;</span>\4',
-				'<a href="mailto:([^@]*)@([^"]*)">([^<]*)</a>' => '\3 [\2<span>&#64;</span>\3]',
+				'<a([^>]*) href="mailto:([^("|@)]+)@([^"]+)"([^>]*)>([^(@|<)]+)@([^<]+)</a>' => '\5<span>&#64;</span>\6',
+				'<a([^>]*) href="mailto:([^("|@)]+)@([^"]+)"([^>]*)>([^<]*)</a>' => '\5 [\2<span>&#64;</span>\3]',
 				'<span>@</span>' => '<span>&#64;</span>',
 				'<span><span>&#64;</span></span>' => '<span>&#64;</span>',
 				'([_a-z0-9-]+)(\.[_a-z0-9-]+)*@([a-z0-9-]+)(\.[a-z0-9-]+)*(\.[a-z]{2,6})' => '\1\2<span>&#64;</span>\3\4\5', // Non-linked, standard text, addresses

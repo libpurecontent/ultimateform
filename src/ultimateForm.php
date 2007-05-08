@@ -1383,7 +1383,7 @@ class form
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
-			'required' => false,
+			'required' => $arguments['required'],
 			'requiredButEmpty' => false, # This is covered by $elementProblems
 			#!# Apply $this->_suitableAsEmailTarget () to checkboxes possibly
 			'suitableAsEmailTarget' => false,
@@ -4367,12 +4367,12 @@ class form
 					));
 					break;
 				
-				# VARCHAR (character) field
-				case (eregi ('varchar\(([0-9]+)\)', $type, $matches)):
+				# CHAR/VARCHAR (character) field
+				case (eregi ('(char|varchar)\(([0-9]+)\)', $type, $matches)):
 					$this->input ($standardAttributes + array (
-						'maxlength' => $matches[1],
+						'maxlength' => $matches[2],
 						# Set the size if a (numeric) value is given and the required size is greater than the size specified
-						'size' => ($size && (is_numeric ($size)) && ((int) $matches[1] > $size) ? $size : $matches[1]),
+						'size' => ($size && (is_numeric ($size)) && ((int) $matches[2] > $size) ? $size : $matches[2]),
 					));
 					break;
 				

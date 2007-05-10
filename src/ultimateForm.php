@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.12
+ * @version 1.4.13
  */
 class form
 {
@@ -108,6 +108,7 @@ class form
 		'div'								=> 'ultimateform',					# The value of <div class=""> which surrounds the entire output (or false for none)
 		'displayPresentationMatrix'			=> false,							# Whether to show the presentation defaults
 		'displayTitles'						=> true,							# Whether to show user-supplied titles for each widget
+		'titleReplacements'					=> array (),						# Global replacement of values in titles (mainly of use when dataBinding)
 		'displayDescriptions'				=> true,							# Whether to show user-supplied descriptions for each widget
 		'displayRestrictions'				=> true,							# Whether to show/hide restriction guidelines
 		'display'							=> 'tables',						# Whether to display the form using 'tables', 'css' (CSS layout) 'paragraphs' or 'template'
@@ -134,6 +135,7 @@ class form
 		'requiredFieldClass'				=> 'required',						# The CSS class used to mark a widget as required
 		'submitTo'							=> false,							# The form processing location if being overriden
 		'nullText'							=> 'Please select',					# The 'null' text for e.g. selection boxes
+		'linebreaks' 						=> true,							# Widget-based linebreaks (top level default)
 		'opening'							=> false,							# Optional starting datetime as an SQL string
 		'closing'							=> false,							# Optional closing datetime as an SQL string
 		'validUsers'						=> false,							# Optional valid user(s) - if this is set, a user will be required. To set, specify string/array of valid user(s), or '*' to require any user
@@ -1032,7 +1034,7 @@ class form
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'default'				=> array (),# Pre-selected item
-			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
+			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget (if false, the master value is assumed)
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
@@ -1206,7 +1208,7 @@ class form
 			'maximum'		=> 0,		# The maximum number which must be selected (defaults to 0, i.e. no maximum checking done)
 			'default'			=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
-			'linebreaks'			=> true,	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
+			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
@@ -2549,6 +2551,13 @@ class form
 			if ($showHtmlDirectly) {echo $this->html;}
 			$html = $this->html;
 			return false;
+		}
+		
+		# Perform replacement on the description at top-level if required
+		if ($this->settings['titleReplacements']) {
+			foreach ($this->elements as $name => $elementAttributes) {
+				$this->elements[$name]['title'] = str_replace (array_keys ($this->settings['titleReplacements']), array_values ($this->settings['titleReplacements']), $elementAttributes['title']);
+			}
 		}
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
@@ -4296,10 +4305,8 @@ class form
 					# Amend the type to a specific widget if set
 					if (isSet ($attributes[$fieldName]['type'])) {
 						if (method_exists ($this, $attributes[$fieldName]['type'])) {
-							$fieldAttributes['Type'] = $attributes[$fieldName]['type'];
-							$forceType = true;
+							$forceType = $attributes[$fieldName]['type'];
 						}
-						unset ($attributes[$fieldName]['type']);
 					}
 				}
 				
@@ -4329,7 +4336,7 @@ class form
 			# Deal with looked-up value sets specially, defaulting to select unless the type is forced
 			if ($lookupValues && $fieldAttributes['Type'] != '_hidden') {
 				$lookupType = 'select';
-				if ($forceType && ($fieldAttributes['Type'] == 'checkboxes' || $fieldAttributes['Type'] == 'radiobuttons')) {
+				if ($forceType && ($forceType == 'checkboxes' || $forceType == 'radiobuttons')) {
 					$lookupType = $fieldAttributes['Type'];
 				}
 				$this->$lookupType ($standardAttributes + array (
@@ -4348,7 +4355,14 @@ class form
 				
 				# Force to a specified type if required
 				case ($forceType):
-					$this->$type ($standardAttributes);
+					if (($forceType == 'checkboxes' || $forceType == 'radiobuttons' || $forceType == 'select') && eregi ('(enum|set)\(\'(.*)\'\)', $type, $matches)) {
+						$values = explode ("','", $matches[2]);
+						$this->$forceType ($standardAttributes + array (
+							'values' => $values,
+						));
+					} else {
+						$this->$forceType ($standardAttributes);
+					}
 					break;
 				
 				# Hidden fields - deny editability

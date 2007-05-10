@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.4.13
+ * @version 1.5.0
  */
 class form
 {
@@ -72,6 +72,7 @@ class form
 	var $validationRules = array ();			// Array of validation rules
 	var $databaseConnection = NULL;				// Database connection
 	var $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
+	var $prefixedGroups = array ();				// Groups of element names when using prefixing in dataBinding
 	
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
@@ -116,6 +117,7 @@ class form
 		'displayTemplatePatternWidget'		=> '{%element}',					# The pattern used for signifying element name widget positions when templating
 		'displayTemplatePatternLabel'		=> '{[%element]}',					# The pattern used for signifying element name label positions (optional) when templating
 		'displayTemplatePatternSpecial'		=> '{[[%element]]}',				# The pattern used for signifying element name special item positions (e.g. submit, reset, problems) when templating
+		'classShowType'						=> true,							# Whether to include the widget type within the class list for the container of the widget (e.g. tr in 'tables' mode)
 		'debug'								=> false,							# Whether to switch on debugging
 		'developmentEnvironment'			=> false,							# Whether to run in development mode
 		'displayColons'						=> true,							# Whether to show colons after the initial description
@@ -2604,11 +2606,31 @@ class form
 			$this->html .= "\n\n</div>";
 		}
 		
-		# Return the data, again showing directly if required
+		# Deal with the HTML
 		if ($showHtmlDirectly) {echo $this->html;}
 		$html = $this->html;
 		// $html;	// Nothing is done with $html - it was passed by reference, if at all
-		return $this->outputData ('processing');
+		
+		# Get the data
+		$data = $this->outputData ('processing');
+		
+		# If the data is grouped, rearrange it into groups first
+		if ($this->prefixedGroups) {
+			foreach ($this->prefixedGroups as $group => $fields) {
+				foreach ($fields as $field) {
+					$unprefixedFieldname = ereg_replace ("^{$group}_", '', $field);
+					$groupedData[$group][$unprefixedFieldname] = $data[$field];
+					unset ($data[$field]);
+				}
+			}
+			
+			# Add on the remainder into a new group, called '0'
+			$groupedData[0] = $data;
+			$data = $groupedData;
+		}
+		
+		# Return the data (whether virgin or grouped)
+		return $data;
 	}
 	
 	
@@ -3027,7 +3049,7 @@ class form
 					if ($elementAttributes['type'] == 'heading') {
 						$formHtml .= "\n" . $elementAttributes['html'];
 					} else {
-						$formHtml .= "\n" . '<p id="' . $id . '"' . ($elementIsRequired ? " class=\"{$this->settings['requiredFieldClass']}\"" : '') . '>';
+						$formHtml .= "\n" . '<p class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '" id="' . $id . '">';
 						$formHtml .= "\n\t";
 						if ($this->settings['displayTitles']) {
 							$formHtml .= $elementAttributes['title'] . '<br />';
@@ -3042,7 +3064,7 @@ class form
 					
 				# Display using divs for CSS layout mode; this is different to paragraphs as the form fields are not conceptually paragraphs
 				case 'css':
-					$formHtml .= "\n" . '<div class="row" id="' . $id . '"' . ($elementIsRequired ? " class=\"{$this->settings['requiredFieldClass']}\"" : '') . '>';
+					$formHtml .= "\n" . '<div class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '" id="' . $id . '">';
 					if ($elementAttributes['type'] == 'heading') {
 						$formHtml .= "\n\t<span class=\"title\">" . $elementAttributes['html'] . '</span>';
 					} else {
@@ -3072,7 +3094,7 @@ class form
 				# Tables
 				case 'tables':
 				default:
-					$formHtml .= "\n\t" . '<tr class="' . $id . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '">';
+					$formHtml .= "\n\t" . '<tr class="' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '">';
 					if ($elementAttributes['type'] == 'heading') {
 						# Start by determining the number of columns which will be needed for headings involving a colspan
 						$colspan = 1 + ($this->settings['displayTitles']) + ($displayDescriptions);
@@ -4197,6 +4219,7 @@ class form
 			'size' => 40,
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
 			'commentsAsDescription' => false,	// Whether to use column comments for the description field rather than for the title field
+			'prefix'	=> false,	// What to prefix all field names with (plus _ implied)
 		);
 		
 		# Merge the arguments
@@ -4332,6 +4355,16 @@ class form
 				);
 			}
 			*/
+			
+			# Prefix the field name if required
+			if ($prefix) {	// This will automatically prevent the string '0' anyway
+				if ($prefix === '0') {
+					$this->formSetupErrors['dataBindingPrefix'] = "A databinding prefix cannot be called '0'";
+				}
+				$standardAttributes['name'] = $prefix . '_' . $standardAttributes['name'];
+				//$standardAttributes['unprefixed'] = $standardAttributes['name'];
+				$this->prefixedGroups[$prefix][] = $standardAttributes['name'];
+			}
 			
 			# Deal with looked-up value sets specially, defaulting to select unless the type is forced
 			if ($lookupValues && $fieldAttributes['Type'] != '_hidden') {

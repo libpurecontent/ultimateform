@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.5.0
+ * @version 1.5.1
  */
 class form
 {
@@ -129,6 +129,11 @@ class form
 		'submitButtonText'					=> 'Submit!',						# The form submit button text
 		'submitButtonAccesskey'				=> 's',								# The form submit button accesskey
 		'submitButtonImage'					=> false,							# Location of an image to replace the form submit button
+		'refreshButton'						=> false,							# Whether to include a refresh button (i.e. submit form to redisplay but not process)
+		'refreshButtonAtEnd'				=> true,							# Whether the refresh button appears at the end or the start of the form
+		'refreshButtonText'					=> 'Refresh!',						# The form refresh button text
+		'refreshButtonAccesskey'			=> 'r',								# The form refresh button accesskey
+		'refreshButtonImage'				=> false,							# Location of an image to replace the form refresh button
 		'resetButton'						=> false,							# Whether the reset button is visible (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
 		'resetButtonText'					=> 'Clear changes',					# The form reset button
 		'resetButtonAccesskey'				=> 'r',								# The form reset button accesskey
@@ -218,6 +223,8 @@ class form
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false) [ignored for e-mail type]
@@ -293,7 +300,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => $functionName,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -349,6 +356,8 @@ class form
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false)
@@ -505,7 +514,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -554,7 +563,14 @@ class form
 	- API deficiency: ToolbarSets all have to be set in JS and cannot be done via PHP - see http://dev.fckeditor.net/ticket/30
 	- API deficiency: FormatIndentator = "\t" - has to be set at JS level - see http://dev.fckeditor.net/ticket/304
 	- CSS underlining inheritance seems wrong in Firefox See: http://dev.fckeditor.net/ticket/303
+	- File permissions of created connector files insecure: http://dev.fckeditor.net/ticket/950
 	- Can't set file browser startup folder; see http://sourceforge.net/tracker/index.php?func=detail&aid=1498629&group_id=75348&atid=543655
+	
+	The following would be useful features to be able to have implement or be set via the form contructor:
+	- Replacing the above manual patches with the results of http://dev.fckeditor.net/ticket/306
+	- Single file for file browser configuration: http://dev.fckeditor.net/ticket/845 and http://dev.fckeditor.net/ticket/454
+	- Image manager needs thumbnail/resize/rename functionality: http://dev.fckeditor.net/ticket/147
+	- Start editor in source mode: http://dev.fckeditor.net/ticket/593
 	
 	*/
 	
@@ -566,6 +582,8 @@ class form
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> NULL,		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'regexp'				=> '',		# Regular expression against which the submission must validate
@@ -656,7 +674,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -801,6 +819,8 @@ class form
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'multiple'				=> false,	# Whether to create a multiple-mode select box
 			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
@@ -832,14 +852,14 @@ class form
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
 		
-		# Apply truncation if necessary
-		$arguments['values'] = $widget->truncate ($arguments['values']);
-		
 		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
 		if (application::isMultidimensionalArray ($arguments['values'])) {
 			$arguments['_valuesMultidimensional'] = $arguments['values'];
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
+		
+		# Apply truncation if necessary
+		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
 		# Check that the array of values is not empty
 		#!# Only run other checks below if this error isn't thrown
@@ -1001,7 +1021,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -1033,6 +1053,8 @@ class form
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'default'				=> array (),# Pre-selected item
@@ -1174,7 +1196,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -1205,6 +1227,8 @@ class form
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
 			'maximum'		=> 0,		# The maximum number which must be selected (defaults to 0, i.e. no maximum checking done)
@@ -1382,7 +1406,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -1414,6 +1438,8 @@ class form
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'level'					=> 'date',	# Whether to show 'datetime' / 'date' / 'time' / 'year' widget set
@@ -1442,7 +1468,7 @@ class form
 		
 		# Check the level is supported
 		if (!array_key_exists ($arguments['level'], $levels)) {
-			$this->formSetupErrors['levelInvalid'] = "An invalid 'level' (" . htmlentities ($arguments['level']) . ') was specified in a datetime widget.';
+			$this->formSetupErrors['levelInvalid'] = "An invalid 'level' (" . htmlentities ($arguments['level']) . ') was specified in the ' . htmlentities ($arguments['name']) . ' datetime widget.';
 			#!# Really this should end at this point rather than adding a fake reassignment
 			$arguments['level'] = 'datetime';
 		}
@@ -1652,7 +1678,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -1680,6 +1706,8 @@ class form
 			'name'					=> NULL,	# Name of the element
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'append'				=> '',		# HTML appended to the widget
+			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'directory'				=> NULL,	# Path to the file; any format acceptable
 			'subfields'				=> 1,		# The number of widgets within the widget set (i.e. available file slots)
@@ -1849,7 +1877,7 @@ class form
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
-			'html' => $widgetHtml,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restrictions) ? $restrictions : false),
@@ -2564,7 +2592,7 @@ class form
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		$elementProblems = $this->getElementProblems ();
-		if (!$this->formPosted || $elementProblems || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
+		if (!$this->formPosted || $elementProblems || isSet ($_POST['__refresh']) || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
 			
 			# Run the callback function if one is set
 			if ($this->settings['callback']) {
@@ -2573,7 +2601,7 @@ class form
 			
 			# Display the form and any problems then end
 			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
-			if (!$this->formPosted || $elementProblems) {
+			if (!$this->formPosted || $elementProblems || isSet ($_POST['__refresh'])) {
 				if ($this->settings['div']) {$this->html .= "\n</div>";}
 				if ($showHtmlDirectly) {echo $this->html;}
 				$html = $this->html;
@@ -2856,6 +2884,9 @@ class form
 			'RESET' => $this->settings['resetButton'],	// Placemarker for the reset button - if there is one
 			'REQUIRED' => false,			// Placemarker for the required fields indicator text
 		);
+		if ($this->settings['refreshButton']) {
+			$specials['REFRESH'] = false;	// Placemarker for a refresh button
+		}
 		
 		# Loop through each special, allocating its replacement shortcut and checking it exists if necessary
 		foreach ($specials as $special => $required) {
@@ -3106,7 +3137,7 @@ class form
 							if ($displayRestriction) {$formHtml .= "<br />\n\t\t\t<span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ")</span>\n\t\t";}
 							$formHtml .= '</td>';
 						}
-						$formHtml .= "\n\t\t<td class=\"data\">" . $elementAttributes['html'] . "</td>";
+						$formHtml .= "\n\t\t<td class=\"data\">" . $elementAttributes['html'] . '</td>';
 						if ($displayDescriptions) {$formHtml .= "\n\t\t<td class=\"description\">" . ($elementAttributes['description'] == '' ? '&nbsp;' : $elementAttributes['description']) . '</td>';}
 					}
 					$formHtml .= "\n\t</tr>";
@@ -3121,13 +3152,27 @@ class form
 		
 		# Add the form button, either at the start or end as required
 		#!# submit_x and submit_y should be treated as a reserved word when using submitButtonAccesskey (i.e. generating type="image")
-		$submitButtonText = $this->settings['submitButtonText'] . (!empty ($this->settings['submitButtonAccesskey']) ? '&nbsp; &nbsp;[Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
-		$formButtonHtml = '<input value="' . $submitButtonText . '" ' . (!empty ($this->settings['submitButtonAccesskey']) ? "accesskey=\"{$this->settings['submitButtonAccesskey']}\" "  : '') . 'type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" class="button" />';
+		$submitButtonText = $this->settings['submitButtonText'] . (!empty ($this->settings['submitButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
+		$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '" ' . (!empty ($this->settings['submitButtonAccesskey']) ? "accesskey=\"{$this->settings['submitButtonAccesskey']}\" "  : '') . 'class="button" />';
+		if ($this->settings['refreshButton']) {
+			$refreshButtonText = $this->settings['refreshButtonText'] . (!empty ($this->settings['refreshButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['refreshButtonAccesskey'] . ']' : '');
+			#!# Need to deny __refresh as a reserved form name
+			$refreshButtonHtml = '<input name="__refresh" type="' . (!$this->settings['refreshButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['refreshButtonImage']}\" name=\"submit\" alt=\"{$refreshButtonText}") . '" value="' . $refreshButtonText . '" ' . (!empty ($this->settings['refreshButtonAccesskey']) ? "accesskey=\"{$this->settings['refreshButtonAccesskey']}\" "  : '') . 'class="button" />';
+		}
 		if ($this->settings['display'] == 'template') {
 			$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['SUBMIT'], $formButtonHtml, $formHtml);
+			if ($this->settings['refreshButton']) {
+				$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['REFRESH'], $refreshButtonHtml, $formHtml);
+			}
 		} else {
 			$formButtonHtml = "\n\n" . '<p class="submit">' . $formButtonHtml . '</p>';
+			if ($this->settings['refreshButton']) {
+				$refreshButtonHtml = "\n\n" . '<p class="refresh">' . $refreshButtonHtml . '</p>';
+			}
 			$formHtml = ((!$this->settings['submitButtonAtEnd']) ? ($formButtonHtml . $formHtml) : ($formHtml . $formButtonHtml));
+			if ($this->settings['refreshButton']) {
+				$formHtml = ((!$this->settings['refreshButtonAtEnd']) ? ($refreshButtonHtml . $formHtml) : ($formHtml . $refreshButtonHtml));
+			}
 		}
 		
 		# Add in the required field indicator for the template version
@@ -3301,7 +3346,7 @@ class form
 		$this->validationTypes = array (
 			'different' => 'The values for each of the sections %fields must be unique.',
 			'same'		=> 'The values for each of the sections %fields must be the same.',
-			'either'	=> 'At least one of the sections %fields must be completed.',
+			'either'	=> 'One of the sections %fields must be completed.',
 		);
 		
 		# Loop through each registered rule
@@ -3944,7 +3989,7 @@ class form
 		
 		# Write the data or handle the error
 		if (!application::writeDataToFile ($data, $this->configureResultFileFilename)) {
-			$this->html .= "\n\n" . '<p class="error">There was a problem writing the information you submitted to a file. It is likely this problem is temporary - please wait a short while then press the refresh button.</p>';
+			$this->html .= "\n\n" . '<p class="error">There was a problem writing the information you submitted to a file. It is likely this problem is temporary - please wait a short while then press the refresh button on your browser.</p>';
 		}
 	}
 	
@@ -4047,13 +4092,20 @@ class form
 				}
 				
 				# Attempt to upload the file
-				if (!move_uploaded_file ($_FILES[$this->settings['name']]['tmp_name'][$name][$key], $arguments['directory'] . $_FILES[$this->settings['name']]['name'][$name][$key])) {
+				$destination = $arguments['directory'] . $_FILES[$this->settings['name']]['name'][$name][$key];
+				if (!move_uploaded_file ($_FILES[$this->settings['name']]['tmp_name'][$name][$key], $destination)) {
+					
 					# Create an array of any failed file uploads
 					#!# Not sure what happens if this fails, given that the attributes may not exist
 					$failures[$attributes['name']] = $attributes;
 					
 				# Continue if the file upload attempt was successful
 				} else {
+					
+					# Fix up the file permission
+					umask (0);
+					chmod ($destination, 0664);
+					
 					# Create an array of any successful file uploads. For security reasons, if the filename is modified to prevent accidental overwrites, the original filename is not modified here
 					#!# There needs to be a differential between presented and actual data in cases where a different filename is actually written to the disk
 					$successes[$attributes['name']] = $attributes;
@@ -4215,6 +4267,7 @@ class form
 			'ordering' => array (),
 			'lookupFunction' => false,
 			'lookupFunctionParameters' => array (),
+			'lookupFunctionAppendTemplate' => false,
 			'truncate' => 40,
 			'size' => 40,
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
@@ -4291,9 +4344,12 @@ class form
 			
 			# Perform a lookup if necessary
 			$lookupValues = false;
+			$targetDatabase = false;
+			$targetTable = false;
 			if ($lookupFunction) {
-				$parameters = array_merge (array ($this->databaseConnection, $title, $fieldAttributes['Type']), application::ensureArray ($lookupFunctionParameters));
-				list ($title, $lookupValues) = call_user_func_array ($lookupFunction, $parameters);
+				$parameters = array ($this->databaseConnection, $title, $fieldAttributes['Type']);
+				if ($lookupFunctionParameters) {$parameters = array_merge ($parameters, application::ensureArray ($lookupFunctionParameters));}
+				list ($title, $lookupValues, $targetDatabase, $targetTable) = call_user_func_array ($lookupFunction, $parameters);
 			}
 			
 			# Convert title from lowerCamelCase to Standard text if necessary
@@ -4315,6 +4371,21 @@ class form
 				'datatype' => $fieldAttributes['Type'],
 				'description' => ($commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : ''),
 			);
+			
+			# If a link template is supplied, place that in, but if it includes a %table/%database template, put it in only if those exist
+			if ($lookupFunctionAppendTemplate) {
+				$templateHasDatabase = substr_count ($lookupFunctionAppendTemplate, '%database');
+				$templateHasTable = substr_count ($lookupFunctionAppendTemplate, '%table');
+				if (!$templateHasDatabase && !$templateHasTable) {$useTemplate = true;}	// Use it if no templating requested
+				if (($templateHasDatabase && $targetDatabase) || ($templateHasTable && $targetTable)) {$useTemplate = true;}	// Use it if templating is in use and the target database/table is present
+				if (($templateHasDatabase && !$targetDatabase) || ($templateHasTable && !$targetTable)) {$useTemplate = false;}	// Ensure both are present if both in use
+				if ($useTemplate) {
+					#!# Need to deny __refresh as a reserved form name
+					$refreshButton = '<input type="submit" value="&#8635;" title="Refresh options" name="__refresh" class="refresh" />';
+					$standardAttributes['append'] = str_replace (array ('%database', '%table', '%refresh'), array ($targetDatabase, $targetTable, $refreshButton), $lookupFunctionAppendTemplate);
+				}
+				
+			}
 			
 			# Overload the attributes if any supplied
 			$forceType = false;
@@ -4463,6 +4534,11 @@ class form
 				case (strtolower ($type) == 'date'):
 				case (strtolower ($type) == 'datetime'):
 				case (strtolower ($type) == 'timestamp'):
+					if (strtolower ($type) == 'timestamp') {
+						$type = 'datetime';
+						$standardAttributes['default'] = 'timestamp';
+						$standardAttributes['editable'] = false;
+					}
 					$this->datetime ($standardAttributes + array (
 						'level' => strtolower ($type),
 						#!# Disabled as seemingly incorrect

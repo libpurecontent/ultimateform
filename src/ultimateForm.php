@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.5.1
+ * @version 1.6.0
  */
 class form
 {
@@ -69,6 +69,7 @@ class form
 	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
 	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added
 	var $elementProblems = array ();			// Array of submitted element problems
+	var $externalProblems = array ();			// Array of external element problems as inserted by the calling applications
 	var $validationRules = array ();			// Array of validation rules
 	var $databaseConnection = NULL;				// Database connection
 	var $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
@@ -232,7 +233,8 @@ class form
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Regular expression against which the submission must validate
-			'disallow'				=> false,		# Regular expression against which the submission must not validate
+			'retrieval'				=> false,	# Turns the widget into a URL field where the specified page/file is then retrieved and saved to the directory stated
+			'disallow'				=> false,	# Regular expression against which the submission must not validate
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
@@ -277,6 +279,43 @@ class form
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
+		# Do retrieval if required
+		$doRetrieval = false;
+		if ($arguments['retrieval']) {
+			
+			# Do not use with e-mail/password types
+			if ($functionName != 'input') {
+				$this->formSetupErrors['retrievalInputOnly'] = 'URL retrieval can only be used on a standard input field type.';
+				$doRetrieval = false;
+			}
+			
+			# Do not use with e-mail/password types
+			if (!ini_get ('allow_url_fopen')) {
+				$this->formSetupErrors['retrievalAllowUrlFopenOff'] = 'URL retrieval cannot be done as the server configuration disallows external file opening.';
+			}
+			
+			# If no regexp has been set, add a basic URL syntax check
+			#!# Ideally this should be replaced when multiple regexps allowed
+			if (empty ($arguments['regexp'])) {
+				$arguments['regexp'] = '^(http|https)://';
+			}
+			
+			# Check that the selected directory exists and is writable (or create it)
+			if (!is_dir ($arguments['retrieval'])) {
+				if (!application::directoryIsWritable ($arguments['retrieval'])) {
+					$this->formSetupErrors['retrievalDirectoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> input URL-retrieval element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
+					$doRetrieval = false;
+				} else {
+					#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
+					#!# umask seems to have no effect - needs testing
+					mkdir ($arguments['retrieval'], 0755, $recursive = true);
+				}
+			}
+			
+			# Confirm setup is OK
+			$doRetrieval = true;
+		}
+		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
 			$widgetHtml = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
@@ -294,6 +333,19 @@ class form
 				$data['presented'] = str_repeat ('*', strlen ($this->form[$arguments['name']]));
 			} else {
 				$data['presented'] = $this->form[$arguments['name']];
+			}
+			
+			# Do URL retrieval if OK
+			#!# Ideally this perhaps ought to be like doUploads, which is run only at the end
+			if ($doRetrieval) {
+				$saveLocation = $arguments['retrieval'] . basename ($elementValue);
+				#!# This next line should be replaced with some variant of urlencode that doesn't swallow / or :
+				$elementValue = str_replace (' ', '%20', $elementValue);
+				if (!$fileContents = file_get_contents ($elementValue)) {
+					$elementProblems['retrievalFailure'] = "URL retrieval failed; possibly the URL you quoted does not exists, or the server is blocking file downloads somehow.";
+				} else {
+					file_put_contents ($saveLocation, $fileContents);
+				}
 			}
 		}
 		
@@ -1871,6 +1923,9 @@ class form
 		}
 		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
 		
+		# Assign half-validated data, for the purposes of the groupValidation check; note that this could be tricked, but should be good enough in most cases, and certainly better than nothing
+		$data['presented'] = $apparentlyUploadedFiles;
+		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
@@ -1887,7 +1942,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
-			'data' => NULL,	// Because the uploading can only be processed later, this is set to NULL
+			'data' => $data,	// Because the uploading can only be processed later, this is set to NULL
 			#!# Not finished
 #			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'unzip'	=> $arguments['unzip'],
@@ -2527,6 +2582,14 @@ class form
 	## Main processing ##
 	
 	
+	# Function to return the submitted but pre-finalised data, for use in adding additional checks
+	function getUnfinalisedData ()
+	{
+		# Return the form data
+		return ($this->formPosted ? $this->form : array ());
+	}
+	
+	
 	# Compatibility name
 	#!# DEPRECATED - remove in future
 	function processForm ()
@@ -2597,6 +2660,11 @@ class form
 			# Run the callback function if one is set
 			if ($this->settings['callback']) {
 				$this->settings['callback'] ($this->elementProblems ? -1 : 0);
+			}
+			
+			# Add a note about refreshing
+			if (isSet ($_POST['__refresh'])) {
+				$this->html .= '<p><em>The form below has been refreshed but not yet submitted.</em></p>';
 			}
 			
 			# Display the form and any problems then end
@@ -3208,6 +3276,7 @@ class form
 	 * Function to prepare a problems list
 	 * @access private
 	 */
+	#!# Make these types generic rather than hard-coded
 	function problemsList ($problems)
 	{
 		# Flatten the multi-level array of problems, starting first with the generic, top-level problems if any exist
@@ -3247,6 +3316,13 @@ class form
 		# Next the group if any exist
 		if (isSet ($problems['group'])) {
 			foreach ($problems['group'] as $name => $groupProblem) {
+				$problemsList[] = $groupProblem;
+			}
+		}
+		
+		# Next the external if any exist
+		if (isSet ($problems['external'])) {
+			foreach ($problems['external'] as $name => $groupProblem) {
 				$problemsList[] = $groupProblem;
 			}
 		}
@@ -3322,9 +3398,12 @@ class form
 		# Run checks for multiple validation fields
 		$this->elementProblems['group'] = $this->_groupValidationChecks ();
 		
+		# Add in externally-supplied problems (where the calling application has inserted data checked against ->getUnfinalisedData), which by default is an empty array
+		$this->elementProblems['external'] = $this->externalProblems;
+		
 		# Return a boolean of whether problems have been found or not
 		#!# This needs to be made more generic, by looping through the first-level arrays to see if any second-level items exist; then new types of problems need not be registered here
-		return $problemsFound = (!empty ($this->elementProblems['generic'])) || (!empty ($this->elementProblems['elements']) || (!empty ($this->elementProblems['group'])));
+		return $problemsFound = (!empty ($this->elementProblems['generic'])) || (!empty ($this->elementProblems['elements']) || (!empty ($this->elementProblems['group'])) || (!empty ($this->elementProblems['external'])));
 	}
 	
 	
@@ -3369,6 +3448,14 @@ class form
 				$this->formSetupErrors['validationFieldsAbsent'] = 'The field ' . (count ($missing) > 1 ? 'names' : 'name') . " '<strong>" . implode ("</strong>', '<strong>", $missing) . "</strong>' " . (count ($missing) > 1 ? 'names' : 'was') . " specified for a validation rule, but no such " . (count ($missing) > 1 ? 'elements exist' : 'element exists') . '.';
 			}
 		}
+	}
+	
+	
+	# Function to register external problems as registered by the calling application
+	function registerProblem ($key, $message)
+	{
+		# Register the problem
+		$this->externalProblems[$key] = $message;
 	}
 	
 	
@@ -4810,6 +4897,7 @@ class formWidget
 # Antispam Captcha option
 # Support for select::regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
 # Consider issue of null bytes in ereg - http://uk.php.net/manual/en/ref.regex.php#74258
+# Consider grouping/fieldset and design issues at http://www.sitepoint.com/print/fancy-form-design-css/
 
 # Version 2 feature proposals
 #!# Self-creating form mode
@@ -4818,6 +4906,8 @@ class formWidget
 #!# 	Change the output methods to objects
 #!# Allow multiple carry-throughs, perhaps using formCarried[$formNumber][...]: Add carry-through as an additional array section; then translate the additional array as a this-> input to hidden fields.
 #!# Enable javascript as an option
+		# On-submit disable switch bouncing
+		# Assign only the final submit button as the one accepting a 'return' when using multiple submits (refresh)
 #!# 	Use ideas in http://www.sitepoint.com/article/1273/3 for having js-validation with an icon
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]
 #!# Add AJAX validation flag See: http://particletree.com/features/degradable-ajax-form-validation/ (but modified version needed because this doesn't use Unobtrusive DHTML - see also http://particletree.com/features/a-guide-to-unobtrusive-javascript-validation/ )

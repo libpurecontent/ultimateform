@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.6.0
+ * @version 1.6.1
  */
 class form
 {
@@ -161,6 +161,7 @@ class form
 		'fixMailHeaders'					=> false,							# Whether to add additional mail headers, for use with a server that fails to add Message-Id/Date/Return-Path; set as (bool) true or (str) application name
 		'cols'								=> 30,								# Global setting for textarea cols - number of columns
 		'rows'								=> 5,								# Global setting for textarea cols - number of rows
+		'mailAdminErrors'					=> false,							# Whether to mail the admin with any errors in the form setup
 	);
 	
 	
@@ -342,7 +343,7 @@ class form
 				#!# This next line should be replaced with some variant of urlencode that doesn't swallow / or :
 				$elementValue = str_replace (' ', '%20', $elementValue);
 				if (!$fileContents = file_get_contents ($elementValue)) {
-					$elementProblems['retrievalFailure'] = "URL retrieval failed; possibly the URL you quoted does not exists, or the server is blocking file downloads somehow.";
+					$elementProblems['retrievalFailure'] = "URL retrieval failed; possibly the URL you quoted does not exist, or the server is blocking file downloads somehow.";
 				} else {
 					file_put_contents ($saveLocation, $fileContents);
 				}
@@ -2835,7 +2836,24 @@ class form
 		$this->_checkGroupValidations ();
 		
 		# If there are any form setup errors - a combination of those just defined and those assigned earlier in the form processing, show them
-		if (!empty ($this->formSetupErrors)) {$this->html .= application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, (count ($this->formSetupErrors) > 1 ? 'Various errors were' : 'An error was') . " found in the setup of the form. The website's administrator needs to correct the configuration before the form will work:");}
+		if (!empty ($this->formSetupErrors)) {
+			$setupErrorText = application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, (count ($this->formSetupErrors) > 1 ? 'Various errors were' : 'An error was') . " found in the setup of the form. The website's administrator needs to correct the configuration before the form will work:");
+			$this->html .= $setupErrorText;
+			
+			# E-mail the errors to the admin if wanted
+			foreach ($this->formSetupErrors as $error) {
+				$errorTexts[] = "\n- " . strip_tags ($error);
+			}
+			if ($this->settings['mailAdminErrors']) {
+				$administrator = (application::validEmail ($this->settings['mailAdminErrors']) ? $this->settings['mailAdminErrors'] : $_SERVER['SERVER_ADMIN']);
+				mail (
+					$administrator,
+					'Form setup error',
+					wordwrap ("The webform at \n" . $_SERVER['_PAGE_URL'] . "\nreports the following ultimateForm setup misconfiguration:\n\n" . implode ("\n", $errorTexts)),
+					$additionalHeaders = 'From: Website feedback <' . $administrator . ">\r\n"
+				);
+			}
+		}
 		
 		# Set that the form has effectively been displayed
 		$this->formDisplayed = true;

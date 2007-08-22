@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.6.1
+ * @version 1.6.2
  */
 class form
 {
@@ -233,7 +233,8 @@ class form
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
 			'default'				=> '',		# Default value (optional)
-			'regexp'				=> '',		# Regular expression against which the submission must validate
+			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
+			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'retrieval'				=> false,	# Turns the widget into a URL field where the specified page/file is then retrieved and saved to the directory stated
 			'disallow'				=> false,	# Regular expression against which the submission must not validate
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
@@ -275,14 +276,14 @@ class form
 		# Describe restrictions on the widget
 		if ($arguments['enforceNumeric'] && ($functionName != 'email')) {$restriction = 'Must be numeric';}
 		if ($functionName == 'email') {$restriction = 'Must be valid';}
-		if ($arguments['regexp'] && ($functionName != 'email')) {$restriction = 'A specific pattern is required';}
+		if (($arguments['regexp'] || $arguments['regexpi']) && ($functionName != 'email')) {$restriction = 'A specific pattern is required';}
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
 		# Do retrieval if required
 		$doRetrieval = false;
-		if ($arguments['retrieval']) {
+		if ($arguments['retrieval'] && $this->form[$arguments['name']] && !$widget->getElementProblems (false)) {
 			
 			# Do not use with e-mail/password types
 			if ($functionName != 'input') {
@@ -297,8 +298,8 @@ class form
 			
 			# If no regexp has been set, add a basic URL syntax check
 			#!# Ideally this should be replaced when multiple regexps allowed
-			if (empty ($arguments['regexp'])) {
-				$arguments['regexp'] = '^(http|https)://';
+			if (empty ($arguments['regexp']) && empty ($arguments['regexpi'])) {
+				$arguments['regexpi'] = '^(http|https)://';
 			}
 			
 			# Check that the selected directory exists and is writable (or create it)
@@ -342,8 +343,8 @@ class form
 				$saveLocation = $arguments['retrieval'] . basename ($elementValue);
 				#!# This next line should be replaced with some variant of urlencode that doesn't swallow / or :
 				$elementValue = str_replace (' ', '%20', $elementValue);
-				if (!$fileContents = file_get_contents ($elementValue)) {
-					$elementProblems['retrievalFailure'] = "URL retrieval failed; possibly the URL you quoted does not exist, or the server is blocking file downloads somehow.";
+				if (!$fileContents = @file_get_contents ($elementValue)) {
+					$elementProblems['retrievalFailure'] = "URL retrieval failed; possibly the URL you quoted does not exists, or the server is blocking file downloads somehow.";
 				} else {
 					file_put_contents ($saveLocation, $fileContents);
 				}
@@ -416,9 +417,11 @@ class form
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false)
 			'cols'					=> $this->settings['cols'],		# Number of columns (optional; defaults to 30)
 			'rows'					=> $this->settings['rows'],		# Number of rows (optional; defaults to 5)
+			'wrap'					=> false,	# Value for non-standard 'wrap' attribute
 			'default'				=> '',		# Default value (optional)
-			'regexp'				=> '',		# Regular expression(s) against which all lines of the submission must validate
-			'disallow'				=> false,		# Regular expression against which all lines of the submission must not validate
+			'regexp'				=> '',		# Case-sensitive regular expression(s) against which all lines of the submission must validate
+			'regexpi'				=> '',		# Case-insensitive regular expression(s) against which all lines of the submission must validate
+			'disallow'				=> false,	# Regular expression against which all lines of the submission must not validate
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
@@ -453,7 +456,7 @@ class form
 		$elementValue = $widget->getValue ();
 		
 		# Perform validity tests if anything has been submitted and regexp(s)/disallow are supplied
-		if ($elementValue && ($arguments['regexp'] || $arguments['disallow'] || $arguments['mode'] == 'coordinates')) {
+		if ($elementValue && ($arguments['regexp'] || $arguments['regexpi'] || $arguments['disallow'] || $arguments['mode'] == 'coordinates')) {
 			
 			# Branch a copy of the data as an array, split by the newline and check it is complete
 			$lines = explode ("\n", $elementValue);
@@ -475,14 +478,17 @@ class form
 				}
 				
 				# If the line does not validate against a specified regexp, add the line to a list of lines containing a problem then move onto the next line
-				if ($arguments['regexp']) {
-					if (!ereg ($arguments['regexp'], $line)) {
+				if ($arguments['regexp'] || $arguments['regexpi']) {
+					if ($arguments['regexp'] && (!ereg ($arguments['regexp'], $line))) {
+						$problemLines[] = $i;
+						continue;
+					} else if ($arguments['regexpi'] && (!eregi ($arguments['regexpi'], $line))) {
 						$problemLines[] = $i;
 						continue;
 					}
 				}
 				
-				# If the line does not validate against a specified regexp, add the line to a list of lines containing a problem then move onto the next line
+				# If the line does not validate against a specified disallow, add the line to a list of lines containing a problem then move onto the next line
 				#!# Merge this with formWidget::regexpCheck ()
 				#!# Consider allowing multiple disallows, even though a regexp can deal with that anyway
 				if ($arguments['disallow']) {
@@ -501,7 +507,7 @@ class form
 			
 			# If any problem lines are found, construct the error message for this
 			if (isSet ($problemLines)) {
-				$elementProblems['failsRegexp'] = (count ($problemLines) > 1 ? 'Rows ' : 'Row ') . implode (', ', $problemLines) . (count ($problemLines) > 1 ? ' do not' : ' does not') . ' match a specified pattern required for this section' . (($arguments['mode'] == 'coordinates') ? ', ' . ((count ($arguments['regexp']) > 1) ? 'including' : 'namely' ) . ' the need for two co-ordinates per line' : '') . '.';
+				$elementProblems['failsRegexp'] = (count ($problemLines) > 1 ? 'Rows ' : 'Row ') . implode (', ', $problemLines) . (count ($problemLines) > 1 ? ' do not' : ' does not') . ' match a specified pattern required for this section' . (($arguments['mode'] == 'coordinates') ? ', ' . (($arguments['regexp'] || $arguments['regexpi']) ? 'including' : 'namely' ) . ' the need for two co-ordinates per line' : '') . '.';
 			}
 			
 			# If any problem lines are found, construct the error message for this
@@ -529,7 +535,7 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea name="' . $this->settings['name'] . "[{$arguments['name']}]\" id=\"" . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea name="' . $this->settings['name'] . "[{$arguments['name']}]\" id=\"" . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
 			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']])));
 			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
@@ -639,7 +645,8 @@ class form
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
-			'regexp'				=> '',		# Regular expression against which the submission must validate
+			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
+			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'disallow'				=> false,		# Regular expression against which the submission must not validate
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'width'					=> '100%',		# Width
@@ -3444,6 +3451,7 @@ class form
 			'different' => 'The values for each of the sections %fields must be unique.',
 			'same'		=> 'The values for each of the sections %fields must be the same.',
 			'either'	=> 'One of the sections %fields must be completed.',
+			'all'		=> 'The values for all of the sections %fields must be completed if one of them is.',
 		);
 		
 		# Loop through each registered rule
@@ -3451,7 +3459,7 @@ class form
 			
 			# Ensure the validation is a valid type
 			if (!array_key_exists ($validationRule['type'], $this->validationTypes)) {
-				$this->formSetupErrors['validationTypeInvalid'] = "The group validation type '<strong>{$validationRule['type']}</strong>' is not supported.";
+				$this->formSetupErrors['validationTypeInvalid'] = "The group validation type '<strong>{$validationRule['type']}</strong>' is not a supported type.";
 				return;
 			}
 			
@@ -3495,8 +3503,11 @@ class form
 			
 			# Make an array of non-empty values for use with the 'different' check
 			$nonEmptyValues = array ();
+			$emptyValues = array ();
 			foreach ($values as $value) {
-				if (!empty ($value)) {
+				if (empty ($value)) {
+					$emptyValues[] = $value;
+				} else {
 					$nonEmptyValues[] = $value;
 				}
 			}
@@ -3504,9 +3515,10 @@ class form
 			# Check the rule
 			#!# Ideally refactor to avoid the same list of cases specified as $this->validationTypes
 			if (
-				(($rule['type'] == 'different') && ($nonEmptyValues) && (count ($nonEmptyValues) != count (array_unique ($nonEmptyValues))))
-				|| (($rule['type'] == 'same')      && ((count ($values) > 1) && count (array_unique ($values)) != 1))
-				|| (($rule['type'] == 'either')    && (application::allArrayElementsEmpty ($values)))
+				   ( ($rule['type'] == 'different') && ($nonEmptyValues) && (count ($nonEmptyValues) != count (array_unique ($nonEmptyValues))) )
+				|| ( ($rule['type'] == 'same')      && ((count ($values) > 1) && count (array_unique ($values)) != 1) )
+				|| ( ($rule['type'] == 'either')    && (application::allArrayElementsEmpty ($values)) )
+				|| ( ($rule['type'] == 'all')       && $nonEmptyValues && $emptyValues )
 			) {
 				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace ('%fields', $this->_fieldListString ($rule['fields']), $this->validationTypes[$rule['type']]);
 			}
@@ -4855,6 +4867,11 @@ class formWidget
 				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for the {$this->arguments['name']} section.";
 			}
 		}
+		if (strlen ($this->arguments['regexpi'])) {
+			if (!eregi ($this->arguments['regexpi'], $this->value)) {
+				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for the {$this->arguments['name']} section.";
+			}
+		}
 		
 		# 'disallow' regexp checks (for text types)
 		if ($this->arguments['disallow'] !== false) {
@@ -4914,7 +4931,7 @@ class formWidget
 #!# $resultLines[] should have the [techName] optional
 # Antispam Captcha option
 # Support for select::regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
-# Consider issue of null bytes in ereg - http://uk.php.net/manual/en/ref.regex.php#74258
+# Consider issue of null bytes in ereg - http://uk.php.net/manual/en/ref.regex.php#74258 - probably migrate to preg_ anyway, as PHP6 deprecates ereg
 # Consider grouping/fieldset and design issues at http://www.sitepoint.com/print/fancy-form-design-css/
 
 # Version 2 feature proposals

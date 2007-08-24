@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.6.2
+ * @version 1.6.3
  */
 class form
 {
@@ -918,6 +918,13 @@ class form
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
 		
+		# Loop through each element value to check that it is in the available values, and just discard without comment any that are not
+		foreach ($elementValue as $index => $value) {
+			if (!array_key_exists ($value, $arguments['values'])) {
+				unset ($elementValue[$index]);
+			}
+		}
+		
 		# Apply truncation if necessary
 		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
@@ -1143,9 +1150,6 @@ class form
 		# Obtain the value of the form submission (which may be empty)
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : '');
 		
-		# Check whether the field satisfies any requirement for a field to be required
-		$requiredButEmpty = $widget->requiredButEmpty ();
-		
 		$elementValue = $widget->getValue ();
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
@@ -1164,6 +1168,14 @@ class form
 		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {$this->formSetupErrors['radiobuttonsNoValues'] = 'No values have been set for the set of radio buttons.';}
+		
+		# Loop through each element value to check that it is in the available values, and just discard without comment any that are not
+		if (!array_key_exists ($elementValue, $arguments['values'])) {
+			$elementValue = false;
+		}
+		
+		# Check whether the field satisfies any requirement for a field to be required
+		$requiredButEmpty = ($arguments['required'] && !$elementValue);
 		
 		# Ensure that there cannot be multiple initial values set if the multiple flag is off; note that the default can be specified as an array, for easy swapping with a select (which in singular mode behaves similarly)
 		$arguments['default'] = application::ensureArray ($arguments['default']);

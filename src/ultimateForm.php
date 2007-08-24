@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.6.3
+ * @version 1.7.0
  */
 class form
 {
@@ -106,6 +106,7 @@ class form
 	
 	# Specify available arguments as defaults or as NULL (to represent a required argument)
 	var $argumentDefaults = array (
+		'get'								=> false,							# Enable GET support instead of (default) POST
 		'name'								=> 'form',							# Name of the form
 		'div'								=> 'ultimateform',					# The value of <div class=""> which surrounds the entire output (or false for none)
 		'displayPresentationMatrix'			=> false,							# Whether to show the presentation defaults
@@ -187,8 +188,11 @@ class form
 		# Set up and check any database connection
 		$this->_setupDatabaseConnection ();
 		
+		# Determine the method in use
+		$this->method = ($this->settings['get'] ? 'get' : 'post');
+		
 		# Define the submission location (as _SERVER cannot be set in a class variable declaration); PATH_INFO attacks (see: http://forum.hardened-php.net/viewtopic.php?id=20 ) are not relevant here for this form usage
-		if ($this->settings['submitTo'] === false) {$this->settings['submitTo'] = $_SERVER['REQUEST_URI'];}
+		if ($this->settings['submitTo'] === false) {$this->settings['submitTo'] = ($this->method == 'get' ? $_SERVER['SCRIPT_NAME'] : $_SERVER['REQUEST_URI']);}
 		
 		# Ensure the userlist is an array, whether empty or otherwise
 		$this->settings['validUsers'] = application::ensureArray ($this->settings['validUsers']);
@@ -196,17 +200,20 @@ class form
 		# If no user is supplied, attempt to obtain the REMOTE_USER (if one exists) as the default
 		if (!$this->settings['user']) {$this->settings['user'] = (isSet ($_SERVER['REMOTE_USER']) ? $_SERVER['REMOTE_USER'] : false);}
 		
+		# Determine the variables collection in use - $_GET or $_POST
+		$this->collection = ($this->method == 'get' ? $_GET : $_POST);
+		
 		# If there are files posted, merge the multi-part posting of files to the main form array, effectively emulating the structure of a standard form input type
-		if (!empty ($_FILES[$this->settings['name']])) {$this->mergeFilesIntoPost ();}
+		$this->mergeFilesIntoPost ();
 		
 		# Assign whether the form has been posted or not
-		$this->formPosted = (isSet ($_POST[$this->settings['name']]));
+		$this->formPosted = ($this->settings['name'] ? (isSet ($this->collection[$this->settings['name']])) : !empty ($this->collection));
 		
 		# Add in the hidden security fields if required, having verified username existence if relevant; these need to go at the start so that any username is set as the key
 		$this->addHiddenSecurityFields ();
 		
 		# Import the posted data if the form is posted; this has to be done initially otherwise the input widgets won't have anything to reference
-		if ($this->formPosted) {$this->form = $_POST[$this->settings['name']];}
+		if ($this->formPosted) {$this->form = ($this->settings['name'] ? $this->collection[$this->settings['name']] : $this->collection);}
 	}
 	
 	
@@ -320,11 +327,11 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"" . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml = '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
 		} else {
 			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
-			$hiddenInput = '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$hiddenInput = '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
 			$widgetHtml .= $hiddenInput;
 		}
 		
@@ -535,10 +542,10 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea name="' . $this->settings['name'] . "[{$arguments['name']}]\" id=\"" . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" id="' . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
 			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']])));
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Get the posted data
@@ -708,7 +715,7 @@ class form
 			
 			# Define the widget's core HTML by instantiating the richtext editor module and setting required options
 			require_once ('fckeditor.php');
-			$editor = new FCKeditor ("{$this->settings['name']}[{$arguments['name']}]");
+			$editor = new FCKeditor ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
 			$editor->BasePath	= $arguments['editorBasePath'];
 			$editor->Width		= $arguments['width'];
 			$editor->Height		= $arguments['height'];
@@ -718,7 +725,7 @@ class form
 			$widgetHtml = $editor->CreateHtml ();
 		} else {
 			$widgetHtml = $this->form[$arguments['name']];
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -1005,7 +1012,7 @@ class form
 			}
 			
 			# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-			$widgetHtml = "\n\t\t\t<select name=\"" . $this->settings['name'] . "[{$arguments['name']}][]\"" . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
+			$widgetHtml = "\n\t\t\t<select name=\"" . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[]"' . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
 			if (!isSet ($arguments['_valuesMultidimensional'])) {
 				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				foreach ($arguments['valuesWithNull'] as $value => $visible) {
@@ -1042,7 +1049,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][]\" type=\"hidden\" value=\"" . htmlentities ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[]" type="hidden" value="' . htmlentities ($value) . '" />';
 				}
 			}
 			
@@ -1220,7 +1227,7 @@ class form
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
 				#$visible = str_replace ('', '&dagger;', htmlentities ($visible));
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . $this->settings['name'] . "[{$arguments['name']}]\"" . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlentities ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '"' . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlentities ($visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1234,7 +1241,7 @@ class form
 				foreach ($arguments['values'] as $value => $visible) {
 					if ($value == $elementValue) {	// This loop is done to prevent offsets which may still arise due to the 'defaultMissingFromValuesArray' error not resulting in further termination of widget production
 						$widgetHtml  = htmlentities ($arguments['values'][$elementValue]);
-						$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($elementValue) . '" />';
+						$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($elementValue) . '" />';
 					}
 				}
 			}
@@ -1385,7 +1392,7 @@ class form
 				}
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . $this->settings['name'] . "[{$arguments['name']}][{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1406,7 +1413,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}][{$value}]\" type=\"hidden\" value=\"true\" />";
+					$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]\" type=\"hidden\" value=\"true\" />";
 				}
 			}
 			
@@ -1684,14 +1691,14 @@ class form
 			# Start with the time if required
 			if (substr_count ($arguments['level'], 'time')) {	// datetime or time
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span>';
-				$widgetHtml .= '<input name="' . $this->settings['name'] . '[' . $arguments['name'] . '][time]" type="text" size="10" value="' . $elementValue['time'] . '" />';
+				$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[time]" type="text" size="10" value="' . $elementValue['time'] . '" />';
 			}
 			
 			# Add the Define the date and month input boxes; if the day or year are 0 then nothing will be displayed
 			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . $this->settings['name'] . '[' . $arguments['name'] . '][day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
-				$widgetHtml .= "\n\t\t\t\t" . '<select name="' . $this->settings['name'] . '[' . $arguments['name'] . '][month]">';
+				$widgetHtml .= "\n\t\t\t\t" . '<select name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[month]">';
 				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
 				$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
 				foreach ($months as $monthNumber => $monthName) {
@@ -1703,7 +1710,7 @@ class form
 			# Add the year box
 			if ($arguments['level'] != 'time') {
 				$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
-				$widgetHtml .= '<input size="4" name="' . $this->settings['name'] . '[' . $arguments['name'] . '][year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
+				$widgetHtml .= '<input size="4" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
 			}
 			
 			# Surround with a fieldset if necessary
@@ -1714,7 +1721,7 @@ class form
 			
 			# Non-editable version
 			$widgetHtml  = timedate::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">' . (($arguments['level'] != 'time') ? '(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') : '(Current time') . ')' . '</span>' : '');
-			$widgetHtml .= "\n\t\t\t" . '<input name="' . $this->settings['name'] . "[{$arguments['name']}]\" type=\"hidden\" value=\"" . htmlentities ($arguments['default']) . '" />';
+			$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($arguments['default']) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -1806,6 +1813,12 @@ class form
 		
 		$elementValue = $widget->getValue ();
 		
+		# Ensure that the POST method is being used, as apparently required by RFC1867 and by PHP
+		if ($this->method != 'post') {
+			$this->formSetupErrors['uploadsRequirePost'] = 'File uploads require the POST method to be used in the form, so either the get setting or the upload widgets should be removed.';
+			return false;	// Discontinue further checks
+		}
+		
 		# Check whether unzipping is supported
 		if ($arguments['unzip'] && !extension_loaded ('zip')) {
 			$this->formSetupErrors['uploadUnzipUnsupported'] = 'Unzipping of zip files upon upload was requested but the unzipping module is not available on this server.';
@@ -1891,24 +1904,25 @@ class form
 				}
 			}
 			
-			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is non-standard and seemingly not supported by any browsers, so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name
-			$widgetHtml .= '<input name="' . $this->settings['name'] . "[{$arguments['name']}][{$subfield}]\" type=\"file\" size=\"{$arguments['size']}\" />";
+			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is non-standard and seemingly not supported by any browsers, so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would reveal to the user the size of the PHP ini setting
+			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
+			$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$subfield}]\" type=\"file\" size=\"{$arguments['size']}\" />";
 			$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
 		}
 		
 		# If fields which don't have a file extension have been found, throw a user error
 		if (isSet ($extensionsMissing)) {
-			$elementProblems['fileExtensionAbsent'] = (count ($extensionsMissing) > 1 ? 'The files ' : 'The file ') . implode (', ', $extensionsMissing) . (count ($extensionsMissing) > 1 ? ' have' : ' has') . ' no file extension, but file extensions are required for files selected in this section.';
+			$elementProblems['fileExtensionAbsent'] = (count ($extensionsMissing) > 1 ? 'The files <em>' : 'The file <em>') . implode ('</em>, <em>', $extensionsMissing) . (count ($extensionsMissing) > 1 ? '</em> have' : '</em> has') . ' no file extension, but file extensions are required for files selected in this section.';
 		}
 		
 		# If fields which have an invalid extension have been found, throw a user error
 		if (isSet ($filenameInvalidSubfields)) {
-			$elementProblems['fileExtensionMismatch'] = (count ($filenameInvalidSubfields) > 1 ? 'All files ' : 'The file ') . implode (', ', $filenameInvalidSubfields) . (count ($filenameInvalidSubfields) > 1 ? ' do not' : ' does not') . ' comply with the specified file extension rules for this section.';
+			$elementProblems['fileExtensionMismatch'] = (count ($filenameInvalidSubfields) > 1 ? 'The files <em>' : 'The file <em>') . implode ('</em>, <em>', $filenameInvalidSubfields) . (count ($filenameInvalidSubfields) > 1 ? '</em> do not' : '</em> does not') . ' comply with the specified file extension rules for this section.';
 		}
 		
 		# If any files have been uploaded, the user will need to re-select them.
 		if ($apparentlyUploadedFiles > 0) {
-			$this->elementProblems['generic']['reselectUploads'] = "You will need to reselect the $apparentlyUploadedFiles files you selected for uploading, because of problems elsewhere in the form. (Re-selection is a security requirement of your web browser.)";
+			$this->elementProblems['generic']['reselectUploads'] = "You will need to reselect the " . ($apparentlyUploadedFiles == 1 ? 'file' : "{$apparentlyUploadedFiles} files") . " you selected for uploading, because of problems elsewhere in the form. (Re-selection is a security requirement of your web browser.)";
 		}
 		
 		# Check if the field is required (i.e. the minimum number of fields is greater than 0) and, if so, run further checks
@@ -2001,7 +2015,7 @@ class form
 		# Create the HTML by looping through the data array; this is only of use to non- self-processing forms, i.e. where the data is sent elsewhere; for self-processing the submitted data is ignored
 		$widgetHtml = "\n";
 		foreach ($arguments['values'] as $key => $value) {
-			$widgetHtml .= "\n\t" . '<input type="hidden" name="' . $this->settings['name'] . "[{$arguments['name']}][$key]" . '" value="' . $value . '" />';
+			$widgetHtml .= "\n\t" . '<input type="hidden" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$key}]" . '" value="' . $value . '" />';
 		}
 		$widgetHtml .= "\n";
 		
@@ -2056,14 +2070,14 @@ class form
 		switch ($level) {
 			case '0':
 			case 'p':
-				$widgetHtml = "<p>$title</p>";
+				$widgetHtml = "<p>{$title}</p>";
 				break;
 			case 'text':
 			case '':
 				$widgetHtml = $title;
 				break;
 			default:
-				$widgetHtml = "<h$level>$title</h$level>";
+				$widgetHtml = "<h{$level}>{$title}</h{$level}>";
 				break;
 		}
 		
@@ -2137,7 +2151,7 @@ class form
 	function cleanId ($id)
 	{
 		# Define the replacements
-		$replacements = array (' ', ',', '', '!', '(', ')', '[', ']',);
+		$replacements = array (' ', ',', '', '!', '(', ')' /*, '[', ']', */);
 		
 		# Perform the replacements
 		$id = str_replace ($replacements, '_', $id);
@@ -2180,21 +2194,51 @@ class form
 	 */
 	function mergeFilesIntoPost ()
 	{
-		# Loop through each upload widget set which has been submitted (even if empty); note that _FILES is arranged differently depending on whether you are using 'formname[elementname]' or just 'elementname' as the element name - see "HTML array feature" note at www.php.net/features.file-upload
-		foreach ($_FILES[$this->settings['name']]['name'] as $name => $subElements) {
+		# PHP's _FILES array is arranged differently depending on whether you are using 'formname[elementname]' or just 'elementname' as the element name - see "HTML array feature" note at www.php.net/features.file-upload
+		if ($this->settings['name']) {	// i.e. <input name="formname[widgetname]"
 			
-			# Loop through each upload widget set's subelements (e.g. 4 items if there are 4 input tags within the widget set)
-			foreach ($subElements as $key => $value) {
+			# End if no files
+			if (empty ($_FILES[$this->settings['name']])) {return;}
+			
+			# Loop through each upload widget set which has been submitted (even if empty)
+			foreach ($_FILES[$this->settings['name']]['name'] as $widgetName => $subElements) {	// 'name' is used but type/tmp_name/error/size could also have been used
 				
-				# Map the file information into the main form element array
-				if (!empty ($value)) {
-					$_POST[$this->settings['name']][$name][$key] = array (
-						'name' => $_FILES[$this->settings['name']]['name'][$name][$key],
-						'type' => $_FILES[$this->settings['name']]['type'][$name][$key],
-						'tmp_name' => $_FILES[$this->settings['name']]['tmp_name'][$name][$key],
-						#'error' => $_FILES[$this->settings['name']]['error'][$name][$key],
-						'size' => $_FILES[$this->settings['name']]['size'][$name][$key],
-					);
+				# Loop through each upload widget set's subelements (e.g. 4 items if there are 4 input tags within the widget set)
+				foreach ($subElements as $elementIndex => $value) {
+					
+					# Map the file information into the main form element array
+					if (!empty ($value)) {
+						$this->collection[$this->settings['name']][$widgetName][$elementIndex] = array (
+							'name' => $_FILES[$this->settings['name']]['name'][$widgetName][$elementIndex],
+							'type' => $_FILES[$this->settings['name']]['type'][$widgetName][$elementIndex],
+							'tmp_name' => $_FILES[$this->settings['name']]['tmp_name'][$widgetName][$elementIndex],
+							#'error' => $_FILES[$this->settings['name']]['error'][$widgetName][$elementIndex],
+							'size' => $_FILES[$this->settings['name']]['size'][$widgetName][$elementIndex],
+						);
+					}
+				}
+			}
+		} else {	// i.e. <input name="widgetname"
+			
+			# End if no files
+			if (empty ($_FILES)) {return;}
+			
+			# Loop through each upload widget set which has been submitted (even if empty); note that _FILES is arranged differently depending on whether you are using 'formname[elementname]' or just 'elementname' as the element name - see "HTML array feature" note at www.php.net/features.file-upload
+			foreach ($_FILES as $widgetName => $aspects) {
+				
+				# Loop through each sub element
+				foreach ($aspects['name'] as $elementIndex => $value) {
+					
+					# Map the file information into the main form element array
+					if (!empty ($value)) {
+						$this->collection[$widgetName][$elementIndex] = array (
+							'name' => $_FILES[$widgetName]['name'][$elementIndex],
+							'type' => $_FILES[$widgetName]['type'][$elementIndex],
+							'tmp_name' => $_FILES[$widgetName]['tmp_name'][$elementIndex],
+							#'error' => $_FILES[$widgetName]['error'][$elementIndex],
+							'size' => $_FILES[$widgetName]['size'][$elementIndex],
+						);
+					}
 				}
 			}
 		}
@@ -2675,7 +2719,7 @@ class form
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		$elementProblems = $this->getElementProblems ();
-		if (!$this->formPosted || $elementProblems || isSet ($_POST['__refresh']) || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
+		if (!$this->formPosted || $elementProblems || isSet ($this->collection['__refresh']) || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
 			
 			# Run the callback function if one is set
 			if ($this->settings['callback']) {
@@ -2683,13 +2727,13 @@ class form
 			}
 			
 			# Add a note about refreshing
-			if (isSet ($_POST['__refresh'])) {
+			if (isSet ($this->collection['__refresh'])) {
 				$this->html .= '<p><em>The form below has been refreshed but not yet submitted.</em></p>';
 			}
 			
 			# Display the form and any problems then end
 			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
-			if (!$this->formPosted || $elementProblems || isSet ($_POST['__refresh'])) {
+			if (!$this->formPosted || $elementProblems || isSet ($this->collection['__refresh'])) {
 				if ($this->settings['div']) {$this->html .= "\n</div>";}
 				if ($showHtmlDirectly) {echo $this->html;}
 				$html = $this->html;
@@ -3115,7 +3159,7 @@ class form
 		if (($this->settings['display'] != 'template') && ($this->settings['requiredFieldIndicator'] === 'top')) {$html .= $requiredFieldIndicatorHtml;}
 		
 		# Start the constructed form HTML
-		$html .= "\n" . '<form method="post" name="' . $this->settings['name'] . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '">';
+		$html .= "\n" . '<form method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '">';
 		#!# This needs to be investigated further:  $html .= "\n" . '<input type="hidden" name="_charset_" />';
 		
 		# Start the HTML
@@ -3357,7 +3401,7 @@ class form
 			}
 		}
 		
-		# Next the external if any exist
+		# Next the external problems if any exist
 		if (isSet ($problems['external'])) {
 			foreach ($problems['external'] as $name => $groupProblem) {
 				$problemsList[] = $groupProblem;
@@ -3396,9 +3440,10 @@ class form
 	 * Function to check for problems
 	 * @access private
 	 */
+	#!# The whole problems area needs refactoring
 	function getElementProblems ()
 	{
-		# If the form is posted, return false
+		# If the form is not posted, end here
 		if (!$this->formPosted) {return false;}
 		
 		# Loop through each created form element (irrespective of whether it has been submitted or not), run checks for problems, and deal with multi-dimensional arrays
@@ -3419,17 +3464,10 @@ class form
 			#!# Do checks on hidden fields
 		}
 		
-		# Check whether there are any incomplete fields 
+		# If there are any incomplete fields, add it to the start of the problems array
+		if (!isSet ($this->elementProblems['generic'])) {$this->elementProblems['generic'] = array ();}
 		if (isSet ($incompleteFields)) {
-			
-			# If there are any incomplete fields, add it to the start of the problems array
 			$this->elementProblems['generic']['incompleteFields'] = "You need to enter a value for the following required " . ((count ($incompleteFields) == 1) ? 'field' : 'fields') . ': <strong>' . implode ('</strong>, <strong>', $incompleteFields) . '</strong>.';
-			
-		} else {
-			# If there are no fields incomplete, remove the requirement to force upload(s) reselection
-			if (isSet ($this->elementProblems['generic']['reselectUploads'])) {
-				unset ($this->elementProblems['generic']['reselectUploads']);
-			}
 		}
 		
 		# Run checks for multiple validation fields
@@ -3438,9 +3476,19 @@ class form
 		# Add in externally-supplied problems (where the calling application has inserted data checked against ->getUnfinalisedData), which by default is an empty array
 		$this->elementProblems['external'] = $this->externalProblems;
 		
+		# If there are no fields incomplete, remove the requirement to force upload(s) reselection
+		$genericProblemsOtherThanUpload = ((count ($this->elementProblems['generic']) > 1) || ($this->elementProblems['generic'] && !isSet ($this->elementProblems['generic']['reselectUploads'])));
+		#!# Make $this->elementProblems['elements'] always exist to remove this inconsistency
+		if (!$genericProblemsOtherThanUpload && !isSet ($this->elementProblems['elements']) && !$this->elementProblems['group'] && !$this->elementProblems['external']) {
+			if (isSet ($this->elementProblems['generic']['reselectUploads'])) {
+				unset ($this->elementProblems['generic']['reselectUploads']);
+			}
+		}
+		
 		# Return a boolean of whether problems have been found or not
 		#!# This needs to be made more generic, by looping through the first-level arrays to see if any second-level items exist; then new types of problems need not be registered here
-		return $problemsFound = (!empty ($this->elementProblems['generic'])) || (!empty ($this->elementProblems['elements']) || (!empty ($this->elementProblems['group'])) || (!empty ($this->elementProblems['external'])));
+		#!# Again, make $this->elementProblems['elements'] always exist to remove the isSet/!empty inconsistency
+		return $problemsFound = (!empty ($this->elementProblems['generic'])) || (isSet ($this->elementProblems['elements']) || (!empty ($this->elementProblems['group'])) || (!empty ($this->elementProblems['external'])));
 	}
 	
 	
@@ -4190,25 +4238,33 @@ class form
 				#!# How can we deal with multiple files?
 				if ($arguments['forcedFileName']) {
 					#!# This is very hacky
-					$file = basename ($_FILES[$this->settings['name']]['name'][$name][$key]);
+					$file = basename ($this->settings['name'] ? $_FILES[$this->settings['name']]['name'][$name][$key] : $_FILES[$name]['name'][$key]);
 					if (strpos ($file, '.') !== true) {$file = 'NULL.' . $file;}
 					$fileExtension  = array_pop (explode ('.', $file));
 					$fileName = basename ($file, '.' . $fileExtension);
-					$attributes['name'] = $_FILES[$this->settings['name']]['name'][$name][$key] = $arguments['forcedFileName'] . '.' . $fileExtension;
+					if ($this->settings['name']) {
+						$attributes['name'] = $_FILES[$this->settings['name']]['name'][$name][$key] = $arguments['forcedFileName'] . '.' . $fileExtension;
+					} else {
+						$attributes['name'] = $_FILES[$name]['name'][$key] = $arguments['forcedFileName'] . '.' . $fileExtension;
+					}
 				}
 				
 				# Check whether a file already exists
-				if (file_exists ($existingFileName = ($arguments['directory'] . $_FILES[$this->settings['name']]['name'][$name][$key]))) {
+				if (file_exists ($existingFileName = ($arguments['directory'] . ($this->settings['name'] ? $_FILES[$this->settings['name']]['name'][$name][$key] : $_FILES[$name]['name'][$key])))) {
 					
 					# Check whether the file being uploaded has the same checksum as the existing file
-					if (md5_file ($existingFileName) != md5_file ($_FILES[$this->settings['name']]['tmp_name'][$name][$key])) {
+					if (md5_file ($existingFileName) != md5_file ($this->settings['name'] ? $_FILES[$this->settings['name']]['tmp_name'][$name][$key] : $_FILES[$name]['tmp_name'][$key])) {
 						
 						# If version control is enabled, move the old file, appending the date; if the file really cannot be renamed, append the date to the new file instead
 						if ($arguments['enableVersionControl']) {
 							$timestamp = date ('Ymd-His');
 							# Rename the file, altering the filename reference (using .= )
 							if (!@rename ($existingFileName, $existingFileName .= '.replaced-' . $timestamp)) {
-								$_FILES[$this->settings['name']]['name'][$name][$key] .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
+								if ($this->settings['name']) {
+									$_FILES[$this->settings['name']]['name'][$name][$key] .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
+								} else {
+									$_FILES[$name]['name'][$key] .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
+								}
 							}
 							
 						/* # If version control is not enabled, give a new name to the new file to prevent the old one being overwritten accidentally
@@ -4221,8 +4277,8 @@ class form
 				}
 				
 				# Attempt to upload the file
-				$destination = $arguments['directory'] . $_FILES[$this->settings['name']]['name'][$name][$key];
-				if (!move_uploaded_file ($_FILES[$this->settings['name']]['tmp_name'][$name][$key], $destination)) {
+				$destination = $arguments['directory'] . ($this->settings['name'] ? $_FILES[$this->settings['name']]['name'][$name][$key] : $_FILES[$name]['name'][$key]);
+				if (!move_uploaded_file (($this->settings['name'] ? $_FILES[$this->settings['name']]['tmp_name'][$name][$key] : $_FILES[$name]['tmp_name'][$key]), $destination)) {
 					
 					# Create an array of any failed file uploads
 					#!# Not sure what happens if this fails, given that the attributes may not exist

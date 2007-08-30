@@ -51,7 +51,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.7.0
+ * @version 1.7.1
  */
 class form
 {
@@ -4234,55 +4234,44 @@ class form
 			# Loop through each sub-element
 			foreach ($this->form[$name] as $key => $attributes) {
 				
-				# Assign the eventual name (overwriting the uploaded name if the name is being forced)
-				#!# How can we deal with multiple files?
+				# Create a shortcut for the filename (just the name, not with the path)
+				$filename = $attributes['name'];
+				
+				# Overwrite the filename if being forced; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
-					#!# This is very hacky
-					$file = basename ($this->settings['name'] ? $_FILES[$this->settings['name']]['name'][$name][$key] : $_FILES[$name]['name'][$key]);
-					if (strpos ($file, '.') !== true) {$file = 'NULL.' . $file;}
-					$fileExtension  = array_pop (explode ('.', $file));
-					$fileName = basename ($file, '.' . $fileExtension);
-					if ($this->settings['name']) {
-						$attributes['name'] = $_FILES[$this->settings['name']]['name'][$name][$key] = $arguments['forcedFileName'] . '.' . $fileExtension;
-					} else {
-						$attributes['name'] = $_FILES[$name]['name'][$key] = $arguments['forcedFileName'] . '.' . $fileExtension;
-					}
+					$pathinfo = pathinfo ($filename);
+					$fileExtension = (isSet ($pathinfo['filename']) ? $pathinfo['filename'] : '');
+					$filename = $arguments['forcedFileName'] . '.' . $fileExtension;
 				}
 				
-				# Check whether a file already exists
-				if (file_exists ($existingFileName = ($arguments['directory'] . ($this->settings['name'] ? $_FILES[$this->settings['name']]['name'][$name][$key] : $_FILES[$name]['name'][$key])))) {
+				# If version control is enabled, do checks to prevent overwriting
+				if ($arguments['enableVersionControl']) {
 					
-					# Check whether the file being uploaded has the same checksum as the existing file
-					if (md5_file ($existingFileName) != md5_file ($this->settings['name'] ? $_FILES[$this->settings['name']]['tmp_name'][$name][$key] : $_FILES[$name]['tmp_name'][$key])) {
+					# Check whether a file already exists
+					if (file_exists ($existingFile = $arguments['directory'] . $filename)) {
 						
-						# If version control is enabled, move the old file, appending the date; if the file really cannot be renamed, append the date to the new file instead
-						if ($arguments['enableVersionControl']) {
-							$timestamp = date ('Ymd-His');
-							# Rename the file, altering the filename reference (using .= )
-							if (!@rename ($existingFileName, $existingFileName .= '.replaced-' . $timestamp)) {
-								if ($this->settings['name']) {
-									$_FILES[$this->settings['name']]['name'][$name][$key] .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
-								} else {
-									$_FILES[$name]['name'][$key] .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
-								}
-							}
+						# Check whether the existing file has the same checksum as the file being uploaded
+						if (md5_file ($existingFile) != md5_file ($attributes['tmp_name'])) {
 							
-						/* # If version control is not enabled, give a new name to the new file to prevent the old one being overwritten accidentally
-						} else {
-							# If a file of the same name but a different checksum exists, append the date and time to the proposed filename
-							$_FILES[$this->settings['name']]['name'][$name][$key] .= date ('.Ymd-His');
-							*/
+							# Rename the file by appending the date to it
+							$timestamp = date ('Ymd-His');
+							$renamed = @rename ($existingFile, $existingFile . ".replaced-{$timestamp}");
+							
+							# If renaming failed, append an explanation+timestamp to the new file
+							if (!$renamed) {
+								$filename .= '.forRenamingBecauseCannotMoveOld-' . $timestamp;
+							}
 						}
 					}
 				}
 				
-				# Attempt to upload the file
-				$destination = $arguments['directory'] . ($this->settings['name'] ? $_FILES[$this->settings['name']]['name'][$name][$key] : $_FILES[$name]['name'][$key]);
-				if (!move_uploaded_file (($this->settings['name'] ? $_FILES[$this->settings['name']]['tmp_name'][$name][$key] : $_FILES[$name]['tmp_name'][$key]), $destination)) {
+				# Attempt to upload the file to the (now finalised) destination
+				$destination = $arguments['directory'] . $filename;
+				if (!move_uploaded_file ($attributes['tmp_name'], $destination)) {
 					
 					# Create an array of any failed file uploads
 					#!# Not sure what happens if this fails, given that the attributes may not exist
-					$failures[$attributes['name']] = $attributes;
+					$failures[$filename] = $attributes;
 					
 				# Continue if the file upload attempt was successful
 				} else {
@@ -4293,11 +4282,12 @@ class form
 					
 					# Create an array of any successful file uploads. For security reasons, if the filename is modified to prevent accidental overwrites, the original filename is not modified here
 					#!# There needs to be a differential between presented and actual data in cases where a different filename is actually written to the disk
-					$successes[$attributes['name']] = $attributes;
+					$successes[$filename] = $attributes;
 					
 					# Unzip the file if required
-					if ($arguments['unzip'] && substr (strtolower ($attributes['name']), -4) == '.zip') {
-						if ($unzippedFiles = $this->_unzip ($attributes['name'], $arguments['directory'], $deleteAfterUnzipping = true)) {
+					#!# Somehow move this higher up so that the same renaming rules apply
+					if ($arguments['unzip'] && substr (strtolower ($filename), -4) == '.zip') {
+						if ($unzippedFiles = $this->_unzip ($filename, $arguments['directory'], $deleteAfterUnzipping = true)) {
 							$listUnzippedFilesMaximum = (is_numeric ($arguments['unzip']) ? $arguments['unzip'] : $this->settings['listUnzippedFilesMaximum']);
 							$totalUnzippedFiles = count ($unzippedFiles);
 							
@@ -4312,11 +4302,11 @@ class form
 							}
 							
 							# Add the (described) zip file to the list of successes
-							$successes[$attributes['name']]['name'] .= " [automatically unpacked and containing {$totalUnzippedFiles} " . ($totalUnzippedFiles == 1 ? 'file' : 'files') . ($totalUnzippedFiles > $listUnzippedFilesMaximum ? '' : ': ' . implode ('; ', $unzippedFilesListPreRenaming)) . ']';
+							$successes[$filename]['name'] .= " [automatically unpacked and containing {$totalUnzippedFiles} " . ($totalUnzippedFiles == 1 ? 'file' : 'files') . ($totalUnzippedFiles > $listUnzippedFilesMaximum ? '' : ': ' . implode ('; ', $unzippedFilesListPreRenaming)) . ']';
 						}
 					} else {
 						# Add the directory location into the key name
-						$actualUploadedFiles[$arguments['directory'] . $attributes['name']] = $attributes;
+						$actualUploadedFiles[$arguments['directory'] . $filename] = $attributes;
 					}
 				}
 			}
@@ -4334,12 +4324,13 @@ class form
 					$data['compiled'][$actualUploadedFileLocation] = $attributes;
 				}
 				
-				# For the compiled version, give the number of files uploaded and their names
-				$totalSuccesses = count ($successes);
 				# Add each of the files to the master array, appending the location for each
 				foreach ($successes as $success => $attributes) {
 					$filenames[] = $attributes['name'];
 				}
+				
+				# For the compiled version, give the number of files uploaded and their names
+				$totalSuccesses = count ($successes);
 				$data['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode ('; ', $filenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
 			}
 			
@@ -4396,6 +4387,7 @@ class form
 					$timestamp = date ('Ymd-His');
 					# Rename the file, altering the filename reference (using .= )
 					$originalIsRenamed = $filename;
+					#!# Error here - seems to rename the new rather than the original
 					rename ($filename, $filename .= '.replaced-' . $timestamp);
 				}
 			}

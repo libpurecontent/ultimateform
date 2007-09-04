@@ -23,6 +23,9 @@
  * - The ability to set elements as non-editable
  * - Ability to generate form widgets automatically by reading a database structure (dataBinding facility)
  * - Group validation rules to ensure that at least one field is completed, that all are the same or all are different
+ * - GET support available
+ * - Uploaded files can be attached to e-mails
+ * - Uploaded zip files can be automatically unzipped
  * 
  * REQUIREMENTS:
  * - PHP4.1 or above
@@ -51,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.7.1
+ * @version 1.8.0
  */
 class form
 {
@@ -74,6 +77,7 @@ class form
 	var $databaseConnection = NULL;				// Database connection
 	var $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
 	var $prefixedGroups = array ();				// Groups of element names when using prefixing in dataBinding
+	var $attachments = array ();				// Array of attachments
 	
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
@@ -163,6 +167,9 @@ class form
 		'cols'								=> 30,								# Global setting for textarea cols - number of columns
 		'rows'								=> 5,								# Global setting for textarea cols - number of rows
 		'mailAdminErrors'					=> false,							# Whether to mail the admin with any errors in the form setup
+		'attachments'						=> false,							# Whether to send uploaded file(s) as attachment(s) (they will not be unzipped)
+		'attachmentsMaxSize'				=> '10M',							# Total maximum attachment(s) size; attachments will be allowed into an e-mail until they reach this limit
+		'attachmentsDeleteIfMailed'			=> true,							# Whether to delete the uploaded file(s) if successfully mailed
 	);
 	
 	
@@ -1800,6 +1807,8 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			#!# Consider a way of adding a checkbox to confirm on a per-widget basis; adds quite a few complications though
 			'unzip'					=> false,	# Whether to unzip a zip file on arrival, either true/false or the number of files (defaulting to $this->settings['listUnzippedFilesMaximum']) which should be listed in any visible result output
+			'attachments'			=> $this->settings['attachments'],	# Whether to send uploaded file(s) as attachment(s) (they will not be unzipped)
+			'attachmentsDeleteIfMailed'	=> $this->settings['attachmentsDeleteIfMailed'],	# Whether to delete the uploaded file(s) if successfully mailed
 		);
 		
 		# Create a new form widget
@@ -1876,21 +1885,21 @@ class form
 			$elementProblems['subfieldsMismatch'] = 'You appear to have submitted more files than there are fields available.';
 		}
 		
-		# Start a counter for the number of files apparently uploaded
-		$apparentlyUploadedFiles = 0;
-		
 		# Start the HTML
 		$widgetHtml = '';
 		if ($arguments['subfields'] > 1) {$widgetHtml .= "\n\t\t\t";}
 		
 		# Loop through the number of fields required to create the widget and perform checks
+		$apparentlyUploadedFiles = array ();
 		for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
 			
 			# Continue further processing if the file has been uploaded
 			if (isSet ($elementValue[$subfield])) {
 				
-				# Increment the number of apparently uploaded files (irrespective of whether they pass other checks)
-				$apparentlyUploadedFiles++;
+				# Add the apparently uploaded file (irrespective of whether it passes other checks)
+				$elementValue[$subfield]['_directory'] = $arguments['directory'];	// Cache the directory for later use
+				$elementValue[$subfield]['_attachmentsDeleteIfMailed'] = $arguments['attachmentsDeleteIfMailed'];
+				$apparentlyUploadedFiles[] = $elementValue[$subfield];
 				
 				# If an extension is required but the submitted item doesn't contain a dot, throw a problem
 				if (($extensionRequired) && (strpos ($elementValue[$subfield]['name'], '.') === false)) {
@@ -1921,20 +1930,21 @@ class form
 		}
 		
 		# If any files have been uploaded, the user will need to re-select them.
-		if ($apparentlyUploadedFiles > 0) {
-			$this->elementProblems['generic']['reselectUploads'] = "You will need to reselect the " . ($apparentlyUploadedFiles == 1 ? 'file' : "{$apparentlyUploadedFiles} files") . " you selected for uploading, because of problems elsewhere in the form. (Re-selection is a security requirement of your web browser.)";
+		$totalApparentlyUploadedFiles = count ($apparentlyUploadedFiles);
+		if ($totalApparentlyUploadedFiles > 0) {
+			$this->elementProblems['generic']['reselectUploads'] = "You will need to reselect the " . ($totalApparentlyUploadedFiles == 1 ? 'file' : "{$totalApparentlyUploadedFiles} files") . " you selected for uploading, because of problems elsewhere in the form. (Re-selection is a security requirement of your web browser.)";
 		}
 		
 		# Check if the field is required (i.e. the minimum number of fields is greater than 0) and, if so, run further checks
 		if ($required = ($arguments['required'] > 0)) {
 			
 			# If none have been uploaded, class this as requiredButEmpty
-			if ($apparentlyUploadedFiles == 0) {
+			if ($totalApparentlyUploadedFiles == 0) {
 				$requiredButEmpty = true;
 				
 			# If too few have been uploaded, produce a individualised warning message
-			} else if ($apparentlyUploadedFiles < $arguments['required']) {
-				$elementProblems['underMinimum'] = ($arguments['required'] != $arguments['subfields'] ? 'At least' : 'All') . " <strong>{$arguments['required']}</strong> " . ($arguments['required'] > 1 ? 'files' : 'file') . ' must be submitted; you will need to reselect the ' . ($apparentlyUploadedFiles == 1 ? 'file' : "{$apparentlyUploadedFiles} files") . ' that you did previously select, for security reasons.';
+			} else if ($totalApparentlyUploadedFiles < $arguments['required']) {
+				$elementProblems['underMinimum'] = ($arguments['required'] != $arguments['subfields'] ? 'At least' : 'All') . " <strong>{$arguments['required']}</strong> " . ($arguments['required'] > 1 ? 'files' : 'file') . ' must be submitted; you will need to reselect the ' . ($totalApparentlyUploadedFiles == 1 ? 'file' : "{$totalApparentlyUploadedFiles} files") . ' that you did previously select, for security reasons.';
 			}
 		}
 		
@@ -1958,7 +1968,15 @@ class form
 		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
 		
 		# Assign half-validated data, for the purposes of the groupValidation check; note that this could be tricked, but should be good enough in most cases, and certainly better than nothing
-		$data['presented'] = $apparentlyUploadedFiles;
+		$data['presented'] = $totalApparentlyUploadedFiles;
+		
+		# Register the attachments, and disable unzipping
+		#!# Ideally unzipping should be done after a zip file is e-mailed, but this would require much refactoring of the output processing, i.e. (i) upload, (ii) attach attachments, (iii) unzip
+		if ($arguments['attachments']) {
+			$this->attachments = array_merge ($this->attachments, $apparentlyUploadedFiles);
+			$this->uploadProperties[$arguments['name']]['unzip'] = false;
+			$arguments['unzip'] = false;
+		}
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
@@ -4104,19 +4122,113 @@ class form
 		# Define additional mail headers for compatibility
 		$additionalHeaders .= $this->fixMailHeaders ($sender);
 		
+		# Compile the message text
+		$message = wordwrap ($introductoryText . "\n\n\n\n" . implode ("\n\n\n", $resultLines));
+		
+		# Add attachments if required, to the e-mail type only (not confirmation e-mail type), rewriting the message
+		if (($outputType == 'email') && $this->attachments) {
+			list ($message, $additionalHeaders) = $this->attachmentsMessage ($message, $additionalHeaders, $introductoryText, $resultLines);
+		}
+		
 		# Send the e-mail
 		#!# Add an @ and a message if sending fails (marking whether the info has been logged in other ways)
 		$success = mail (
 			$recipient,
 			$this->configureResultEmailedSubjectTitle[$outputType],
-			wordwrap ($introductoryText . "\n\n\n\n" . implode ("\n\n\n", $resultLines)),
+			$message,
 			$additionalHeaders
 		);
+		
+		# Delete the attachments that have been mailed, if required
+		if (($outputType == 'email') && $this->attachments && $success) {
+			foreach ($this->attachments as $index => $attachment) {
+				if ($attachment['_attachmentsDeleteIfMailed']) {
+					unlink ($this->attachments[$index]['_directory'] . $this->attachments[$index]['name']);
+				}
+			}
+		}
 		
 		# Confirm sending (or an error) for the confirmation e-mail type
 		if ($outputType == 'confirmationEmail') {
 			$this->html .= "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
 		}
+	}
+	
+	
+	# Function to add attachments; useful articles explaining the background at www.zend.com/zend/spotlight/sendmimeemailpart1.php and www.hollowearth.co.uk/tech/php/email_attachments.php
+	function attachmentsMessage ($message, $additionalHeaders, $introductoryText, $resultLines)
+	{
+		# Get the maximum total attachment size, per attachment, converting it to bytes, or explicitly false for no limit
+		$attachmentsMaxSize = ($this->settings['attachmentsMaxSize'] ? $this->settings['attachmentsMaxSize'] : ini_get ('upload_max_filesize'));
+		$attachmentsMaxSize = application::convertSizeToBytes ($attachmentsMaxSize);
+		
+		# Read the attachments into memory first, or unset the reference to an unreadable attachment, stopping when the attachment size reaches the total limit
+		$totalAttachmentsOriginal = count ($this->attachments);
+		$attachmentsTotalSize = 0;	// in bytes
+		foreach ($this->attachments as $index => $attachment) {
+			$attachmentsTotalSizeProposed = $attachmentsTotalSize + $attachment['size'];
+			$attachmentSizeAllowable = ($attachmentsTotalSizeProposed <= $attachmentsMaxSize);
+			$filename = $attachment['_directory'] . $attachment['name'];
+			if ($attachmentSizeAllowable && file_exists ($filename) && is_readable ($filename)) {
+				$this->attachments[$index]['_contents'] = chunk_split (base64_encode (file_get_contents ($filename)));
+				$attachmentsTotalSize = $attachmentsTotalSizeProposed;
+			} else {
+				unset ($this->attachments[$index]);
+			}
+		}
+		
+		# Attachment counts
+		$totalAttachments = count ($this->attachments);
+		$totalAttachmentsDifference = ($totalAttachmentsOriginal - $totalAttachments);
+		
+		# If attachments were successfully read, add them to the e-mail
+		if ($this->attachments) {
+			
+			# Set the MIME boundary, a unique string
+			$mimeBoundary = '<<<--==+X[' . md5( time ()). ']';
+			
+			# Add MIME headers
+			$additionalHeaders .= "MIME-Version: 1.0\r\n";
+			$additionalHeaders .= "Content-Type: multipart/mixed;\r\n";
+			$additionalHeaders .= ' boundary="' . $mimeBoundary . '"';
+			
+			# Push the attachment stuff into the main message area, starting with the MIME introduction
+			$message  = "\r\n";
+			$message .= "This is a multi-part message in MIME format.\r\n";
+			$message .= "\r\n";
+			$message .= '--' . $mimeBoundary . "\r\n";
+			
+			# Main message 'attachment'
+			$message .= "Content-Type: text/plain; charset=\"iso-8859-1\"\r\n";
+			$message .= "Content-Transfer-Encoding: 7bit\r\n";
+			$message .= "\r\n";
+			$message .= wordwrap ($introductoryText . "\n\n" . ($totalAttachments == 1 ? 'There is also an attachment.' : "There are also {$totalAttachments} attachments.") . ($totalAttachmentsDifference ? ' ' . ($totalAttachmentsDifference == 1 ? 'One other submitted file was too large to e-mail, so it has' : "{$totalAttachmentsDifference} other submitted files were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' : '') . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "\r\n\r\n\r\n" . "\r\n";
+			$message .= '--' . $mimeBoundary;
+			
+			# Add each attachment, starting with a mini-header for each
+			foreach ($this->attachments as $index => $attachment) {
+				$message .= "\r\n";	// End of previous boundary
+				$message .= 'Content-Type: ' . ($attachment['type']) . ";\r\n";
+				$message .= ' name="' . $attachment['name'] . "\"\r\n";
+				$message .= "Content-Disposition: attachment;\r\n";
+				$message .= ' filename="' . $attachment['name'] . "\"\r\n";
+				$message .= "Content-Transfer-Encoding: base64\r\n";
+				$message .= "\r\n";
+				$message .= $attachment['_contents'];
+				$message .= "\r\n";
+				$message .= '--' . $mimeBoundary;	// \r\n is added in next iteration of loop
+			}
+			
+			# Finish the final boundary
+			$message .= '--';
+		} else {
+			
+			# Say that there were no attachments but that the files were saved
+			$message  = wordwrap ($introductoryText . "\n\n" . ($totalAttachmentsOriginal == 1 ? 'There is also a submitted file, which was too large to e-mail, so it has' : "There are also {$totalAttachmentsOriginal} submitted files, which were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "\r\n\r\n\r\n" . "\r\n";
+		}
+		
+		# Return the message
+		return array ($message, $additionalHeaders);
 	}
 	
 	
@@ -4993,6 +5105,7 @@ class formWidget
 # Support for select::regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
 # Consider issue of null bytes in ereg - http://uk.php.net/manual/en/ref.regex.php#74258 - probably migrate to preg_ anyway, as PHP6 deprecates ereg
 # Consider grouping/fieldset and design issues at http://www.sitepoint.com/print/fancy-form-design-css/
+# Deal with widget name conversion of dot to underscore: http://uk2.php.net/manual/en/language.types.array.php#52124
 
 # Version 2 feature proposals
 #!# Self-creating form mode

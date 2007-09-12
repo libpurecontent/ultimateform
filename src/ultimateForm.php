@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.8.0
+ * @version 1.8.1
  */
 class form
 {
@@ -1044,10 +1044,13 @@ class form
 		} else {
 			
 			# Loop through each default argument (if any) to prepare them
+			#!# All this stuff isn't even needed if errors have been found
 			#!# Need to double-check that $arguments['default'] isn't being changed above this point [$arguments['default'] is deliberately used here because of the $identifier system above]
 			$presentableDefaults = array ();
 			foreach ($arguments['default'] as $argument) {
-				$presentableDefaults[$argument] = $arguments['values'][$argument];
+				if (isSet ($arguments['values'][$argument])) {
+					$presentableDefaults[$argument] = $arguments['values'][$argument];
+				}
 			}
 			
 			# Set the widget HTML
@@ -4638,7 +4641,12 @@ class form
 			if ($lookupFunction) {
 				$parameters = array ($this->databaseConnection, $title, $fieldAttributes['Type']);
 				if ($lookupFunctionParameters) {$parameters = array_merge ($parameters, application::ensureArray ($lookupFunctionParameters));}
-				list ($title, $lookupValues, $targetDatabase, $targetTable) = call_user_func_array ($lookupFunction, $parameters);
+				$userFunctionResult = call_user_func_array ($lookupFunction, $parameters);
+				if (count ($userFunctionResult) != 4) {	// Should be returning an array of four values as per the list() call below
+					$this->formSetupErrors['dataBindingLookupFunctionReturnValuesInvalid'] = "You specified a lookup function ('<strong>" . (is_array ($lookupFunction) ? implode ('::', $lookupFunction) : $lookupFunction) . "</strong>') for the data binding, but the function does not return an array of four values as is required.";
+					return false;
+				}
+				list ($title, $lookupValues, $targetDatabase, $targetTable) = $userFunctionResult;
 			}
 			
 			# Convert title from lowerCamelCase to Standard text if necessary

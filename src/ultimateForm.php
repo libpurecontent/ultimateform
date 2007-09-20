@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.8.1
+ * @version 1.8.2
  */
 class form
 {
@@ -334,11 +334,11 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
 		} else {
 			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
-			$hiddenInput = '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$hiddenInput = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
 			$widgetHtml .= $hiddenInput;
 		}
 		
@@ -549,10 +549,10 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" id="' . $this->settings['name'] . $this->cleanId ("[{$arguments['name']}]") . "\" cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
 			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']])));
-			$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Get the posted data
@@ -723,6 +723,7 @@ class form
 			# Define the widget's core HTML by instantiating the richtext editor module and setting required options
 			require_once ('fckeditor.php');
 			$editor = new FCKeditor ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
+			#!# NB Can't define ID in FCKeditor textarea
 			$editor->BasePath	= $arguments['editorBasePath'];
 			$editor->Width		= $arguments['width'];
 			$editor->Height		= $arguments['height'];
@@ -732,7 +733,7 @@ class form
 			$widgetHtml = $editor->CreateHtml ();
 		} else {
 			$widgetHtml = $this->form[$arguments['name']];
-			$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -943,8 +944,10 @@ class form
 		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
 		# Check that the array of values is not empty
-		#!# Only run other checks below if this error isn't thrown
-		if (empty ($arguments['values'])) {$this->formSetupErrors['selectNoValues'] = 'No values have been set as selection items.';}
+		if (empty ($arguments['values'])) {
+			$this->formSetupErrors['selectNoValues'] = 'No values have been set as selection items.';
+			return false;
+		}
 		
 		# Check that the given minimum required is not more than the number of items actually available
 		$totalSubItems = count ($arguments['values']);
@@ -1019,7 +1022,7 @@ class form
 			}
 			
 			# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-			$widgetHtml = "\n\t\t\t<select name=\"" . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[]"' . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
+			$widgetHtml = "\n\t\t\t<select" . $this->nameIdHtml ($arguments['name'], true) . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
 			if (!isSet ($arguments['_valuesMultidimensional'])) {
 				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				foreach ($arguments['valuesWithNull'] as $value => $visible) {
@@ -1059,7 +1062,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[]" type="hidden" value="' . htmlentities ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], true) . ' type="hidden" value="' . htmlentities ($value) . '" />';
 				}
 			}
 			
@@ -1233,11 +1236,10 @@ class form
 			# Create the widget
 			/* #!# Write branching code around here which uses _valuesMultidimensional, when implementing fieldset grouping */
 			foreach ($arguments['values'] as $value => $visible) {
-				$elementId = $this->cleanId ("{$arguments['name']}_{$value}");
+				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				#$visible = str_replace ('', '&dagger;', htmlentities ($visible));
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '"' . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ' id="' . $elementId . '"' . " /><label for=\"" . $elementId . '">' . htmlentities ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($visible)) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1251,7 +1253,7 @@ class form
 				foreach ($arguments['values'] as $value => $visible) {
 					if ($value == $elementValue) {	// This loop is done to prevent offsets which may still arise due to the 'defaultMissingFromValuesArray' error not resulting in further termination of widget production
 						$widgetHtml  = htmlentities ($arguments['values'][$elementValue]);
-						$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($elementValue) . '" />';
+						$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], false, $elementValue) . ' type="hidden" value="' . htmlentities ($elementValue) . '" />';
 					}
 				}
 			}
@@ -1377,9 +1379,6 @@ class form
 			$subwidgetIndex = 1;
 			foreach ($arguments['values'] as $value => $visible) {
 				
-				# Construct the element ID, which must be unique	
-				$elementId = $this->cleanId ("{$this->settings['name']}__{$arguments['name']}__{$value}");
-				
 				# If the form is not posted, assign the initial value (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
 				if (!$this->formPosted) {
 					if (in_array ($value, $arguments['default'])) {
@@ -1401,8 +1400,12 @@ class form
 					$elementValue[$value] = '';
 				}
 				
+//				# Construct the element ID, which must be unique	
+				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
+				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
+//				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1423,7 +1426,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]\" type=\"hidden\" value=\"true\" />";
+					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' type="hidden" value="true" />';
 				}
 			}
 			
@@ -1701,14 +1704,14 @@ class form
 			# Start with the time if required
 			if (substr_count ($arguments['level'], 'time')) {	// datetime or time
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span>';
-				$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[time]" type="text" size="10" value="' . $elementValue['time'] . '" />';
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'time', true) . ' type="text" size="10" value="' . $elementValue['time'] . '" />';
 			}
 			
 			# Add the Define the date and month input boxes; if the day or year are 0 then nothing will be displayed
 			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[day]"  size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
-				$widgetHtml .= "\n\t\t\t\t" . '<select name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[month]">';
+				$widgetHtml .= "\n\t\t\t\t" . '<select' . $this->nameIdHtml ($arguments['name'], false, 'month', true) . '>';
 				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
 				$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
 				foreach ($months as $monthNumber => $monthName) {
@@ -1720,7 +1723,7 @@ class form
 			# Add the year box
 			if ($arguments['level'] != 'time') {
 				$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
-				$widgetHtml .= '<input size="4" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '[year]" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
 			}
 			
 			# Surround with a fieldset if necessary
@@ -1731,7 +1734,7 @@ class form
 			
 			# Non-editable version
 			$widgetHtml  = timedate::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">' . (($arguments['level'] != 'time') ? '(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') : '(Current time') . ')' . '</span>' : '');
-			$widgetHtml .= "\n\t\t\t" . '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . '" type="hidden" value="' . htmlentities ($arguments['default']) . '" />';
+			$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($arguments['default']) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -1918,7 +1921,7 @@ class form
 			
 			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is non-standard and seemingly not supported by any browsers, so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would reveal to the user the size of the PHP ini setting
 			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
-			$widgetHtml .= '<input name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$subfield}]\" type=\"file\" size=\"{$arguments['size']}\" />";
+			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\" />";
 			$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
 		}
 		
@@ -2036,7 +2039,7 @@ class form
 		# Create the HTML by looping through the data array; this is only of use to non- self-processing forms, i.e. where the data is sent elsewhere; for self-processing the submitted data is ignored
 		$widgetHtml = "\n";
 		foreach ($arguments['values'] as $key => $value) {
-			$widgetHtml .= "\n\t" . '<input type="hidden" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$key}]" . '" value="' . $value . '" />';
+			$widgetHtml .= "\n\t" . '<input type="hidden"' . $this->nameIdHtml ($arguments['name'], false, $key, true) . ' value="' . $value . '" />';
 		}
 		$widgetHtml .= "\n";
 		
@@ -2120,6 +2123,20 @@ class form
 	}
 	
 	
+	# Function to generate ID and name HTML
+	function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false)
+	{
+		# Create the name and ID and compile the HTML
+		$name = ' name="' .              ($this->settings['name'] ? "{$this->settings['name']}[{$widgetName}]" : $widgetName) . ($multiple ? '[]' : '') . ($nameAppend ? "[{$subitem}]" : '') . '"';
+		if ($subitem !== false) {$widgetName .= "_{$subitem}";}
+		$id   = ' id="' . $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$widgetName}]" : $widgetName) . '"';
+		$html = $name . $id;
+		
+		# Return the HTML
+		return $html;
+	}
+	
+	
 	# Function to ensure that all initial values are in the array of values
 	function ensureDefaultsAvailable ($arguments)
 	{
@@ -2172,10 +2189,13 @@ class form
 	function cleanId ($id)
 	{
 		# Define the replacements
-		$replacements = array (' ', ',', '', '!', '(', ')' /*, '[', ']', */);
+		$replacements = array (' ', ',', '', '!', '(', ')', '[', ']');
 		
 		# Perform the replacements
 		$id = str_replace ($replacements, '_', $id);
+		
+		# Chop off any final _
+		if (substr ($id, -1) == '_') {$id = substr ($id, 0, -1);}
 		
 		# Return the cleaned ID
 		return $id;
@@ -3250,7 +3270,7 @@ class form
 					if ($elementAttributes['type'] == 'heading') {
 						$formHtml .= "\n" . $elementAttributes['html'];
 					} else {
-						$formHtml .= "\n" . '<p class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '" id="' . $id . '">';
+						$formHtml .= "\n" . '<p class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '"' . '>';
 						$formHtml .= "\n\t";
 						if ($this->settings['displayTitles']) {
 							$formHtml .= $elementAttributes['title'] . '<br />';
@@ -5097,7 +5117,6 @@ class formWidget
 #!# Apache setup needs to be carefully tested, in conjunction with php.net/ini-set and php.net/configuration.changes
 #!# Add links to the id="$name" form elements in cases of USER errors (not for the templating mode though)
 #!# Need to prevent the form code itself being overwritable by uploads or CSV writing, by doing a check on the filenames
-#!# Not all $widgetHtml declarations have an id="" given (make sure it is $this>cleanId'd though)
 #!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/ ; checkbox & radiobutton have some infrastructure written (but commented out) already
 #!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp e.g. accept="list_of_mime_types" for type=file
 #!# Number validation: validate numbers with strval() and intval() or floatval() - www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html

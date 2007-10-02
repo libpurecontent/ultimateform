@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.8.2
+ * @version 1.8.3
  */
 class form
 {
@@ -933,13 +933,6 @@ class form
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
 		
-		# Loop through each element value to check that it is in the available values, and just discard without comment any that are not
-		foreach ($elementValue as $index => $value) {
-			if (!array_key_exists ($value, $arguments['values'])) {
-				unset ($elementValue[$index]);
-			}
-		}
-		
 		# Apply truncation if necessary
 		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
@@ -981,6 +974,16 @@ class form
 		
 		# Emulate the need for the field to be 'required', i.e. the minimum number of fields is greater than 0
 		$required = ($arguments['required'] > 0);
+		
+		# Loop through each element value to check that it is in the available values, and just discard without comment any that are not
+		foreach ($elementValue as $index => $value) {
+			#!# This check against the identifier is a poor fix and should be done better architecturally
+			if (!substr ($value, 0, strlen ($identifier)) == $identifier) {
+				if (!array_key_exists ($value, $arguments['values'])) {
+					unset ($elementValue[$index]);
+				}
+			}
+		}
 		
 		# Remove null if it's submitted, so that it can never end up in the results; this is different to radiobuttons, because a radiobutton set can have nothing selected on first load, whereas a select always has something selected, so a null must be present
 		foreach ($elementValue as $index => $submittedValue) {
@@ -1062,7 +1065,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], true) . ' type="hidden" value="' . htmlentities ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], $arguments['multiple']) . ' type="hidden" value="' . htmlentities ($value) . '" />';
 				}
 			}
 			

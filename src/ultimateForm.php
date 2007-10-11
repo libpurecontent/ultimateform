@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.8.3
+ * @version 1.9.0
  */
 class form
 {
@@ -170,6 +170,7 @@ class form
 		'attachments'						=> false,							# Whether to send uploaded file(s) as attachment(s) (they will not be unzipped)
 		'attachmentsMaxSize'				=> '10M',							# Total maximum attachment(s) size; attachments will be allowed into an e-mail until they reach this limit
 		'attachmentsDeleteIfMailed'			=> true,							# Whether to delete the uploaded file(s) if successfully mailed
+		'charset'							=> 'UTF-8',							# Encoding used in entity conversions; www.joelonsoftware.com/articles/Unicode.html is worth a read
 	);
 	
 	
@@ -334,11 +335,11 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '" />';
 		} else {
-			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']]));
+			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']));
 			#!# Change to registering hidden internally
-			$hiddenInput = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$hiddenInput = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '" />';
 			$widgetHtml .= $hiddenInput;
 		}
 		
@@ -549,10 +550,10 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '</textarea>';
 		} else {
-			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']])));
-			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset'])));
+			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '" />';
 		}
 		
 		# Get the posted data
@@ -733,7 +734,7 @@ class form
 			$widgetHtml = $editor->CreateHtml ();
 		} else {
 			$widgetHtml = $this->form[$arguments['name']];
-			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -1029,7 +1030,7 @@ class form
 			if (!isSet ($arguments['_valuesMultidimensional'])) {
 				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				foreach ($arguments['valuesWithNull'] as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible) . '</option>';
+					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible, ENT_COMPAT, $this->settings['charset']) . '</option>';
 				}
 			} else {
 				
@@ -1038,11 +1039,11 @@ class form
 					if (is_array ($mainValue)) {
 						$widgetHtml .= "\n\t\t\t\t\t<optgroup label=\"$key\">";
 						foreach ($mainValue as $value => $visible) {
-							$widgetHtml .= "\n\t\t\t\t\t\t" . '<option value="' . htmlentities ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible) . '</option>';
+							$widgetHtml .= "\n\t\t\t\t\t\t" . '<option value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($visible, ENT_COMPAT, $this->settings['charset']) . '</option>';
 						}
 						$widgetHtml .= "\n\t\t\t\t\t</optgroup>";
 					} else {
-						$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($key) . '"' . (in_array ($key, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($mainValue) . '</option>';
+						$widgetHtml .= "\n\t\t\t\t" . '<option value="' . htmlentities ($key, ENT_COMPAT, $this->settings['charset']) . '"' . (in_array ($key, $elementValue) ? ' selected="selected"' : '') . '>' . htmlentities ($mainValue, ENT_COMPAT, $this->settings['charset']) . '</option>';
 					}
 				}
 			}
@@ -1065,7 +1066,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], $arguments['multiple']) . ' type="hidden" value="' . htmlentities ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], $arguments['multiple']) . ' type="hidden" value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '" />';
 				}
 			}
 			
@@ -1242,7 +1243,7 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($visible)) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($visible, ENT_COMPAT, $this->settings['charset'])) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1255,8 +1256,8 @@ class form
 			if ($arguments['default']) {
 				foreach ($arguments['values'] as $value => $visible) {
 					if ($value == $elementValue) {	// This loop is done to prevent offsets which may still arise due to the 'defaultMissingFromValuesArray' error not resulting in further termination of widget production
-						$widgetHtml  = htmlentities ($arguments['values'][$elementValue]);
-						$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], false, $elementValue) . ' type="hidden" value="' . htmlentities ($elementValue) . '" />';
+						$widgetHtml  = htmlentities ($arguments['values'][$elementValue], ENT_COMPAT, $this->settings['charset']);
+						$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], false, $elementValue) . ' type="hidden" value="' . htmlentities ($elementValue, ENT_COMPAT, $this->settings['charset']) . '" />';
 					}
 				}
 			}
@@ -1407,8 +1408,8 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-//				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
-				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible) . '</label>';
+//				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible, ENT_COMPAT, $this->settings['charset']) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible, ENT_COMPAT, $this->settings['charset']) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1563,7 +1564,7 @@ class form
 		
 		# Check the level is supported
 		if (!array_key_exists ($arguments['level'], $levels)) {
-			$this->formSetupErrors['levelInvalid'] = "An invalid 'level' (" . htmlentities ($arguments['level']) . ') was specified in the ' . htmlentities ($arguments['name']) . ' datetime widget.';
+			$this->formSetupErrors['levelInvalid'] = "An invalid 'level' (" . htmlentities ($arguments['level'], ENT_COMPAT, $this->settings['charset']) . ') was specified in the ' . htmlentities ($arguments['name'], ENT_COMPAT, $this->settings['charset']) . ' datetime widget.';
 			#!# Really this should end at this point rather than adding a fake reassignment
 			$arguments['level'] = 'datetime';
 		}
@@ -1737,7 +1738,7 @@ class form
 			
 			# Non-editable version
 			$widgetHtml  = timedate::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">' . (($arguments['level'] != 'time') ? '(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') : '(Current time') . ')' . '</span>' : '');
-			$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($arguments['default']) . '" />';
+			$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($arguments['default'], ENT_COMPAT, $this->settings['charset']) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -2718,6 +2719,7 @@ class form
 		if ($html) {$this->html = $html . $this->html;}
 		
 		# Open the surrounding <div> if relevant
+		#!# This should not be done if the form is successful
 		if ($this->settings['div']) {$this->html .= "\n\n<div class=\"{$this->settings['div']}\">";}
 		
 		# Show the presentation matrix if required (this is allowed to bypass the form setup so that the administrator can see what corrections are needed)
@@ -2778,6 +2780,7 @@ class form
 			# Display the form and any problems then end
 			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
 			if (!$this->formPosted || $elementProblems || isSet ($this->collection['__refresh'])) {
+				#!# This should not be done if the form is successful
 				if ($this->settings['div']) {$this->html .= "\n</div>";}
 				if ($showHtmlDirectly) {echo $this->html;}
 				$html = $this->html;
@@ -2806,6 +2809,7 @@ class form
 		if ($this->settings['formCompleteText']) {$this->html .= "\n" . '<p><a href="' . $_SERVER['REQUEST_URI'] . '">Click here to reset the page.</a></p>';}
 		
 		# Close the surrounding <div> if relevant
+		#!# This should not be done if the form is successful
 		if ($this->settings['div']) {
 			$this->html .= "\n\n</div>";
 		}
@@ -3962,7 +3966,7 @@ class form
 				
 				$html .= "\n\t" . '<tr>';
 				$html .= "\n\t\t" . "<td class=\"displayformat\"><em>$displayFormat</em></td>";
-				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . htmlentities ($presentationMatrix[$type]['_descriptions'][$default]) . ']--></td>';
+				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . htmlentities ($presentationMatrix[$type]['_descriptions'][$default], ENT_COMPAT, $this->settings['charset']) . ']--></td>';
 				$html .= "\n\t\t" . "<td>$others</td>";
 				$html .= "\n\t" . '</tr>';
 			}
@@ -4045,7 +4049,7 @@ class form
 			# Compile the HTML
 			$html .= "\n\t<tr>";
 			$html .= "\n\t\t" . '<td class="key">' . (isSet ($this->elements[$name]['title']) ? $this->elements[$name]['title'] : $name) . ':</td>';
-			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data))) . '</td>';
+			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlentities ($data, ENT_COMPAT, $this->settings['charset']))) . '</td>';
 			$html .= "\n\t</tr>";
 		}
 		$html .= "\n" . '</table>';
@@ -4176,7 +4180,7 @@ class form
 		
 		# Confirm sending (or an error) for the confirmation e-mail type
 		if ($outputType == 'confirmationEmail') {
-			$this->html .= "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
+			$this->html .= "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlentities ($this->configureResultConfirmationEmailRecipient, ENT_COMPAT, $this->settings['charset'])) . ').</p>';
 		}
 	}
 	
@@ -4378,8 +4382,8 @@ class form
 				# Overwrite the filename if being forced; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
 					$pathinfo = pathinfo ($filename);
-					$fileExtension = (isSet ($pathinfo['filename']) ? $pathinfo['filename'] : '');
-					$filename = $arguments['forcedFileName'] . '.' . $fileExtension;
+					$fileExtension = (isSet ($pathinfo['extension']) ? '.' . $pathinfo['extension'] : '');
+					$filename = $arguments['forcedFileName'] . $fileExtension;
 				}
 				
 				# If version control is enabled, do checks to prevent overwriting

@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.0
+ * @version 1.9.1
  */
 class form
 {
@@ -171,6 +171,7 @@ class form
 		'attachmentsMaxSize'				=> '10M',							# Total maximum attachment(s) size; attachments will be allowed into an e-mail until they reach this limit
 		'attachmentsDeleteIfMailed'			=> true,							# Whether to delete the uploaded file(s) if successfully mailed
 		'charset'							=> 'UTF-8',							# Encoding used in entity conversions; www.joelonsoftware.com/articles/Unicode.html is worth a read
+		'ip'								=> true,							# Whether to expose the submitter's IP address in the e-mail output format
 	);
 	
 	
@@ -186,7 +187,7 @@ class form
 		require_once ('application.php');
 		
 		# Assign constants
-		$this->timestamp = date ('Y-m-d H:m:s');
+		$this->timestamp = date ('Y-m-d H:i:s');
 		
 		# Import supplied arguments to assign defaults against specified ones available
 		foreach ($this->argumentDefaults as $argument => $defaultValue) {
@@ -632,13 +633,14 @@ class form
 	$Config['Regexp']['Image']	= '^([-_a-zA-Z0-9]{1,25})$' ;
 	
 	
-	The following are experienced deficiencies in FCKeditor 2.3.1:
+	The following are experienced deficiencies in FCKeditor 2.4.1:
 	- Auto-hyperlinking doesn't work in Firefox - see http://dev.fckeditor.net/ticket/302
 	- API deficiency: ToolbarSets all have to be set in JS and cannot be done via PHP - see http://dev.fckeditor.net/ticket/30
 	- API deficiency: FormatIndentator = "\t" - has to be set at JS level - see http://dev.fckeditor.net/ticket/304
 	- CSS underlining inheritance seems wrong in Firefox See: http://dev.fckeditor.net/ticket/303
 	- File permissions of created connector files insecure: http://dev.fckeditor.net/ticket/950
 	- Can't set file browser startup folder; see http://sourceforge.net/tracker/index.php?func=detail&aid=1498629&group_id=75348&atid=543655
+	- Language problems: http://dev.fckeditor.net/ticket/1456
 	
 	The following would be useful features to be able to have implement or be set via the form contructor:
 	- Replacing the above manual patches with the results of http://dev.fckeditor.net/ticket/306
@@ -828,10 +830,17 @@ class form
 			'<\?xml:namespace([^>]*)>' => '',	// Remove Word XML namespace tags
 			'<o:p> </o:p>'	=> '',	// WordHTML characters
 			'<o:p></o:p>'	=> '',	// WordHTML characters
+			'<o:p />'	=> '',	// WordHTML characters
+			' class="c([0-9])"'	=> '',	// Word classes
+			'<p> </p>'	=> '',	// Empty paragraphs
+			'<div> </div>'	=> '',	// Empty divs
 			'<span>([^<]*)</span>' => '<TEMP2span>\\1</TEMP2span>',	// Protect FIR-style spans
 			"</?span([^>]*)>"	=> '',	// Remove other spans
+			'[[:space:]]+</li>'	=> '</li>',	// Whitespace before list item closing tags
 			'[[:space:]]*<h([1-6]{1})([^>]*)>[[:space:]]</h([1-6]{1})>[[:space:]]*' => '',	// Headings containing only whitespace
+			'[[:space:]]+</h'	=> '</h',	// Whitespace before heading closing tags
 			'<h([2-6]+)'	=> "\n<h\\1",	// Line breaks before headings 2-6
+			'<h([1-6]+) id="Heading([0-9]+)">'	=> '<h\\1>',	// Headings from R2Net converter
 			'<br /></h([1-6]+)>'	=> "</h\\1>",	// Pointless line breaks just before a heading closing tag
 			'</h([1-6]+)>'	=> "</h\\1>\n",	// Line breaks after all headings
 			"<(li|tr|/tr|tbody|/tbody)"	=> "\t<\\1",	// Indent level-two tags
@@ -4098,8 +4107,7 @@ class form
 		}
 		
 		# Construct the introductory text, including the IP address for the e-mail type
-		#!# Make the IP address bit configurable; currently removed: ($outputType == 'email' ? ', from the IP address ' . $_SERVER['REMOTE_ADDR'] : '')
-		$introductoryText = ($outputType == 'confirmationEmail' ? $this->settings['confirmationEmailIntroductoryText'] . ($this->settings['confirmationEmailIntroductoryText'] ? "\n\n\n" : '') : $this->settings['emailIntroductoryText'] . ($this->settings['emailIntroductoryText'] ? "\n\n\n" : '')) . ($outputType == 'email' ? 'Below is a submission from the form' :  'Below is a confirmation of (apparently) your submission from the form') . " at \n" . $_SERVER['_PAGE_URL'] . "\nmade at " . date ('g:ia, jS F Y') . ', from the IP address ' . $_SERVER['REMOTE_ADDR'] . '.';
+		$introductoryText = ($outputType == 'confirmationEmail' ? $this->settings['confirmationEmailIntroductoryText'] . ($this->settings['confirmationEmailIntroductoryText'] ? "\n\n\n" : '') : $this->settings['emailIntroductoryText'] . ($this->settings['emailIntroductoryText'] ? "\n\n\n" : '')) . ($outputType == 'email' ? 'Below is a submission from the form' :  'Below is a confirmation of (apparently) your submission from the form') . " at \n" . $_SERVER['_PAGE_URL'] . "\nmade at " . date ('g:ia, jS F Y') . ($this->settings['ip'] ? ', from the IP address ' . $_SERVER['REMOTE_ADDR'] : '') . '.';
 		
 		# Add an abuse notice if required
 		if (($outputType == 'confirmationEmail') && ($this->configureResultConfirmationEmailAbuseNotice)) {$introductoryText .= "\n\n(If it was not you who submitted the form, please report it as abuse to " . $this->configureResultConfirmationEmailAdministrator . ' .)';}

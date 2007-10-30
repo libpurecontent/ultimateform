@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.1
+ * @version 1.9.2
  */
 class form
 {
@@ -787,7 +787,7 @@ class form
 			$parameters = array (
 				'output-xhtml' => true,
 				'show-body-only'	=> true,
-				'clean' => true,
+				'clean' => true,	// Note that this also removes style="clear: ..." from e.g. a <p> tag
 				'enclose-text'	=> true,
 				'drop-proprietary-attributes' => true,
 				'drop-font-tags' => true,
@@ -831,16 +831,15 @@ class form
 			'<o:p> </o:p>'	=> '',	// WordHTML characters
 			'<o:p></o:p>'	=> '',	// WordHTML characters
 			'<o:p />'	=> '',	// WordHTML characters
-			' class="c([0-9])"'	=> '',	// Word classes
-			'<p> </p>'	=> '',	// Empty paragraphs
-			'<div> </div>'	=> '',	// Empty divs
+			' class="c([0-9])"'     => '',  // Word classes
+			'<p> </p>'      => '',  // Empty paragraph
+			'<div> </div>'  => '',  // Empty divs
 			'<span>([^<]*)</span>' => '<TEMP2span>\\1</TEMP2span>',	// Protect FIR-style spans
 			"</?span([^>]*)>"	=> '',	// Remove other spans
-			'[[:space:]]+</li>'	=> '</li>',	// Whitespace before list item closing tags
 			'[[:space:]]*<h([1-6]{1})([^>]*)>[[:space:]]</h([1-6]{1})>[[:space:]]*' => '',	// Headings containing only whitespace
-			'[[:space:]]+</h'	=> '</h',	// Whitespace before heading closing tags
+			'[[:space:]]+</li>'     => '</li>',     // Whitespace before list item closing tags
+			'[[:space:]]+</h'       => '</h',       // Whitespace before heading closing tags
 			'<h([2-6]+)'	=> "\n<h\\1",	// Line breaks before headings 2-6
-			'<h([1-6]+) id="Heading([0-9]+)">'	=> '<h\\1>',	// Headings from R2Net converter
 			'<br /></h([1-6]+)>'	=> "</h\\1>",	// Pointless line breaks just before a heading closing tag
 			'</h([1-6]+)>'	=> "</h\\1>\n",	// Line breaks after all headings
 			"<(li|tr|/tr|tbody|/tbody)"	=> "\t<\\1",	// Indent level-two tags
@@ -848,6 +847,7 @@ class form
 			" href=\"{$arguments['editorBasePath']}editor/"	=> ' href=\"',	// Workaround for Editor basepath bug
 			' href="([^("|/)]*)/' . $arguments['directoryIndex'] . '"'	=> ' href="\1/"',	// Chop off directory index links
 			'<br /></h1>' => '</h1>',	// Remove breaks before an H1 closing tag
+			'<h([1-6]+) id="Heading([0-9]+)">'      => '<h\\1>',    // Headings from R2Net converter
 		);
 		
 		# Obfuscate e-mail addresses
@@ -2383,6 +2383,9 @@ class form
 				$this->configureResultEmailedSubjectTitle['email'] = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $subjectTitle);
 			}
 		}
+		
+		#!# This cleaning routine is not a great fix but at least helps avoid ugly e-mail subject lines for now
+		//$this->configureResultEmailedSubjectTitle['email'] = html_entity_decode (application::htmlentitiesNumericUnicode ($this->configureResultEmailedSubjectTitle['email']), ENT_COMPAT, 'UTF-8');
 	}
 	
 	
@@ -4773,7 +4776,7 @@ class form
 			if ($lookupValues && $fieldAttributes['Type'] != '_hidden') {
 				$lookupType = 'select';
 				if ($forceType && ($forceType == 'checkboxes' || $forceType == 'radiobuttons')) {
-					$lookupType = $fieldAttributes['Type'];
+					$lookupType = $forceType;
 				}
 				$this->$lookupType ($standardAttributes + array (
 					'forceAssociative' => true,	// Force associative checking of defaults
@@ -5159,6 +5162,7 @@ class formWidget
 		# On-submit disable switch bouncing
 		# Assign only the final submit button as the one accepting a 'return' when using multiple submits (refresh)
 #!# 	Use ideas in http://www.sitepoint.com/article/1273/3 for having js-validation with an icon
+		# http://www.tetlaw.id.au/view/javascript/really-easy-field-validation   may be a useful library
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]
 #!# Add AJAX validation flag See: http://particletree.com/features/degradable-ajax-form-validation/ (but modified version needed because this doesn't use Unobtrusive DHTML - see also http://particletree.com/features/a-guide-to-unobtrusive-javascript-validation/ )
 

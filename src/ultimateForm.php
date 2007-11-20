@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.2
+ * @version 1.9.3
  */
 class form
 {
@@ -777,6 +777,10 @@ class form
 			'&#8212;' => '__MDASH',
 			'&ndash;' => '__NDASH',
 			'&mdash;' => '__MDASH',
+			'XXX' => 'YYY',
+			'<p style="clear: both;">' => '__PSTYLECLEARBOTH',
+			'<p style="clear: left;">' => '__PSTYLECLEARLEFT',
+			'<p style="clear: right;">' => '__PSTYLECLEARRIGHT',
 		);
 		$content = str_replace (array_keys ($cache), array_values ($cache), $content);
 		
@@ -846,7 +850,6 @@ class form
 			"<td"	=> "\t\t<td",	// Double-indent level-three tags
 			" href=\"{$arguments['editorBasePath']}editor/"	=> ' href=\"',	// Workaround for Editor basepath bug
 			' href="([^("|/)]*)/' . $arguments['directoryIndex'] . '"'	=> ' href="\1/"',	// Chop off directory index links
-			'<br /></h1>' => '</h1>',	// Remove breaks before an H1 closing tag
 			'<h([1-6]+) id="Heading([0-9]+)">'      => '<h\\1>',    // Headings from R2Net converter
 		);
 		

@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.3
+ * @version 1.9.4
  */
 class form
 {
@@ -172,6 +172,7 @@ class form
 		'attachmentsDeleteIfMailed'			=> true,							# Whether to delete the uploaded file(s) if successfully mailed
 		'charset'							=> 'UTF-8',							# Encoding used in entity conversions; www.joelonsoftware.com/articles/Unicode.html is worth a read
 		'ip'								=> true,							# Whether to expose the submitter's IP address in the e-mail output format
+		'passwordGeneratedLength'			=> 6,								# Length of a generated password
 	);
 	
 	
@@ -247,21 +248,34 @@ class form
 			'required'				=> false,	# Whether required or not
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false) [ignored for e-mail type]
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
+			'minlength'				=> '',		# Minimum length (optional; defaults to no limit)
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'retrieval'				=> false,	# Turns the widget into a URL field where the specified page/file is then retrieved and saved to the directory stated
 			'disallow'				=> false,	# Regular expression against which the submission must not validate
+			'current'				=> false,	# List of current values against which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
+		# Add in password-specific defaults
+		if ($functionName == 'password') {
+			$argumentDefaults['generate'] = false;	# Whether to generate a password if no value supplied as default
+		}
+		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, $functionName);
 		
 		$arguments = $widget->getArguments ();
+		
+		# Generate an initial password if required and no default supplied
+		if (($functionName == 'password') && $arguments['generate'] && !$arguments['default']) {
+			$length = (is_numeric ($arguments['generate']) ? $arguments['generate'] : $this->settings['passwordGeneratedLength']);
+			$arguments['default'] = application::generatePassword ($length);
+		}
 		
 		# If the widget is not editable, fix the form value to the default
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
@@ -275,6 +289,9 @@ class form
 		# Prevent multi-line submissions
 		$widget->preventMultilineSubmissions ();
 		
+		# Run minlength checking
+		$widget->checkMinLength ();
+		
 		# Run maxlength checking
 		$widget->checkMaxLength ();
 		
@@ -283,6 +300,9 @@ class form
 		
 		# Perform pattern checks
 		$widget->regexpCheck ();
+		
+		# Perform uniqueness check
+		$widget->uniquenessCheck ();
 		
 		$elementValue = $widget->getValue ();
 		
@@ -438,10 +458,12 @@ class form
 			'regexp'				=> '',		# Case-sensitive regular expression(s) against which all lines of the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression(s) against which all lines of the submission must validate
 			'disallow'				=> false,	# Regular expression against which all lines of the submission must not validate
+			'current'				=> false,	# List of current values which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'minlength'				=> false,	# Minimum number of characters allowed
 			'maxlength'				=> false,	# Maximum number of characters allowed
 		);
 		
@@ -463,11 +485,19 @@ class form
 		# Clean to numeric if required
 		$widget->cleanToNumeric ();
 		
+		# Enable minlength checking
+		#!# A $restriction needs to be shown
+		$widget->checkMinLength ();
+		
 		# Enable maxlength checking
+		#!# A $restriction needs to be shown
 		$widget->checkMaxLength ();
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
+		
+		# Perform uniqueness check
+		$widget->uniquenessCheck ();
 		
 		$elementValue = $widget->getValue ();
 		
@@ -665,6 +695,7 @@ class form
 			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'disallow'				=> false,		# Regular expression against which the submission must not validate
+			'current'				=> false,	# List of current values which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'width'					=> '100%',		# Width
 			'height'				=> '400px',		# Height
@@ -714,6 +745,9 @@ class form
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
+		
+		# Perform uniqueness check
+		$widget->uniquenessCheck ();
 		
 		$elementValue = $widget->getValue ();
 		
@@ -4995,6 +5029,18 @@ class formWidget
 	}
 	
 	
+	# Function to check the minimum length of what is submitted
+	function checkMinLength ()
+	{
+		#!# Move the is_numeric check into the argument cleaning stage
+		if (is_numeric ($this->arguments['minlength'])) {
+			if (strlen ($this->value) < $this->arguments['minlength']) {
+				$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . strlen ($this->value) . '</strong>) than are allowed (<strong>' . $this->arguments['minlength'] . '</strong>).';
+			}
+		}
+	}
+	
+	
 	# Function to check the maximum length of what is submitted
 	function checkMaxLength ()
 	{
@@ -5118,6 +5164,40 @@ class formWidget
 			if (!application::validEmail ($this->value)) {
 				$this->elementProblems['invalidEmail'] = 'The e-mail address you gave appears to be invalid.';
 			}
+		}
+	}
+	
+	
+	# Function to check for uniqueness
+	function uniquenessCheck ($caseSensitiveComparison = false, $trim = true)
+	{
+		# End if no current values supplied
+		if (!$this->arguments['current']) {return NULL;}
+		
+		# End if array is multi-dimensional
+		if (application::isMultidimensionalArray ($this->arguments['current'])) {
+			$this->formSetupErrors['currentIsMultidimensional'] = "The list of current values pre-supplied for the '{$this->arguments['name']}' field cannot be multidimensional.";
+			return false;
+		}
+		
+		# Ensure the current values are an array
+		$this->arguments['current'] = application::ensureArray ($this->arguments['current']);
+		
+		# Trim values
+		if ($trim) {
+			$this->arguments['current'] = application::arrayTrim ($this->arguments['current']);
+		}
+		
+		# Find clashes
+		if ($caseSensitiveComparison) {
+			$clash = in_array ($this->value, $this->arguments['current']);
+		} else {
+			$clash = application::iin_array ($this->value, $this->arguments['current']);
+		}
+		
+		# Throw user error if any clashes
+		if ($clash) {
+			$this->elementProblems['valueMatchesCurrent'] = 'This value already exists - please enter another.';
 		}
 	}
 }

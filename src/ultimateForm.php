@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.4
+ * @version 1.9.5
  */
 class form
 {
@@ -258,12 +258,19 @@ class form
 			'current'				=> false,	# List of current values against which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'confirmation'			=> false,	# Whether to generate a confirmation field
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
 		# Add in password-specific defaults
 		if ($functionName == 'password') {
-			$argumentDefaults['generate'] = false;	# Whether to generate a password if no value supplied as default
+			$argumentDefaults['generate'] = false;		# Whether to generate a password if no value supplied as default
+			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation password field
+		}
+		
+		# Add in email-specific defaults
+		if ($functionName == 'email') {
+			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation e-mail field
 		}
 		
 		# Create a new form widget
@@ -279,6 +286,20 @@ class form
 		
 		# If the widget is not editable, fix the form value to the default
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
+		
+		# If a confirmation field is required, generate it (first) and convert the original one (second) to the confirmation type
+		if ($arguments['confirmation']) {
+			if (($functionName == 'password') || ($functionName == 'email')) {
+				$arguments['confirmation'] = false;	// Prevent circular reference
+				$this->$functionName ($arguments);
+				$originalName = $arguments['name'];
+				#!# Need to deny this as a valid name elsewhere
+				$arguments['name'] .= '__confirmation';
+				$arguments['title'] .= ' (confirmation)';
+				$arguments['description'] = 'Please retype to confirm.';
+				$this->validation ('same', array ($originalName, $arguments['name']));
+			}
+		}
 		
 		# Obtain the value of the form submission (which may be empty)
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : '');

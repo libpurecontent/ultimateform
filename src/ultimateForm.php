@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.5
+ * @version 1.9.6
  */
 class form
 {
@@ -171,6 +171,7 @@ class form
 		'attachmentsMaxSize'				=> '10M',							# Total maximum attachment(s) size; attachments will be allowed into an e-mail until they reach this limit
 		'attachmentsDeleteIfMailed'			=> true,							# Whether to delete the uploaded file(s) if successfully mailed
 		'charset'							=> 'UTF-8',							# Encoding used in entity conversions; www.joelonsoftware.com/articles/Unicode.html is worth a read
+		'mailAsIso'							=> true,							# Whether to use ISO encoding in e-mails sent
 		'ip'								=> true,							# Whether to expose the submitter's IP address in the e-mail output format
 		'passwordGeneratedLength'			=> 6,								# Length of a generated password
 	);
@@ -4227,6 +4228,11 @@ class form
 		# Add attachments if required, to the e-mail type only (not confirmation e-mail type), rewriting the message
 		if (($outputType == 'email') && $this->attachments) {
 			list ($message, $additionalHeaders) = $this->attachmentsMessage ($message, $additionalHeaders, $introductoryText, $resultLines);
+		}
+		
+		# Mail message encoding
+		if ($this->settings['mailAsIso']) {
+			$message = application::unicodeToIso ($message);
 		}
 		
 		# Send the e-mail

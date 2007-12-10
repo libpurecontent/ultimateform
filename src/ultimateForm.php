@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.6
+ * @version 1.9.7
  */
 class form
 {
@@ -658,7 +658,7 @@ class form
 	
 	
 	/**
-	 * Create a rich text editor field based on FCKeditor 2.3.1
+	 * Create a rich text editor field based on FCKeditor
 	 * @param array $arguments Supplied arguments - see template
 	 */
 	 
@@ -666,37 +666,59 @@ class form
 	
 	# Note: make sure php_value file_uploads is on in the upload location!
 	
-	The following source code alterations must be made to FCKeditor 2.3.1
+	The following source code alterations must be made to FCKeditor 2.5
 	
-	1. Customised configurations which cannot go in the PHP at present
-	Add the supplied file /_fckeditor/fckconfig-customised.js
+	1. Add public patches providing increased control of FCKeditor uploading (note that these two clash in one place which will need manual resolution)
+	Apply the patch (or changed files) which someone has supplied at: http://dev.fckeditor.net/ticket/1650 which provides upload filename regexp checking
+	Apply the patch (or changed files) which someone has supplied at: http://dev.fckeditor.net/ticket/1651 which provides upload filename clash configuration
 	
-	2. More control for FCKeditor uploading
-	Apply the patch (or changed files) which someone has supplied at: http://dev.fckeditor.net/ticket/306
+	2. Customised configurations which cannot go in the PHP at present
+	Add the supplied file <fckeditor-root>/fckconfig-customised.js
 	
-	3. Open editor/filemanager/browser/default/connectors/php/config.php and change:
-	$Config['Enabled'] = true ;
-	$Config['UserFilesPath'] = '/' ;
-	$Config['UserFilesAbsolutePath'] = $_SERVER['DOCUMENT_ROOT'];
-	and optionally, for best practice filenames
-	$Config['Subdirectory']['File']	= '' ;
-	$Config['Regexp']['File']	= '^([-_a-zA-Z0-9]{1,25})$' ;
-	$Config['Subdirectory']['Image']	= '' ;
-	$Config['Regexp']['Image']	= '^([-_a-zA-Z0-9]{1,25})$' ;
+	3. Open <fckeditor-root>editor/filemanager/browser/connectors/php/config.php and add to the end:
+		
+		# Check for regexp [available from patch in ticket 1650]
+		$Config['Regexp']['File']	= '^([-_a-zA-Z0-9]{1,40})$' ;
+		$Config['Regexp']['Image']	= '^([-_a-zA-Z0-9]{1,40})$' ;
+		$Config['Regexp']['Flash']	= '^([-_a-zA-Z0-9]{1,40})$' ;
+		$Config['Regexp']['Media']	= '^([-_a-zA-Z0-9]{1,40})$' ;
+		
+		# Clash checking [available from patch in ticket 1651]
+		$Config['FilenameClashBehaviour'] = 'renameold';
+		
+		# Local settings, which will override the main ones above
+		$Config['Enabled'] = true ;
+		$Config['UserFilesPath'] = '/' ;	// Set to / if you want filebrowsing across the whole site directory
+		$Config['UserFilesAbsolutePath'] = $_SERVER['DOCUMENT_ROOT'];
+		
+		$Config['FileTypesPath']['File']			= $Config['UserFilesPath'];
+		$Config['QuickUploadPath']['File']			= $Config['UserFilesPath'];
+		$Config['FileTypesPath']['Image']			= $Config['UserFilesPath'];
+		$Config['QuickUploadPath']['Image']			= $Config['UserFilesPath'] . 'images/';
+		$Config['FileTypesPath']['Flash']			= $Config['UserFilesPath'];
+		$Config['QuickUploadPath']['Flash']			= $Config['UserFilesPath'];
+		$Config['FileTypesPath']['Media']			= $Config['UserFilesPath'];
+		$Config['QuickUploadPath']['Media']			= $Config['UserFilesPath'];
+		
+		$Config['FileTypesAbsolutePath']['File']			= $Config['UserFilesAbsolutePath'];
+		$Config['QuickUploadAbsolutePath']['File']			= $Config['UserFilesAbsolutePath'];
+		$Config['FileTypesAbsolutePath']['Image']			= $Config['UserFilesAbsolutePath'];
+		$Config['QuickUploadAbsolutePath']['Image']			= $Config['UserFilesAbsolutePath'] . 'images/';
+		$Config['FileTypesAbsolutePath']['Flash']			= $Config['UserFilesAbsolutePath'];
+		$Config['QuickUploadAbsolutePath']['Flash']			= $Config['UserFilesAbsolutePath'];
+		$Config['FileTypesAbsolutePath']['Media']			= $Config['UserFilesAbsolutePath'];
+		$Config['QuickUploadAbsolutePath']['Media']			= $Config['UserFilesAbsolutePath'];
 	
 	
-	The following are experienced deficiencies in FCKeditor 2.4.1:
+	FCKeditor 2.5 problems:
 	- Auto-hyperlinking doesn't work in Firefox - see http://dev.fckeditor.net/ticket/302
-	- API deficiency: ToolbarSets all have to be set in JS and cannot be done via PHP - see http://dev.fckeditor.net/ticket/30
-	- API deficiency: FormatIndentator = "\t" - has to be set at JS level - see http://dev.fckeditor.net/ticket/304
 	- CSS underlining inheritance seems wrong in Firefox See: http://dev.fckeditor.net/ticket/303
+	- Can't set file browser startup folder; see http://dev.fckeditor.net/ticket/1652
 	- File permissions of created connector files insecure: http://dev.fckeditor.net/ticket/950
-	- Can't set file browser startup folder; see http://sourceforge.net/tracker/index.php?func=detail&aid=1498629&group_id=75348&atid=543655
-	- Language problems: http://dev.fckeditor.net/ticket/1456
-	
-	The following would be useful features to be able to have implement or be set via the form contructor:
-	- Replacing the above manual patches with the results of http://dev.fckeditor.net/ticket/306
-	- Single file for file browser configuration: http://dev.fckeditor.net/ticket/845 and http://dev.fckeditor.net/ticket/454
+	- ToolbarSets all have to be set in JS and cannot be done via PHP - see http://dev.fckeditor.net/ticket/30
+	- FormatIndentator = "\t" - has to be set at JS level - see http://dev.fckeditor.net/ticket/304
+	- Replacing the above manual patches with the results of http://dev.fckeditor.net/ticket/1650 and http://dev.fckeditor.net/ticket/1651
+	- Single file for file browser configuration: http://dev.fckeditor.net/ticket/845
 	- Image manager needs thumbnail/resize/rename functionality: http://dev.fckeditor.net/ticket/147
 	- Start editor in source mode: http://dev.fckeditor.net/ticket/593
 	
@@ -725,21 +747,24 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'editorBasePath'		=> '/_fckeditor/',	# Location of the editor files
 			'editorToolbarSet'		=> 'pureContent',	# Editor toolbar set
-			'editorConfig'				=> array (	# Editor configuration
-				'CustomConfigurationsPath' => '/_fckeditor/fckconfig-customised.js',
-				'FontFormats'			=> 'p;h1;h2;h3;h4;h5;h6;pre',
-				'UserFilesPath'			=> '/',
-				'EditorAreaCSS'			=> '',
-				'BaseHref'				=> '',	// Doesn't work, and http://sourceforge.net/tracker/?group_id=75348&atid=543653&func=detail&aid=1205638 doesn't fix it
-				'GeckoUseSPAN'			=> false,	#!# Even in .js version this seems to have no effect
-				'StartupFocus'			=> false,
-				'ToolbarCanCollapse'	=> false,
-				// 'FormatIndentator'		=> "\t",
+			'editorConfig'				=> array (	# Editor configuration - see http://wiki.fckeditor.net/Developer's_Guide/Configuration/Configurations_Settings
+				'CustomConfigurationsPath'	=> '/_fckeditor/fckconfig-customised.js',
+				'FontFormats'				=> 'p;h1;h2;h3;h4;h5;h6;pre',
+				'EditorAreaCSS'				=> '',
+				'StartupFocus'				=> false,
+				'ToolbarCanCollapse'		=> false,
+				'LinkUpload'				=> false,	// Whether the link box includes the [quick]'upload' tab
+				'ImageUpload'				=> false,	// Whether the image box includes the [quick]'upload' tab
+				'BodyId'					=> false,	// Apply value of <body id="..."> to editing window
+				'BodyClass'					=> false,	// Apply value of <body class="..."> to editing window
+				'CleanWordKeepsStructure'	=> true,	// Use Word structure rather than presentation
+				'LinkDlgHideTarget'			=> true,	// Hide link target dialog box
+				'FillEmptyBlocks'			=> false,	// Whether to add &nbsp; into empty table cells
+				'FirefoxSpellChecker'		=> true,	// Enable Firefox 2's spell checker
+				'ForcePasteAsPlainText'		=> false,	// Discard all formatting when pasting text
+				'BaseHref'					=> $_SERVER['_PAGE_URL'],		// Current location (enables relative images to be correct)
+				//'FormatIndentator'			=> '	', // Tabs - still doesn't work in FCKeditor
 				// "ToolbarSets['pureContent']" => "[ ['Source'], ['Cut','Copy','Paste','PasteText','PasteWord','-','SpellCheck'], ['Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'], ['Bold','Italic','StrikeThrough','-','Subscript','Superscript'], ['OrderedList','UnorderedList','-','Outdent','Indent'], ['Link','Unlink','Anchor'], ['Image','Table','Rule','SpecialChar'/*,'ImageManager','UniversalKey'*/], /*['Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden']*/ [/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-'], ['Print','About'] ] ;",
-				#!# Consider finding a way of getting the new MCPUK browser working - the hard-coded paths in the default browser which have to be hacked is far from ideal
-				'LinkBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Connector=connectors/php/connector.php',
-				'ImageBrowserURL'		=> '/_fckeditor/editor/filemanager/browser/default/browser.html?Type=Image&Connector=connectors/php/connector.php',
-				// 'PreserveSessionOnFileBrowser' => true,
 			),
 			'protectEmailAddresses' => true,	// Whether to obfuscate e-mail addresses
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links (as made within the editing system) or false
@@ -819,7 +844,7 @@ class form
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
 			'data' => (isSet ($data) ? $data : NULL),
-			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'TEXT') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	

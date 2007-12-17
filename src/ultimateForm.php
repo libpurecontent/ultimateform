@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.7
+ * @version 1.9.8
  */
 class form
 {
@@ -298,6 +298,7 @@ class form
 				$arguments['name'] .= '__confirmation';
 				$arguments['title'] .= ' (confirmation)';
 				$arguments['description'] = 'Please retype to confirm.';
+				$arguments['discard'] = true;
 				$this->validation ('same', array ($originalName, $arguments['name']));
 			}
 		}
@@ -799,7 +800,7 @@ class form
 		$elementValue = $widget->getValue ();
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid), or clean it if posted
-		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments));
+		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments, str_replace ('-', '', strtolower ($this->settings['charset']))));
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
@@ -850,7 +851,7 @@ class form
 	
 	
 	# Function to clean the content
-	function richtextClean ($content, &$arguments)
+	function richtextClean ($content, &$arguments, $charset = 'utf8')
 	{
 		# Cache wanted characters stripped by tidy's 'bare' option
 		$cache = array (
@@ -892,7 +893,7 @@ class form
 			);
 			
 			# Tidy up the output; see http://www.zend.com/php5/articles/php5-tidy.php for a tutorial
-			$content = tidy_parse_string ($content, $parameters);
+			$content = tidy_parse_string ($content, $parameters, $charset);
 			tidy_clean_repair ($content);
 			$content = tidy_get_output ($content);
 		}

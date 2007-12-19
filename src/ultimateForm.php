@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.9
+ * @version 1.9.10
  */
 class form
 {
@@ -289,7 +289,7 @@ class form
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
 		
 		# If a confirmation field is required, generate it (first) and convert the original one (second) to the confirmation type
-		if ($arguments['confirmation']) {
+		if ($arguments['confirmation'] && $arguments['editable']) {
 			if (($functionName == 'password') || ($functionName == 'email')) {
 				$arguments['confirmation'] = false;	// Prevent circular reference
 				$this->$functionName ($arguments);
@@ -2335,7 +2335,7 @@ class form
 	 */
 	function mergeFilesIntoPost ()
 	{
-		# PHP's _FILES array is arranged differently depending on whether you are using 'formname[elementname]' or just 'elementname' as the element name - see "HTML array feature" note at www.php.net/features.file-upload
+		# PHP's _FILES array is (stupidly) arranged differently depending on whether you are using 'formname[elementname]' or just 'elementname' as the element name - see "HTML array feature" note at www.php.net/features.file-upload
 		if ($this->settings['name']) {	// i.e. <input name="formname[widgetname]"
 			
 			# End if no files
@@ -2693,6 +2693,7 @@ class form
 	
 	
 	# Function to return the specification
+	#!# This needs to exclude proxied widgets, e.g. password confirmation
 	function getSpecification ()
 	{
 		# Return the elements array
@@ -4410,6 +4411,7 @@ class form
 		#!# A check is needed to ensure the file being written to doesn't previously contain headings related to a different configuration
 		
 		# Write the data or handle the error
+		#!# Replace with file_put_contents when making class PHP5-only
 		if (!application::writeDataToFile ($data, $this->configureResultFileFilename)) {
 			$this->html .= "\n\n" . '<p class="error">There was a problem writing the information you submitted to a file. It is likely this problem is temporary - please wait a short while then press the refresh button on your browser.</p>';
 		}
@@ -4585,7 +4587,7 @@ class form
 				$data['presented'] .= ($successes ? ' ' : '') . $totalFailures . ($totalFailures > 1 ? ' files' : ' file') . ' (' . implode ('; ', array_keys ($failures)) . ') unfortunately failed to copy over for some unspecified reason.';
 			}
 			
-			# The raw component array out with empty fields upto the number of created subfields; note this HAS to use the original filenames, because an unzipped version could overrun
+			# Pad the rawcomponents array out with empty fields upto the number of created subfields; note this HAS to use the original filenames, because an unzipped version could overrun
 			$data['rawcomponents'] = array_pad ($filenames, $arguments['subfields'], false);
 			
 			# Assign the output data
@@ -4811,7 +4813,6 @@ class form
 					$refreshButton = '<input type="submit" value="&#8635;" title="Refresh options" name="__refresh" class="refresh" />';
 					$standardAttributes['append'] = str_replace (array ('%database', '%table', '%refresh'), array ($targetDatabase, $targetTable, $refreshButton), $lookupFunctionAppendTemplate);
 				}
-				
 			}
 			
 			# Overload the attributes if any supplied

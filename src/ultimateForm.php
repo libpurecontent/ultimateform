@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.8
+ * @version 1.9.9
  */
 class form
 {
@@ -1293,7 +1293,8 @@ class form
 		}
 		
 		# Check whether the field satisfies any requirement for a field to be required
-		$requiredButEmpty = ($arguments['required'] && !$elementValue);
+		#!# Migrate this to using $widget->requiredButEmpty when $widget->setValue uses references not copied values
+		$requiredButEmpty = ($arguments['required'] && (strlen ($elementValue) == 0));
 		
 		# Ensure that there cannot be multiple initial values set if the multiple flag is off; note that the default can be specified as an array, for easy swapping with a select (which in singular mode behaves similarly)
 		$arguments['default'] = application::ensureArray ($arguments['default']);
@@ -1306,7 +1307,7 @@ class form
 		
 		# If the field is not a required field (and therefore there is a null text field), ensure that none of the values have an empty string as the value (which is reserved for the null)
 		#!# Policy question: should empty values be allowed at all? If so, make a special constant for a null field but which doesn't have the software name included
-		if (!$arguments['required'] && in_array ('', array_keys ($arguments['values']))) {
+		if (!$arguments['required'] && in_array ('', array_keys ($arguments['values']), true)) {
 			$this->formSetupErrors['defaultNullClash'] = "In the <strong>{$arguments['name']}</strong> element, one value was assigned to an empty value (i.e. '').";
 		}
 		
@@ -1350,6 +1351,7 @@ class form
 			if ($arguments['default']) {
 				foreach ($arguments['values'] as $value => $visible) {
 					if ($value == $elementValue) {	// This loop is done to prevent offsets which may still arise due to the 'defaultMissingFromValuesArray' error not resulting in further termination of widget production
+						#!# Offset generated here if editable false and the preset value not present
 						$widgetHtml  = htmlentities ($arguments['values'][$elementValue], ENT_COMPAT, $this->settings['charset']);
 						$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], false, $elementValue) . ' type="hidden" value="' . htmlentities ($elementValue, ENT_COMPAT, $this->settings['charset']) . '" />';
 					}
@@ -5040,13 +5042,15 @@ class formWidget
 	
 	
 	# Function to return the arguments
-	function getArguments () {
+	function getArguments ()
+	{
 		return $this->arguments;
 	}
 	
 	
 	# Function to return the widget's (submitted but processed) value
-	function getValue () {
+	function getValue ()
+	{
 		return $this->value;
 	}
 	
@@ -5054,13 +5058,14 @@ class formWidget
 	# Function to determine if a widget is required but empty
 	function requiredButEmpty ()
 	{
+		# Return the value; note that strlen rather than empty() is used because the PHP stupidly allows the string "0" to be empty()
 		return (($this->arguments['required']) && (strlen ($this->value) == 0));
 	}
 	
 	
 	# Function to return the widget's problems
-	function getElementProblems ($problems) {
-		
+	function getElementProblems ($problems)
+	{
 		#!# Temporary: merge in any problems from the object
 		if ($problems) {$this->elementProblems += $problems;}
 		
@@ -5266,7 +5271,7 @@ class formWidget
 #!# Complete the restriction notices
 #!# Add a CSS class to each type of widget so that more detailed styling can be applied
 #!# Enable locales, e.g. ordering month-date-year for US users
-#!# Consider language localisation (put error messages into a global array)
+#!# Consider language localisation (put error messages into a global array, or use gettext)
 #!# Add in <span>&#64;</span> for on-screen e-mail types
 #!# Apache setup needs to be carefully tested, in conjunction with php.net/ini-set and php.net/configuration.changes
 #!# Add links to the id="$name" form elements in cases of USER errors (not for the templating mode though)
@@ -5274,6 +5279,7 @@ class formWidget
 #!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/ ; checkbox & radiobutton have some infrastructure written (but commented out) already
 #!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp e.g. accept="list_of_mime_types" for type=file
 #!# Number validation: validate numbers with strval() and intval() or floatval() - www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
+#!# Move to in_array with strict third parameter (see fix put in for 1.9.9 for radiobuttons)
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck
 # Enable specification of a validation function (i.e. callback for checking a value against a database)
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode

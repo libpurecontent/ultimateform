@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.9.10
+ * @version 1.10.0
  */
 class form
 {
@@ -1898,6 +1898,8 @@ class form
 			'name'					=> NULL,	# Name of the element
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'default'				=> false,	# Default value(s) (optional), i.e. the current filename(s) if any
+			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'append'				=> '',		# HTML appended to the widget
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
@@ -1915,12 +1917,42 @@ class form
 			'unzip'					=> false,	# Whether to unzip a zip file on arrival, either true/false or the number of files (defaulting to $this->settings['listUnzippedFilesMaximum']) which should be listed in any visible result output
 			'attachments'			=> $this->settings['attachments'],	# Whether to send uploaded file(s) as attachment(s) (they will not be unzipped)
 			'attachmentsDeleteIfMailed'	=> $this->settings['attachmentsDeleteIfMailed'],	# Whether to delete the uploaded file(s) if successfully mailed
+			#!# Change to default to true in a later release once existing applications migrated over
+			'flatten'				=> false,	# Whether to flatten the rawcomponents (i.e. default in 'processing' mode) result if only a single subfield is specified
 		);
 		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
 		
 		$arguments = $widget->getArguments ();
+		
+		# Deal with handling of default file specification
+		if ($arguments['default']) {
+			$arguments['default'] = application::ensureArray ($arguments['default']);
+			
+			# Ensure there are not too many default files
+			if (count ($arguments['default']) > $arguments['subfields']) {
+				$this->formSetupErrors['uploadsMismatch'] = "More default files than there are fields available were supplied for the <strong>{$arguments['name']}</strong> file upload element.";
+				return false;
+			}
+			
+			# Reorganise any defaults into the same hierarchy as would be posted by the form (rather than just being a single-dimensional array of names) and discard all other supplied info
+			$confirmedDefault = array ();
+			for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
+				if (isSet ($arguments['default'][$subfield])) {
+					if (strlen ($arguments['default'][$subfield])) {	// i.e. ensure there is actually a filename
+						$confirmedDefault[$subfield] = array (
+							'name'		=> $arguments['default'][$subfield],
+							'type'		=> NULL,
+							'tmp_name'	=> NULL,
+							'size'		=> NULL,
+							'_source'	=> 'default',
+						);
+					}
+				}
+			}
+			$arguments['default'] = $confirmedDefault;	// Overwrite the original supplied simple array with the new validated multi-dimensional (or empty) array
+		}
 		
 		# Obtain the value of the form submission (which may be empty)
 		#!# NB The equivalent of this line was not present before refactoring
@@ -1939,9 +1971,6 @@ class form
 			$this->formSetupErrors['uploadUnzipUnsupported'] = 'Unzipping of zip files upon upload was requested but the unzipping module is not available on this server.';
 			$arguments['unzip'] = false;
 		}
-		
-		# Cache the upload properties
-		$this->uploadProperties[$arguments['name']] = $arguments;
 		
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
 		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
@@ -1971,6 +2000,9 @@ class form
 		if ($arguments['subfields'] != round ($arguments['subfields'])) {$this->formSetupErrors['uploadSubfieldsIncorrect'] = "You specified a non-whole number (<strong>{$arguments['subfields']}</strong>) for the number of file upload widgets in the <strong>{$arguments['name']}</strong> upload element which the form should create.";}
 		if ($arguments['subfields'] < 1) {$this->formSetupErrors['uploadSubfieldsIncorrect'] = "The number of files to be uploaded must be at least one; you specified <strong>{$arguments['subfields']}</strong> for the <strong>{$arguments['name']}</strong> upload element.";}
 		
+		# Explicitly switch off flattening if there is not a singular subfield
+		if ($arguments['subfields'] != 1) {$arguments['flatten'] = false;}
+		
 		# Check that the minimum required is a whole number and that it is not greater than the number actually available
 		if ($arguments['required'] != round ($arguments['required'])) {$this->formSetupErrors['uploadSubfieldsMinimumIncorrect'] = "You specified a non-whole number (<strong>{$arguments['required']}</strong>) for the number of file upload widgets in the <strong>{$arguments['name']}</strong> upload element which must the user must upload.";}
 		if ($arguments['required'] > $arguments['subfields']) {$this->formSetupErrors['uploadSubfieldsMinimumMismatch'] = "The required minimum number of files which the user must upload (<strong>{$arguments['required']}</strong>) specified in the <strong>{$arguments['name']}</strong> upload element is above the number of files actually available to be specified for upload (<strong>{$arguments['subfields']}</strong>).";}
@@ -1997,6 +2029,7 @@ class form
 		
 		# Loop through the number of fields required to create the widget and perform checks
 		$apparentlyUploadedFiles = array ();
+		if ($arguments['default']) {$apparentlyUploadedFiles = $arguments['default'];}	// add in the numerically-indexed defaults (which are then overwritten if more uploaded)
 		for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
 			
 			# Continue further processing if the file has been uploaded
@@ -2005,7 +2038,7 @@ class form
 				# Add the apparently uploaded file (irrespective of whether it passes other checks)
 				$elementValue[$subfield]['_directory'] = $arguments['directory'];	// Cache the directory for later use
 				$elementValue[$subfield]['_attachmentsDeleteIfMailed'] = $arguments['attachmentsDeleteIfMailed'];
-				$apparentlyUploadedFiles[] = $elementValue[$subfield];
+				$apparentlyUploadedFiles[$subfield] = $elementValue[$subfield];
 				
 				# If an extension is required but the submitted item doesn't contain a dot, throw a problem
 				if (($extensionRequired) && (strpos ($elementValue[$subfield]['name'], '.') === false)) {
@@ -2019,10 +2052,26 @@ class form
 				}
 			}
 			
-			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is non-standard and seemingly not supported by any browsers, so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would reveal to the user the size of the PHP ini setting
+			# Where default file(s) are/is expected, show - for the current subfield - the filename for each file (or that there is no file)
+			if ($arguments['default']) {
+				$widgetHtml .= '<p class="currentfile' . ($subfield > 0 ? ' currentfilenext' : '') . '">' . (isSet ($arguments['default'][$subfield]) ? 'Current file: <span class="filename">' . htmlentities (basename ($arguments['default'][$subfield]['name']), ENT_COMPAT, $this->settings['charset']) . '</span>' : '<span class="comment">(No current file)</span>') . "</p>\n\t\t\t";
+			}
+			
+			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is bogus (non-standard and seemingly not supported by any browsers), so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would expose to the user the size of the PHP ini setting
 			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
-			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\" />";
-			$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
+			if ($arguments['editable']) {
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\" />";
+				$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
+			} else {
+				if ($arguments['default'] && isSet ($arguments['default'][$subfield])) {
+					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . ' type="hidden" value="' . htmlentities (basename ($arguments['default'][$subfield]['name']), ENT_COMPAT, $this->settings['charset']) . '" />' . "\n\t\t\t";
+				}
+			}
+		}
+		
+		# Append the description where default filename(s) are supplied
+		if ($arguments['default'] && $arguments['editable']) {
+			$arguments['description'] = 'Entering a new file will replace the current reference' . ($arguments['description'] ? ". {$arguments['description']}" : '');	// Note that the form itself does not handle file deletions (except for natural overwrites), because the 'default' is just a string coming from $data
 		}
 		
 		# If fields which don't have a file extension have been found, throw a user error
@@ -2036,7 +2085,7 @@ class form
 		}
 		
 		# If any files have been uploaded, the user will need to re-select them.
-		$totalApparentlyUploadedFiles = count ($apparentlyUploadedFiles);
+		$totalApparentlyUploadedFiles = count ($apparentlyUploadedFiles);	// This will include the defaults, some of which might have been overwritten
 		if ($totalApparentlyUploadedFiles > 0) {
 			$this->elementProblems['generic']['reselectUploads'] = "You will need to reselect the " . ($totalApparentlyUploadedFiles == 1 ? 'file' : "{$totalApparentlyUploadedFiles} files") . " you selected for uploading, because of problems elsewhere in the form. (Re-selection is a security requirement of your web browser.)";
 		}
@@ -2087,6 +2136,9 @@ class form
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
+		# Cache the upload properties
+		$this->uploadProperties[$arguments['name']] = $arguments;
+		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
@@ -2099,11 +2151,14 @@ class form
 			'requiredButEmpty' => (isSet ($requiredButEmpty) ? $requiredButEmpty : false),
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
+			'flatten' => $arguments['flatten'],
 			'discard' => $arguments['discard'],
 			'data' => $data,	// Because the uploading can only be processed later, this is set to NULL
 			#!# Not finished
 #			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'unzip'	=> $arguments['unzip'],
+			'subfields' => $arguments['subfields'],
+			'default'	=> $arguments['default'],
 		);
 	}
 	
@@ -4478,8 +4533,28 @@ class form
 			$failures = array ();
 			$actualUploadedFiles = array ();
 			
-			# Loop through each sub-element
-			foreach ($this->form[$name] as $key => $attributes) {
+			# Merge the default files list (if there are any such files) into the 'submitted' data, maintaining the indexes but making any new file override the default
+			if ($arguments['default']) {
+				$this->form[$name] += $arguments['default'];	// += uses right-handed then left-handed - see www.php.net/operators.array , i.e. defaults THEN add on original form[name] (i.e. submitted) value(s)
+			}
+			
+			# Loop through each defined subfield
+			for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
+				
+				# If there is no value for this subfield, skip to the next subfield
+				if (!isSet ($this->form[$name][$subfield])) {continue;}
+				
+				# If the subfield contains merely the default value (i.e. _source = default), then continue
+				if (isSet ($this->form[$name][$subfield]['_source']) && ($this->form[$name][$subfield]['_source'] == 'default')) {
+					$filename = $this->form[$name][$subfield]['name'];
+					$actualUploadedFiles[$arguments['directory'] . $filename] = $this->form[$name][$subfield];
+					$successes[$filename]['name'] = $filename;
+					$successes[$filename]['namePresented'] = $filename . ' [previously present]';
+					continue;
+				}
+				
+				# Get the attributes for this sub-element
+				$attributes = $this->form[$name][$subfield];
 				
 				# Create a shortcut for the filename (just the name, not with the path)
 				$filename = $attributes['name'];
@@ -4562,6 +4637,7 @@ class form
 			$data['presented'] = '';
 			$data['compiled'] = array ();
 			$filenames = array ();
+			$presentedFilenames = array ();
 			
 			# If there were any succesful uploads, assign the compiled output
 			if ($successes) {
@@ -4574,11 +4650,12 @@ class form
 				# Add each of the files to the master array, appending the location for each
 				foreach ($successes as $success => $attributes) {
 					$filenames[] = $attributes['name'];
+					$presentedFilenames[] = (isSet ($attributes['namePresented']) ? $attributes['namePresented'] : $attributes['name']);
 				}
 				
 				# For the compiled version, give the number of files uploaded and their names
 				$totalSuccesses = count ($successes);
-				$data['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode ('; ', $filenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
+				$data['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode ('; ', $presentedFilenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
 			}
 			
 			# If there were any failures, list them also
@@ -4589,6 +4666,11 @@ class form
 			
 			# Pad the rawcomponents array out with empty fields upto the number of created subfields; note this HAS to use the original filenames, because an unzipped version could overrun
 			$data['rawcomponents'] = array_pad ($filenames, $arguments['subfields'], false);
+			
+			# Flatten the rawcomponents array if necessary
+			if ($this->elements[$name]['flatten'] && ($this->elements[$name]['subfields'] == 1)) {	// subfields check should not be necessary because it should have been switched off already, but this acts as a safety blanket against offsets
+				$data['rawcomponents'] = (isSet ($data['rawcomponents'][0]) ? $data['rawcomponents'][0] : false);
+			}
 			
 			# Assign the output data
 			$this->elements[$name]['data'] = $data;
@@ -4697,6 +4779,8 @@ class form
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
 			'commentsAsDescription' => false,	// Whether to use column comments for the description field rather than for the title field
 			'prefix'	=> false,	// What to prefix all field names with (plus _ implied)
+			#!# Change to default to true in a later release once existing applications migrated over
+			'intelligence'	=> false,		// Whether to enable intelligent field setup, e.g. password/file*/photograph* become relevant fields and key fields are handled as non-editable
 		);
 		
 		# Merge the arguments
@@ -4815,8 +4899,75 @@ class form
 				}
 			}
 			
-			# Overload the attributes if any supplied
+			# Assuming non-forcing of widget type
 			$forceType = false;
+			
+			# Add intelligence rules if required
+			if ($intelligence) {
+				
+				# Fields with 'password' in become password fields, with a proxied confirmation widget
+				if (eregi ('password', $fieldName)) {
+					$forceType = 'password';
+					$standardAttributes['confirmation'] = true;
+					if ($data) {
+						$standardAttributes['editable'] = false;
+					}
+				}
+				
+				# Richtext fields - text fields with html/richtext in fieldname
+				if (eregi ('(html|richtext)', $fieldName) && (strtolower ($fieldAttributes['Type']) == 'text')) {
+					$forceType = 'richtext';
+					
+					# Use basic toolbar set for fieldnames containing 'basic/mini/simple'
+					if (eregi ('(basic|mini|simple)', $fieldName)) {
+						$standardAttributes['editorToolbarSet'] = 'Basic';
+					}
+				}
+				
+				# Website fields - for fieldnames containing 'url/website/http'
+				if (eregi ('(url|website|http)', $fieldName)) {
+					$standardAttributes['regexp'] = '^(http|https)://';
+					$standardAttributes['description'] = 'Must begin http://';	// ' or https://' not added to this description just to keep it simple
+				}
+				
+				# Upload fields - fieldname containing photograph/upload or starting/ending with file/document
+				if (eregi ('(photograph|upload|^file|^document|file$|document$)', $fieldName)) {
+					$forceType = 'upload';
+					$standardAttributes['flatten'] = true;	// Flatten the output so it's a string not an array
+					$standardAttributes['subfields'] = 1;	// Specify 1 subfield (which is already the default anyway)
+					//$standardAttributes['directory'] = './uploads/';
+				}
+				
+				# Make an auto_increment field not appear
+				if ($fieldAttributes['Extra'] == 'auto_increment') {
+					if (!$value) {
+						continue;	// Skip widget creation (and therefore visibility) if no value
+					} else {
+						$standardAttributes['editable'] = false;
+					}
+					/*
+					$standardAttributes['discard'] = true;
+					
+					$standardAttributes['editable'] = false;
+					if (!$value) {
+						# Show '[Automatically assigned]' as text
+						#!# Find a better way to do this in the widget code than this workaround method; perhaps create a 'show' attribute
+						$forceType = 'select';
+						$standardAttributes['discard'] = true;
+						$standardAttributes['values'] = array (1 => '<em class="comment">[Automatically assigned]</em>');	// The value '1' is used to ensure it always validates, whatever the field length or other specification is
+						$standardAttributes['forceAssociative'] = true;
+						$standardAttributes['default'] = 1;
+					}
+					*/
+				}
+				
+				# Make a timestamp field not appear
+				if ((strtolower ($fieldAttributes['Type']) == 'timestamp') && ($fieldAttributes['Default'] == 'CURRENT_TIMESTAMP')) {
+					continue;	// Skip widget creation
+				}
+			}
+			
+			# Add per-widget overloading if attributes supplied by the calling application
 			if (is_array ($attributes) && (array_key_exists ($fieldName, $attributes))) {
 				
 				# Convert to hidden type if forced
@@ -4844,16 +4995,6 @@ class form
 					$standardAttributes = array_merge ($standardAttributes, $attributes[$fieldName]);
 				}
 			}
-			
-			/*
-			#!# This should be a configurable option, or activated only when doing a non-clone write using setOutputDatabase
-			# Make a primary key which has no supplied value non-editable
-			if (($fieldAttributes['Key'] == 'PRI') && $value) {
-				$standardAttributes += array (
-					'editable' => false,
-				);
-			}
-			*/
 			
 			# Prefix the field name if required
 			if ($prefix) {	// This will automatically prevent the string '0' anyway

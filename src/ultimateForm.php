@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.10.0
+ * @version 1.10.1
  */
 class form
 {
@@ -134,15 +134,18 @@ class form
 		'submitButtonAtEnd'					=> true,							# Whether the submit button appears at the end or the start of the form
 		'submitButtonText'					=> 'Submit!',						# The form submit button text
 		'submitButtonAccesskey'				=> 's',								# The form submit button accesskey
+		'submitButtonTabindex'				=> false,							# The form submit button tabindex (if any)
 		'submitButtonImage'					=> false,							# Location of an image to replace the form submit button
 		'refreshButton'						=> false,							# Whether to include a refresh button (i.e. submit form to redisplay but not process)
 		'refreshButtonAtEnd'				=> true,							# Whether the refresh button appears at the end or the start of the form
 		'refreshButtonText'					=> 'Refresh!',						# The form refresh button text
 		'refreshButtonAccesskey'			=> 'r',								# The form refresh button accesskey
+		'refreshButtonTabindex'				=> false,							# The form refresh button tabindex (if any)
 		'refreshButtonImage'				=> false,							# Location of an image to replace the form refresh button
 		'resetButton'						=> false,							# Whether the reset button is visible (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
 		'resetButtonText'					=> 'Clear changes',					# The form reset button
 		'resetButtonAccesskey'				=> 'r',								# The form reset button accesskey
+		'resetButtonTabindex'				=> false,							# The form reset button tabindex (if any)
 		'warningMessage'					=> false,							# The form incompletion message (a specialised default is used)
 		'requiredFieldIndicator'			=> true,							# Whether the required field indicator is to be displayed (top / bottom/true / false) (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
 		'requiredFieldClass'				=> 'required',						# The CSS class used to mark a widget as required
@@ -260,6 +263,7 @@ class form
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'confirmation'			=> false,	# Whether to generate a confirmation field
+			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
@@ -379,7 +383,7 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '" />';
+			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '"' . $widget->tabindexHtml () . ' />';
 		} else {
 			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']));
 			#!# Change to registering hidden internally
@@ -488,6 +492,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'minlength'				=> false,	# Minimum number of characters allowed
 			'maxlength'				=> false,	# Maximum number of characters allowed
+			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 		);
 		
 		# Create a new form widget
@@ -604,7 +609,7 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ">" . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '</textarea>';
+			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . $widget->tabindexHtml () . '>' . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '</textarea>';
 		} else {
 			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset'])));
 			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '" />';
@@ -1001,6 +1006,7 @@ class form
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
+			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 		);
 		
 		# Create a new form widget
@@ -1120,7 +1126,7 @@ class form
 			}
 			
 			# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-			$widgetHtml = "\n\t\t\t<select" . $this->nameIdHtml ($arguments['name'], true) . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . '>';
+			$widgetHtml = "\n\t\t\t<select" . $this->nameIdHtml ($arguments['name'], true) . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . $widget->tabindexHtml () . '>';
 			if (!isSet ($arguments['_valuesMultidimensional'])) {
 				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				foreach ($arguments['valuesWithNull'] as $value => $visible) {
@@ -1249,6 +1255,7 @@ class form
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
+			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 		);
 		
 		# Create a new form widget
@@ -1338,7 +1345,7 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($visible, ENT_COMPAT, $this->settings['charset'])) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($visible, ENT_COMPAT, $this->settings['charset'])) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1429,6 +1436,7 @@ class form
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
+			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 		);
 		
 		# Create a new form widget
@@ -1505,7 +1513,7 @@ class form
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
 //				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible, ENT_COMPAT, $this->settings['charset']) . '</label>';
-				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlentities ($visible, ENT_COMPAT, $this->settings['charset']) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . htmlentities ($visible, ENT_COMPAT, $this->settings['charset']) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1639,14 +1647,15 @@ class form
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'autoCenturyConversion'	=> 69,		# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
+			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 		);
 		
 		# Define the supported levels
 		$levels = array (
-			'time'		=> 'H:i:s',
-			'datetime'	=> 'Y-m-d H:i:s',
-			'date'		=> 'Y-m-d',
-			'year'		=> 'Y',
+			'time'		=> 'H:i:s',			// Widget order: t
+			'datetime'	=> 'Y-m-d H:i:s',	// Widget order: tdmy
+			'date'		=> 'Y-m-d',			// Widget order: dmy
+			'year'		=> 'Y',				// Widget order: y
 		);
 		
 		# Load the date processing library
@@ -1804,12 +1813,12 @@ class form
 			# Start with the time if required
 			if (substr_count ($arguments['level'], 'time')) {	// datetime or time
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span>';
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'time', true) . ' type="text" size="10" value="' . $elementValue['time'] . '" />';
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'time', true) . ' type="text" size="10" value="' . $elementValue['time'] . '"' . $widget->tabindexHtml () . ' />';
 			}
 			
-			# Add the Define the date and month input boxes; if the day or year are 0 then nothing will be displayed
+			# Add the date and month input boxes; if the day or year are 0 then nothing will be displayed
 			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '" />&nbsp;';
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '"' . ($arguments['level'] == 'date' ? $widget->tabindexHtml () : '') . ' />&nbsp;';
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
 				$widgetHtml .= "\n\t\t\t\t" . '<select' . $this->nameIdHtml ($arguments['name'], false, 'month', true) . '>';
 				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
@@ -1823,7 +1832,7 @@ class form
 			# Add the year box
 			if ($arguments['level'] != 'time') {
 				$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" />' . "\n\t\t";
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" ' . ($arguments['level'] == 'year' ? $widget->tabindexHtml () : '') . '/>' . "\n\t\t";
 			}
 			
 			# Surround with a fieldset if necessary
@@ -1919,6 +1928,7 @@ class form
 			'attachmentsDeleteIfMailed'	=> $this->settings['attachmentsDeleteIfMailed'],	# Whether to delete the uploaded file(s) if successfully mailed
 			#!# Change to default to true in a later release once existing applications migrated over
 			'flatten'				=> false,	# Whether to flatten the rawcomponents (i.e. default in 'processing' mode) result if only a single subfield is specified
+			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 		);
 		
 		# Create a new form widget
@@ -2060,7 +2070,7 @@ class form
 			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is bogus (non-standard and seemingly not supported by any browsers), so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would expose to the user the size of the PHP ini setting
 			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
 			if ($arguments['editable']) {
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\" />";
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . $widget->tabindexHtml ($subfield) . ' />';
 				$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
 			} else {
 				if ($arguments['default'] && isSet ($arguments['default'][$subfield])) {
@@ -2350,7 +2360,9 @@ class form
 		$id = str_replace ($replacements, '_', $id);
 		
 		# Chop off any final _
-		if (substr ($id, -1) == '_') {$id = substr ($id, 0, -1);}
+		while (substr ($id, -1) == '_') {
+			$id = substr ($id, 0, -1);
+		}
 		
 		# Return the cleaned ID
 		return $id;
@@ -3505,11 +3517,11 @@ class form
 		# Add the form button, either at the start or end as required
 		#!# submit_x and submit_y should be treated as a reserved word when using submitButtonAccesskey (i.e. generating type="image")
 		$submitButtonText = $this->settings['submitButtonText'] . (!empty ($this->settings['submitButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
-		$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '" ' . (!empty ($this->settings['submitButtonAccesskey']) ? "accesskey=\"{$this->settings['submitButtonAccesskey']}\" "  : '') . 'class="button" />';
+		$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="button" />';
 		if ($this->settings['refreshButton']) {
 			$refreshButtonText = $this->settings['refreshButtonText'] . (!empty ($this->settings['refreshButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['refreshButtonAccesskey'] . ']' : '');
 			#!# Need to deny __refresh as a reserved form name
-			$refreshButtonHtml = '<input name="__refresh" type="' . (!$this->settings['refreshButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['refreshButtonImage']}\" name=\"submit\" alt=\"{$refreshButtonText}") . '" value="' . $refreshButtonText . '" ' . (!empty ($this->settings['refreshButtonAccesskey']) ? "accesskey=\"{$this->settings['refreshButtonAccesskey']}\" "  : '') . 'class="button" />';
+			$refreshButtonHtml = '<input name="__refresh" type="' . (!$this->settings['refreshButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['refreshButtonImage']}\" name=\"submit\" alt=\"{$refreshButtonText}") . '" value="' . $refreshButtonText . '"' . (!empty ($this->settings['refreshButtonAccesskey']) ? " accesskey=\"{$this->settings['refreshButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['refreshButtonTabindex']) ? " tabindex=\"{$this->settings['refreshButtonTabindex']}\"" : '') . ' class="button" />';
 		}
 		if ($this->settings['display'] == 'template') {
 			$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['SUBMIT'], $formButtonHtml, $formHtml);
@@ -3534,7 +3546,7 @@ class form
 		
 		# Add in a reset button if wanted
 		if ($this->settings['resetButton']) {
-			$resetButtonHtml = '<input value="' . $this->settings['resetButtonText'] . (!empty ($this->settings['resetButtonAccesskey']) ? '&nbsp; &nbsp;[Alt+' . $this->settings['resetButtonAccesskey'] . ']" accesskey="' . $this->settings['resetButtonAccesskey'] : '') . '" type="reset" class="resetbutton" />';
+			$resetButtonHtml = '<input value="' . $this->settings['resetButtonText'] . (!empty ($this->settings['resetButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['resetButtonAccesskey'] . ']" accesskey="' . $this->settings['resetButtonAccesskey'] : '') . '" type="reset" class="resetbutton"' . (is_numeric ($this->settings['resetButtonTabindex']) ? " tabindex=\"{$this->settings['resetButtonTabindex']}\"" : '') . ' />';
 			if ($this->settings['display'] == 'template') {
 				$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['RESET'], $resetButtonHtml, $formHtml);
 			} else {
@@ -5303,6 +5315,28 @@ class formWidget
 		# Re-assign the data
 		#!# Remove these
 		$this->value = $data;
+	}
+	
+	
+	# Helper function for creating tabindex HTML
+	#!# Add tabindex validation, i.e. accept 0-32767, strip leading zeros and confirm is an integer (without decimal places)
+	function tabindexHtml ($subwidgetIndex = false)
+	{
+		# If it's a scalar widget type, return a string
+		if (!$subwidgetIndex) {
+			return (is_numeric ($this->arguments['tabindex']) ? " tabindex=\"{$this->arguments['tabindex']}\"" : '');
+		}
+		
+		# Add a tabindex value if necessary; a numeric value just adds a tabindex to the first subwidget; an array instead creates a tabindex for any keys which exist in the array
+		$tabindexHtml = '';
+		if (is_numeric ($this->arguments['tabindex']) && $subwidgetIndex == 0) {
+			$tabindexHtml = " tabindex=\"{$this->arguments['tabindex']}\"";
+		} else if (is_array ($this->arguments['tabindex']) && array_key_exists ($subwidgetIndex, $this->arguments['tabindex']) && $this->arguments['tabindex'][$subwidgetIndex]) {
+			$tabindexHtml = " tabindex=\"{$this->arguments['tabindex'][$subwidgetIndex]}\"";
+		}
+		
+		# Return the value
+		return $tabindexHtml;
 	}
 	
 	

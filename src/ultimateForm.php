@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.10.1
+ * @version 1.10.2
  */
 class form
 {
@@ -4568,15 +4568,15 @@ class form
 				# Get the attributes for this sub-element
 				$attributes = $this->form[$name][$subfield];
 				
-				# Create a shortcut for the filename (just the name, not with the path)
-				$filename = $attributes['name'];
-				
 				# Overwrite the filename if being forced; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
-					$pathinfo = pathinfo ($filename);
+					$pathinfo = pathinfo ($attributes['name']);
 					$fileExtension = (isSet ($pathinfo['extension']) ? '.' . $pathinfo['extension'] : '');
-					$filename = $arguments['forcedFileName'] . $fileExtension;
+					$attributes['name'] = $arguments['forcedFileName'] . $fileExtension;
 				}
+				
+				# Create a shortcut for the filename (just the name, not with the path)
+				$filename = $attributes['name'];
 				
 				# If version control is enabled, do checks to prevent overwriting
 				if ($arguments['enableVersionControl']) {

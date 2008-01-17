@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.10.2
+ * @version 1.10.3
  */
 class form
 {
@@ -2894,6 +2894,7 @@ class form
 		
 		# Check if the form and PHP environment has been set up OK
 		if (!$this->_setupOk ()) {
+			if ($this->settings['div']) {$this->html .= "\n</div>";}
 			if ($showHtmlDirectly) {echo $this->html;}
 			$html = $this->html;
 			return false;
@@ -2904,6 +2905,7 @@ class form
 		
 		# Check whether the user is a valid user (must be before the setupOk check)
 		if (!$this->validUser ()) {
+			if ($this->settings['div']) {$this->html .= "\n</div>";}
 			if ($showHtmlDirectly) {echo $this->html;}
 			$html = $this->html;
 			return false;
@@ -2911,6 +2913,7 @@ class form
 		
 		# Check whether the facility is open
 		if (!$this->facilityIsOpen ()) {
+			if ($this->settings['div']) {$this->html .= "\n</div>";}
 			if ($showHtmlDirectly) {echo $this->html;}
 			$html = $this->html;
 			return false;
@@ -2918,6 +2921,7 @@ class form
 		
 		# Validate hidden security fields
 		if ($this->hiddenSecurityFieldSubmissionInvalid ()) {
+			if ($this->settings['div']) {$this->html .= "\n</div>";}
 			if ($showHtmlDirectly) {echo $this->html;}
 			$html = $this->html;
 			return false;

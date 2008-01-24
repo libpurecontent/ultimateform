@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.10.3
+ * @version 1.10.4
  */
 class form
 {
@@ -609,7 +609,7 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . $widget->tabindexHtml () . '>' . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '</textarea>';
+			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . $widget->tabindexHtml () . '>' . htmlentities (str_replace (array ('›', '†'), array ('&rsaquo;', '&dagger;'), $this->form[$arguments['name']]), ENT_COMPAT, $this->settings['charset'], $double_encode = false) . '</textarea>';
 		} else {
 			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset'])));
 			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlentities ($this->form[$arguments['name']], ENT_COMPAT, $this->settings['charset']) . '" />';
@@ -1345,7 +1345,7 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . str_replace ('†', '&dagger;', htmlentities ($visible, ENT_COMPAT, $this->settings['charset'])) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . htmlentities (str_replace ('†', '&dagger;', $visible), ENT_COMPAT, $this->settings['charset'], $double_encode = false) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}

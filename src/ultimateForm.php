@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.10.5
+ * @version 1.10.6
  */
 class form
 {
@@ -1257,6 +1257,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'entities'				=> true,	# Convert HTML in label to entity equivalents
 		);
 		
 		# Create a new form widget
@@ -1346,7 +1347,7 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . htmlentities (str_replace ('†', '&dagger;', $visible), ENT_COMPAT, $this->settings['charset'], $double_encode = false) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlentities ($value, ENT_COMPAT, $this->settings['charset']) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? htmlentities (str_replace ('†', '&dagger;', $visible), ENT_COMPAT, $this->settings['charset'], $double_encode = false) : $visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -2330,6 +2331,9 @@ class form
 	#!# This function should be in the widget class but that won't work until formSetupErrors carry back to the main class
 	function ensureHierarchyAssociative ($originalValues, $forceAssociative, $elementName)
 	{
+		# End if no values
+		if (!$originalValues) {return false;}
+		
 		# Convert the values, at any hierarchical level, to being associative
 		if (!$values = application::ensureValuesArrangedAssociatively ($originalValues, $forceAssociative)) {
 			$this->formSetupErrors['hierarchyTooDeep'] = "Multidimensionality is supported only to one level deep, but more levels than this were found in the <strong>$elementName</strong> element.";
@@ -5474,6 +5478,7 @@ class formWidget
 # Consider issue of null bytes in ereg - http://uk.php.net/manual/en/ref.regex.php#74258 - probably migrate to preg_ anyway, as PHP6 deprecates ereg
 # Consider grouping/fieldset and design issues at http://www.sitepoint.com/print/fancy-form-design-css/
 # Deal with widget name conversion of dot to underscore: http://uk2.php.net/manual/en/language.types.array.php#52124
+# Check more thoroughly against XSS at http://ha.ckers.org/xss.html
 
 # Version 2 feature proposals
 #!# Self-creating form mode

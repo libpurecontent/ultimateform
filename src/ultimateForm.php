@@ -54,7 +54,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.10.6
+ * @version 1.10.7
  */
 class form
 {
@@ -159,6 +159,7 @@ class form
 		'userKey'							=> false,							# Whether to log the username, as the key
 		'loggedUserUnique'					=> false,							# Run in user-uniqueness mode, making the key of any CSV the username and checking for resubmissions
 		'timestamping'						=> false,							# Add a timestamp to any CSV entry
+		'ipLogging'							=> false,							# Add the user IP address to any CSV entry
 		'escapeOutput'						=> false,							# Whether to escape output in the processing output ONLY (will not affect other types)
 		'emailIntroductoryText'				=> '',								# Introductory text for e-mail output type
 		'confirmationEmailIntroductoryText'	=> '',								# Introductory text for confirmation e-mail output type
@@ -1922,6 +1923,7 @@ class form
 			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required)
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
+			'lowercaseExtension'	=> false,	# Force the file extension to be lowercased
 			'discard'				=> false,	# Whether to process the input but then discard it in the results; note that the file will still be uploaded
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			#!# Consider a way of adding a checkbox to confirm on a per-widget basis; adds quite a few complications though
@@ -2813,6 +2815,11 @@ class form
 		# Create a hidden timestamp if necessary
 		if ($this->settings['timestamping']) {
 			$securityFields['timestamp'] = $this->timestamp;
+		}
+		
+		# Create a hidden IP field if necessary
+		if ($this->settings['ipLogging']) {
+			$securityFields['ip'] = $_SERVER['REMOTE_ADDR'];
 		}
 		
 		# Make an internal call to the external interface
@@ -4577,10 +4584,17 @@ class form
 				# Get the attributes for this sub-element
 				$attributes = $this->form[$name][$subfield];
 				
+				# Get the file extension
+				$pathinfo = pathinfo ($attributes['name']);
+				$fileExtension = (isSet ($pathinfo['extension']) ? '.' . $pathinfo['extension'] : '');
+				
+				# Lowercase the extension if necessary
+				if ($arguments['lowercaseExtension']) {
+					$fileExtension = strtolower ($fileExtension);
+				}
+				
 				# Overwrite the filename if being forced; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
-					$pathinfo = pathinfo ($attributes['name']);
-					$fileExtension = (isSet ($pathinfo['extension']) ? '.' . $pathinfo['extension'] : '');
 					$attributes['name'] = $arguments['forcedFileName'] . $fileExtension;
 				}
 				

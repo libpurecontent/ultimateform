@@ -59,8 +59,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-7, Martin Lucas-Smith, University of Cambridge
- * @version 1.11.0
+ * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
+ * @version 1.12.0
  */
 class form
 {
@@ -111,7 +111,7 @@ class form
 	
 	# Constants
 	var $timestamp;
-	var $minimumPhpVersion = 4.3;	// md5_file requires 4.2+; file_get_contents and is 4.3+
+	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
 	
 	# Specify available arguments as defaults or as NULL (to represent a required argument)
@@ -185,6 +185,8 @@ class form
 		'ip'								=> true,							# Whether to expose the submitter's IP address in the e-mail output format
 		'browser'							=> false,							# Whether to expose the submitter's browser (user-agent) string in the e-mail output format
 		'passwordGeneratedLength'			=> 6,								# Length of a generated password
+		'antispam'							=> false,							# Global setting for anti-spam checking
+		'antispamRegexp'					=> '~(a href=|<a |\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
 	);
 	
 	
@@ -267,6 +269,7 @@ class form
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'retrieval'				=> false,	# Turns the widget into a URL field where the specified page/file is then retrieved and saved to the directory stated
 			'disallow'				=> false,	# Regular expression against which the submission must not validate
+			'antispam'				=> $this->settings['antispam'],		# Whether to switch on anti-spam checking
 			'current'				=> false,	# List of current values against which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
@@ -335,6 +338,9 @@ class form
 		
 		# Perform pattern checks
 		$widget->regexpCheck ();
+		
+		# Perform antispam checks
+		$widget->antispamCheck ();
 		
 		# Perform uniqueness check
 		$widget->uniquenessCheck ();
@@ -493,6 +499,7 @@ class form
 			'regexp'				=> '',		# Case-sensitive regular expression(s) against which all lines of the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression(s) against which all lines of the submission must validate
 			'disallow'				=> false,	# Regular expression against which all lines of the submission must not validate
+			'antispam'				=> $this->settings['antispam'],		# Whether to switch on anti-spam checking
 			'current'				=> false,	# List of current values which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
@@ -535,9 +542,13 @@ class form
 		# Perform uniqueness check
 		$widget->uniquenessCheck ();
 		
+		# Perform antispam checks
+		$widget->antispamCheck ();
+		
 		$elementValue = $widget->getValue ();
 		
 		# Perform validity tests if anything has been submitted and regexp(s)/disallow are supplied
+		#!# Refactor into the widget class by adding multiline capability
 		if ($elementValue && ($arguments['regexp'] || $arguments['regexpi'] || $arguments['disallow'] || $arguments['mode'] == 'coordinates')) {
 			
 			# Branch a copy of the data as an array, split by the newline and check it is complete
@@ -2895,7 +2906,7 @@ class form
 	/**
 	 * Process/display the form (main wrapper function)
 	 */
-	function process (&$html = NULL)
+	function process (&$html = NULL)	// Note that &$value = defaultValue is not supported in PHP4 - see http://devzone.zend.com/node/view/id/1714#Heading5 point 3; if running PHP4, (a) remove the & and (b) change var $minimumPhpVersion above to 4.3
 	{
 		# Determine whether the HTML is shown directly
 		$showHtmlDirectly = ($html === NULL);
@@ -4325,7 +4336,7 @@ class form
 		# Define the additional headers
 		$sender = ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator);
 		$additionalHeaders  = 'From: Website feedback <' . $sender . ">\r\n";
-		if (isSet ($this->configureResultEmailCc)) {$additionalHeaders .= 'Cc: ' . implode (', ', $this->configureResultEmailCc) . "\r\n";}
+		if (($outputType == 'email') && isSet ($this->configureResultEmailCc)) {$additionalHeaders .= 'Cc: ' . implode (', ', $this->configureResultEmailCc) . "\r\n";}
 		
 		# Add the reply-to if it is set and is not empty and that it has been completed (e.g. in the case of a non-required field)
 		if (isSet ($this->configureResultEmailReplyTo)) {
@@ -5122,6 +5133,9 @@ class form
 				# ENUM (selection) field - explode the matches and insert as values
 				case (eregi ('enum\(\'(.*)\'\)', $type, $matches)):
 					$values = explode ("','", $matches[1]);
+					foreach ($values as $index => $value) {
+						$values[$index] = str_replace ("''", "'", $value);
+					}
 					$this->select ($standardAttributes + array (
 						'values' => $values,
 						'output' => array ('processing' => 'compiled'),
@@ -5419,12 +5433,12 @@ class formWidget
 		#!# Allow flexible array ($regexp => $errorMessage) syntax, as with disallow
 		if (strlen ($this->arguments['regexp'])) {
 			if (!ereg ($this->arguments['regexp'], $this->value)) {
-				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for the {$this->arguments['name']} section.";
+				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
 			}
 		}
 		if (strlen ($this->arguments['regexpi'])) {
 			if (!eregi ($this->arguments['regexpi'], $this->value)) {
-				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for the {$this->arguments['name']} section.";
+				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
 			}
 		}
 		
@@ -5438,7 +5452,7 @@ class formWidget
 				}
 			} else {
 				$disallowRegexp = $this->arguments['disallow'];
-				$disallowErrorMessage = "The submitted information matched a disallowed pattern for the {$this->arguments['name']} section.";
+				$disallowErrorMessage = "The submitted information matched a disallowed pattern for this section.";
 			}
 			
 			# Perform the check
@@ -5451,6 +5465,18 @@ class formWidget
 		if ($this->functionName == 'email') {
 			if (!application::validEmail ($this->value)) {
 				$this->elementProblems['invalidEmail'] = 'The e-mail address you gave appears to be invalid.';
+			}
+		}
+	}
+	
+	
+	# Function to check for spam submissions
+	function antispamCheck ()
+	{
+		# Antispam checks
+		if ($this->arguments['antispam']) {
+			if (preg_match ($this->settings['antispamRegexp'], $this->value)) {
+				$this->elementProblems['failsAntispam'] = "The submitted information matched disallowed text for this section.";
 			}
 		}
 	}

@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.12.0
+ * @version 1.12.1
  */
 class form
 {
@@ -1053,14 +1053,14 @@ class form
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
 		
-		# Apply truncation if necessary
-		$arguments['values'] = $widget->truncate ($arguments['values']);
-		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {
 			$this->formSetupErrors['selectNoValues'] = 'No values have been set as selection items.';
 			return false;
 		}
+		
+		# Apply truncation if necessary
+		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
 		# Check that the given minimum required is not more than the number of items actually available
 		$totalSubItems = count ($arguments['values']);
@@ -1297,6 +1297,12 @@ class form
 		
 		$elementValue = $widget->getValue ();
 		
+		# Check that the array of values is not empty
+		if (empty ($arguments['values'])) {
+			$this->formSetupErrors['radiobuttonsNoValues'] = 'No values have been set as selection items.';
+			return false;
+		}
+		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
 		
@@ -1310,9 +1316,6 @@ class form
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
 		*/
-		
-		# Check that the array of values is not empty
-		if (empty ($arguments['values'])) {$this->formSetupErrors['radiobuttonsNoValues'] = 'No values have been set for the set of radio buttons.';}
 		
 		# Loop through each element value to check that it is in the available values, and just discard without comment any that are not
 		if (!array_key_exists ($elementValue, $arguments['values'])) {
@@ -4830,6 +4833,7 @@ class form
 			'includeOnly' => array (),
 			'exclude' => array (),
 			'ordering' => array (),
+			'enumRadiobuttons' => false,	// Whether to use radiobuttons for ENUM
 			'lookupFunction' => false,
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
@@ -5136,7 +5140,8 @@ class form
 					foreach ($values as $index => $value) {
 						$values[$index] = str_replace ("''", "'", $value);
 					}
-					$this->select ($standardAttributes + array (
+					$widgetType = ($enumRadiobuttons ? 'radiobuttons' : 'select');
+					$this->$widgetType ($standardAttributes + array (
 						'values' => $values,
 						'output' => array ('processing' => 'compiled'),
 					));

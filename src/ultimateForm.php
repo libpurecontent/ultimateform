@@ -28,7 +28,7 @@
  * - Uploaded zip files can be automatically unzipped
  * 
  * REQUIREMENTS:
- * - PHP4.1 or above
+ * - PHP5 or above (PHP4.3 will run with slight modification)
  * - Runs in register_globals OFF mode for security
  * - Requires libraries application.php and pureContent.php
  * 
@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.12.1
+ * @version 1.13.0
  */
 class form
 {
@@ -92,6 +92,7 @@ class form
 	var $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
+	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
 	
 	# Output configuration
 	var $configureResultEmailRecipient;							// The recipient of an e-mail
@@ -2886,6 +2887,196 @@ class form
 	}
 	
 	
+	/* Result viewing */
+	
+	# Function to assemble results into a chart
+	function resultViewer ($suppliedArguments = array ())
+	{
+		# Specify available arguments as defaults or as NULL (to represent a required argument)
+		$argumentDefaults = array (
+			'ignoreFields' => array (),
+			'heading' => 'h2',
+			'anchors' => true,
+			'tableClass' => 'lines',
+			'ulClass' => 'small compact',
+			'ulIgnoreEmpty' => true,
+			'showZeroNulls' => true,
+			'showTableHeadings' => false,
+			'showPercentages' => true,
+			'piecharts' => true,
+			'piechartStub' => '/images/piechart',
+			'piechartWidth' => 250,
+			'piechartHeight' => 200,
+			'piechartDiv'	 => false,
+		);
+		
+		# Merge the arguments
+		$arguments = application::assignArguments ($this->formSetupErrors, $suppliedArguments, $argumentDefaults, 'resultViewer');
+		foreach ($arguments as $key => $value) {
+			$$key = $value;
+		}
+		
+		# Get the results (database storage; preferred to CSV if both in use)
+		if ($this->dataBinding) {
+			$data = $this->databaseConnection->select ($this->dataBinding['database'], $this->dataBinding['table']);
+			
+		# Get the results (CSV storage)
+		} elseif ($this->configureResultFileFilename) {
+			$data = application::getCsvData ($this->configureResultFileFilename);
+			
+		# End if no data source found
+		} else {
+			return $html  = "\n<p>No data source could be found.</p>";
+		}
+		
+		# End if no data is available
+		if (!$data) {
+			return $html  = "\n<p>No submissions have so far been made.</p>";
+		}
+		
+		# Loop through the data and reverse the table direction (i.e. convert from per-row data to per-column data)
+		$results = array ();
+		foreach ($data as $index => $record) {
+			foreach ($record as $key => $value) {
+				$results[$key][$index] = $value;
+			}
+		}
+		
+		# Ensure ignore fields is an array if supplied
+		if ($ignoreFields) {$ignoreFields = application::ensureArray ($ignoreFields);}
+		
+		# Loop through the records to compile them into data
+		$output = array ();
+		$unknownFields = array ();
+		$unknownValues = array ();
+		foreach ($results as $field => $responses) {
+			
+			# Skip this field if not required
+			if ($ignoreFields && is_array ($ignoreFields) && in_array ($field, $ignoreFields)) {continue;}
+			
+			# Thrown an error if an unknown field is found
+			if (!isSet ($this->elements[$field])) {
+				$unknownFields[] = $field;
+				continue;
+			}
+			
+			# Create the heading
+			$output[$field]['heading'] = (isSet ($this->elements[$field]['title']) ? $this->elements[$field]['title'] : '[No heading]');
+			
+			# State if no responses have been found for this field
+			if (!$responses) {
+				$output[$field]['results'] = "\n<p>No submissions for this question have so far been made.</p>";
+				continue;
+			}
+			
+			# Determine if this field is a chart type
+			$isChartType = (isSet ($this->elements[$field]) && (($this->elements[$field]['type'] == 'radiobuttons') || ($this->elements[$field]['type'] == 'select')));
+			
+			# Render the chart types
+			if ($isChartType) {
+				
+				# Count the number of instances of each responses; the NULL check is a workaround to avoid the "Can only count STRING and INTEGER values!" error from array_count_values
+				#!# Other checks needed for e.g. BINARY values?
+				foreach ($responses as $key => $value) {
+					if (is_null ($value)) {
+						$responses[$key] = '';
+					}
+				}
+				$instances = array_count_values ($responses);
+				
+				# Determine the total responses
+				$totalResponses = count ($responses);
+				
+				# If there are empty responses add a null response at the end of the values list
+				$nullAvailable = false;
+				if (!$this->elements[$field]['required']) {
+					$nullAvailable = true;
+					$this->elements[$field]['values'][''] = '<span class="comment"><em>[No response]</em></span>';
+				}
+				
+				# Check for values in the submissions that are not in the available values and compile a list of these
+				if ($differences = array_diff (array_keys ($instances), array_keys ($this->elements[$field]['values']))) {
+					foreach ($differences as $key => $value) {
+						$unknownValues[] = "{$value} [in {$field}]";
+					}
+				}
+				
+				# Compile the table of responses
+				$table = array ();
+				$respondents = array ();
+				$percentages = array ();
+				foreach ($this->elements[$field]['values'] as $value => $visible) {
+					
+					# Determine the numeric number of respondents for this value
+					$respondents[$value] = (array_key_exists ($value, $instances) ? $instances[$value] : 0);
+					
+					# If required, don't add the nulls to the  results table if there have been zero null instances
+					if (!$showZeroNulls) {
+						if ($nullAvailable && ($value == '') && !$respondents[$value]) {
+							continue;
+						}
+					}
+					
+					# Create the main columns
+					$table[$value][''] = $visible;	// Heading would be 'Response'
+					$table[$value]['Respondents'] = $respondents[$value];
+					
+					# Show percentages if required
+					$percentages[$value] = round (($respondents[$value] / $totalResponses) * 100);
+					if ($showPercentages) {
+						$table[$value]['Percentage'] = ($totalResponses ? $percentages[$value] . '%' : 'n/a');
+					}
+				}
+				
+				# Convert the table into HTML
+				$output[$field]['results'] = application::htmlTable ($table, array (), $tableClass, $showKey = false, false, $allowHtml = true, false, false, false, array (), false, $showTableHeadings);
+				
+				# Add a piechart if wanted and wrap it in a div/table as required
+				if ($piecharts) {
+					if ($piechartDiv) {
+						$output[$field]['results'] = "\n<div class=\"surveyresults\">\n\t<div class=\"surveyresultstable\">{$output[$field]['results']}\n\t</div>\n\t<div class=\"surveyresultspiechart\">\n\t\t<img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?values=" . $this->specialchars (implode (',', array_values ($percentages)) . '&desc=' . implode (',', array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" />\n\t</div>\n</div>";
+					} else {
+						$output[$field]['results'] = "\n<table class=\"surveyresults\">\n\t<tr>\n\t\t<td class=\"surveyresultstable\">{$output[$field]['results']}</td>\n\t\t<td class=\"surveyresultspiechart\"><img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?values=" . $this->specialchars (implode (',', array_values ($percentages)) . '&desc=' . implode (',', array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" /></td>\n\t</tr>\n</table>";
+					}
+				}
+				
+			# Render the list types
+			} else {
+				$output[$field]['results'] = application::htmlUl ($responses, 1, $ulClass, $ulIgnoreEmpty);
+			}
+		}
+		
+		# Throw a setup error if unknown (and non-ignored) fields are found
+		if ($unknownFields) {
+			#!# Need to have ->specialchars applied to the fieldnames
+			$this->formSetupErrors['resultReaderUnknownFields'] = 'The following unknown fields were found in the result data: <strong>' . implode ('</strong>, <strong>', $unknownFields) . '</strong>; please synchronise the fieldnames or set the result reader to ignore these fields and retry.';
+		}
+		
+		# Throw a setup error if unknown values are found
+		if ($unknownValues) {
+			$this->formSetupErrors['resultReaderUnknownValues'] = 'The following unknown values were found in the result data: <strong>' . $this->specialchars (implode ('</strong>, <strong>', $unknownValues)) . '</strong>.';
+		}
+		
+		# End if there are form setup errors and report these
+		if ($this->formSetupErrors) {
+			$this->_setupOk ();
+			echo $this->html;
+			return false;
+		}
+		
+		# Compile the HTML
+		$html  = '';
+		foreach ($output as $field => $results) {
+			$fieldEscaped = $this->specialchars ($field);
+			$html .= "\n\n<{$heading} id=\"{$fieldEscaped}\">" . ($anchors ? "<a href=\"#{$fieldEscaped}\">#</a> " : '') . $this->specialchars ($results['heading']) . "</{$heading}>";
+			$html .= "\n" . $results['results'];
+		}
+		
+		# Return the HTML
+		return $html;
+	}
+	
+	
 	
 	## Main processing ##
 	
@@ -4859,6 +5050,12 @@ class form
 			}
 			return false;
 		}
+		
+		# Global the dataBinding connection details
+		$this->dataBinding = array (
+			'database'	=> $database,
+			'table'		=> $table,
+		);
 		
 		# Ensure any lookup function has been defined
 		if ($lookupFunction && !is_callable ($lookupFunction)) {

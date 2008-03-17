@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.0
+ * @version 1.13.1
  */
 class form
 {
@@ -182,6 +182,7 @@ class form
 		'attachmentsMaxSize'				=> '10M',							# Total maximum attachment(s) size; attachments will be allowed into an e-mail until they reach this limit
 		'attachmentsDeleteIfMailed'			=> true,							# Whether to delete the uploaded file(s) if successfully mailed
 		'charset'							=> 'UTF-8',							# Encoding used in entity conversions; www.joelonsoftware.com/articles/unicode.html and www.phpwact.org/php/i18n/charsets are worth a read
+		'csvBom'							=> true,							# Whether to write a BOM at the start of a CSV file
 		'mailAsIso'							=> true,							# Whether to use ISO encoding in e-mails sent
 		'ip'								=> true,							# Whether to expose the submitter's IP address in the e-mail output format
 		'browser'							=> false,							# Whether to expose the submitter's browser (user-agent) string in the e-mail output format
@@ -789,9 +790,12 @@ class form
 				'FirefoxSpellChecker'		=> true,	// Enable Firefox 2's spell checker
 				'ForcePasteAsPlainText'		=> false,	// Discard all formatting when pasting text
 				'BaseHref'					=> $_SERVER['_PAGE_URL'],		// Current location (enables relative images to be correct)
+				'CKFinderLinkBrowserURL'			=> '/_ckfinder/ckfinder.html',
+				'CKFinderImageBrowserURL'			=> '/_ckfinder/ckfinder.html',
 				//'FormatIndentator'			=> '	', // Tabs - still doesn't work in FCKeditor
 				// "ToolbarSets['pureContent']" => "[ ['Source'], ['Cut','Copy','Paste','PasteText','PasteWord','-','SpellCheck'], ['Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'], ['Bold','Italic','StrikeThrough','-','Subscript','Superscript'], ['OrderedList','UnorderedList','-','Outdent','Indent'], ['Link','Unlink','Anchor'], ['Image','Table','Rule','SpecialChar'/*,'ImageManager','UniversalKey'*/], /*['Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden']*/ [/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-'], ['Print','About'] ] ;",
 			),
+			'CKFinder'						=> false,	// Whether to use CKFinder
 			'protectEmailAddresses' => true,	// Whether to obfuscate e-mail addresses
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links (as made within the editing system) or false
 			'directoryIndex' => 'index.html',		// Default directory index name
@@ -829,6 +833,14 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
+			
+			# Determine whether to use CKFinder
+			if ($arguments['CKFinder']) {
+				$arguments['editorConfig']['LinkBrowserURL'] = $arguments['editorConfig']['CKFinderLinkBrowserURL'];
+				$arguments['editorConfig']['ImageBrowserURL'] = $arguments['editorConfig']['CKFinderImageBrowserURL'];
+				unset ($arguments['editorConfig']['CKFinderLinkBrowserURL']);
+				unset ($arguments['editorConfig']['CKFinderImageBrowserURL']);
+			}
 			
 			# Define the widget's core HTML by instantiating the richtext editor module and setting required options
 			require_once ('fckeditor.php');
@@ -4709,11 +4721,14 @@ class form
 		# Compile the data, adding in the header if the file doesn't already exist or is empty, and writing a newline after each line
 		$data = ((!file_exists ($this->configureResultFileFilename) || filesize ($this->configureResultFileFilename) == 0) ? $headerLine : '') . $dataLine;
 		
-		#!# A check is needed to ensure the file being written to doesn't previously contain headings related to a different configuration
+		# Deal with unicode behaviour
+		$unicodeToIso = ($this->settings['charset'] != 'UTF-8');
+		$unicodeAddBom = $this->settings['csvBom'];
 		
+		#!# A check is needed to ensure the file being written to doesn't previously contain headings related to a different configuration
 		# Write the data or handle the error
 		#!# Replace with file_put_contents when making class PHP5-only
-		if (!application::writeDataToFile ($data, $this->configureResultFileFilename)) {
+		if (!application::writeDataToFile ($data, $this->configureResultFileFilename, $unicodeToIso, $unicodeAddBom)) {
 			$this->html .= "\n\n" . '<p class="error">There was a problem writing the information you submitted to a file. It is likely this problem is temporary - please wait a short while then press the refresh button on your browser.</p>';
 		}
 	}

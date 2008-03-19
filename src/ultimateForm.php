@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.1
+ * @version 1.13.2
  */
 class form
 {
@@ -4888,6 +4888,7 @@ class form
 								$unzippedFileLocation = $unzippedFileAttributes['_location'];
 								unset ($unzippedFileAttributes['_location']);
 								$actualUploadedFiles[$unzippedFileLocation] = $unzippedFileAttributes;
+								$actualUploadedFiles[$unzippedFileLocation]['_fromZip'] = $filename;
 								$unzippedFilesListPreRenaming[] = (isSet ($unzippedFileAttributes['original']) ? $unzippedFileAttributes['original'] : $unzippedFileAttributes['name']);
 							}
 							
@@ -5201,6 +5202,7 @@ class form
 				
 				# Website fields - for fieldnames containing 'url/website/http'
 				if (eregi ('(url|website|http)', $fieldName)) {
+					$forceType = 'input';
 					$standardAttributes['regexp'] = '^(http|https)://';
 					$standardAttributes['description'] = 'Must begin http://';	// ' or https://' not added to this description just to keep it simple
 				}

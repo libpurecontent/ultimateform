@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.2
+ * @version 1.13.3
  */
 class form
 {
@@ -169,6 +169,7 @@ class form
 		'ipLogging'							=> false,							# Add the user IP address to any CSV entry
 		'escapeOutput'						=> false,							# Whether to escape output in the processing output ONLY (will not affect other types)
 		'emailIntroductoryText'				=> '',								# Introductory text for e-mail output type
+		'emailShowFieldnames'				=> true,							# Whether to show the underlying fieldnames in the e-mail output type
 		'confirmationEmailIntroductoryText'	=> '',								# Introductory text for confirmation e-mail output type
 		'callback'							=> false,							# Callback function (string name) (NB cannot be $this->methodname) with one integer parameter, so be called just before emitting form HTML - -1 is errors on form, 0 is blank form, 1 is result presentation if any (not called at all if form not displayed)
 		'databaseConnection'				=> false,							# Database connection (filename/array/object/resource)
@@ -4523,7 +4524,7 @@ class form
 				if (is_array ($presentedData[$name])) {$presentedData[$name] = application::printArray ($presentedData[$name]);}
 				
 				# Compile the result line
-				$resultLines[] = strip_tags ($this->elements[$name]['title']) . ($outputType == 'email' ? " [$name]" : '') . ":\n" . $presentedData[$name];
+				$resultLines[] = strip_tags ($this->elements[$name]['title']) . (($this->settings['emailShowFieldnames'] && ($outputType == 'email')) ? " [$name]" : '') . ":\n" . $presentedData[$name];
 			}
 		}
 		
@@ -5556,7 +5557,7 @@ class formWidget
 	function preventMultilineSubmissions ()
 	{
 		# Throw an error if an \n or \r line break is found
-		if (ereg ("([\n|\r]+)", $this->value)) {
+		if (ereg ("([\n\r]+)", $this->value)) {
 			$this->elementProblems['multilineSubmission'] = 'Line breaks are not allowed in field types that do not support these.';
 		}
 	}
@@ -5769,6 +5770,7 @@ class formWidget
 # Consider grouping/fieldset and design issues at http://www.sitepoint.com/print/fancy-form-design-css/
 # Deal with widget name conversion of dot to underscore: http://uk2.php.net/manual/en/language.types.array.php#52124
 # Check more thoroughly against XSS at http://ha.ckers.org/xss.html
+# Add slashes and manual \' replacement need to be re-considered
 
 # Version 2 feature proposals
 #!# Self-creating form mode

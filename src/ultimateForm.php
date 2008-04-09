@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.3
+ * @version 1.13.4
  */
 class form
 {
@@ -336,11 +336,11 @@ class form
 		# Run maxlength checking
 		$widget->checkMaxLength ();
 		
-		# Clean to numeric if required
-		$widget->cleanToNumeric ();
-		
 		# Perform pattern checks
 		$widget->regexpCheck ();
+		
+		# Clean to numeric if required
+		$widget->cleanToNumeric ();
 		
 		# Perform antispam checks
 		$widget->antispamCheck ();
@@ -694,7 +694,7 @@ class form
 	
 	# Note: make sure php_value file_uploads is on in the upload location!
 	
-	The following source code alterations must be made to FCKeditor 2.5
+	The following source code alterations must be made to FCKeditor 2.6
 	
 	1. Add public patches providing increased control of FCKeditor uploading (note that these two clash in one place which will need manual resolution)
 	Apply the patch (or changed files) which someone has supplied at: http://dev.fckeditor.net/ticket/1650 which provides upload filename regexp checking
@@ -713,6 +713,10 @@ class form
 		
 		# Clash checking [available from patch in ticket 1651]
 		$Config['FilenameClashBehaviour'] = 'renameold';
+		
+		# Security
+		$Config['ChmodOnUpload'] = 0770 ;
+		$Config['ChmodOnFolderCreate'] = 0770 ;
 		
 		# Local settings, which will override the main ones above
 		$Config['Enabled'] = true ;
@@ -738,11 +742,10 @@ class form
 		$Config['QuickUploadAbsolutePath']['Media']			= $Config['UserFilesAbsolutePath'];
 	
 	
-	FCKeditor 2.5 problems:
+	FCKeditor 2.6 problems:
 	- Auto-hyperlinking doesn't work in Firefox - see http://dev.fckeditor.net/ticket/302
 	- CSS underlining inheritance seems wrong in Firefox See: http://dev.fckeditor.net/ticket/303
 	- Can't set file browser startup folder; see http://dev.fckeditor.net/ticket/1652
-	- File permissions of created connector files insecure: http://dev.fckeditor.net/ticket/950
 	- ToolbarSets all have to be set in JS and cannot be done via PHP - see http://dev.fckeditor.net/ticket/30
 	- FormatIndentator = "\t" - has to be set at JS level - see http://dev.fckeditor.net/ticket/304
 	- Replacing the above manual patches with the results of http://dev.fckeditor.net/ticket/1650 and http://dev.fckeditor.net/ticket/1651
@@ -5345,6 +5348,7 @@ class form
 				case (eregi ('int\(([0-9]+)\)', $type, $matches)):
 					$this->input ($standardAttributes + array (
 						'enforceNumeric' => true,
+						'regexp' => '^([0-9]*)$',
 						'maxlength' => $matches[1],
 					));
 					break;

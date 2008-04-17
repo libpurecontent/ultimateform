@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.4
+ * @version 1.13.5
  */
 class form
 {
@@ -2274,6 +2274,7 @@ class form
 			'type' => __FUNCTION__,
 			'html' => $widgetHtml,
 			'title' => $arguments['title'],
+			'values' => $arguments['values'],
 			'description' => false,
 			'restriction' => false,
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
@@ -2911,9 +2912,12 @@ class form
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
 			'ignoreFields' => array (),
+			'ignoreHidden' => true,
+			'showHeadings' => true,
 			'heading' => 'h2',
 			'anchors' => true,
 			'tableClass' => 'lines',
+			'tableChartClass' => 'lines surveyresultschart',
 			'ulClass' => 'small compact',
 			'ulIgnoreEmpty' => true,
 			'showZeroNulls' => true,
@@ -2924,6 +2928,7 @@ class form
 			'piechartWidth' => 250,
 			'piechartHeight' => 200,
 			'piechartDiv'	 => false,
+			'chartPercentagePrecision' => 1,	// Number of decimal places to show for percentages in result charts
 		);
 		
 		# Merge the arguments
@@ -2933,12 +2938,15 @@ class form
 		}
 		
 		# Get the results (database storage; preferred to CSV if both in use)
+		$dataSource = NULL;
 		if ($this->dataBinding) {
 			$data = $this->databaseConnection->select ($this->dataBinding['database'], $this->dataBinding['table']);
+			$dataSource = 'database';
 			
 		# Get the results (CSV storage)
 		} elseif ($this->configureResultFileFilename) {
-			$data = application::getCsvData ($this->configureResultFileFilename);
+			$data = application::getCsvData ($this->configureResultFileFilename, false, false, $keyAsFirstRow = true);
+			$dataSource = 'csv';
 			
 		# End if no data source found
 		} else {
@@ -2950,31 +2958,92 @@ class form
 			return $html  = "\n<p>No submissions have so far been made.</p>";
 		}
 		
+		# Ensure ignore fields is an array if supplied as a string (rather than a boolean or an array)
+		if (is_string ($ignoreFields)) {$ignoreFields = application::ensureArray ($ignoreFields);}
+		
 		# Loop through the data and reverse the table direction (i.e. convert from per-row data to per-column data)
-		$results = array ();
-		foreach ($data as $index => $record) {
+		$rawData = array ();
+		foreach ($data as $submissionKey => $record) {
 			foreach ($record as $key => $value) {
-				$results[$key][$index] = $value;
+				$rawData[$key][$submissionKey] = $value;
 			}
 		}
 		
-		# Ensure ignore fields is an array if supplied
-		if ($ignoreFields) {$ignoreFields = application::ensureArray ($ignoreFields);}
-		
-		# Loop through the records to compile them into data
-		$output = array ();
-		$unknownFields = array ();
-		$unknownValues = array ();
-		foreach ($results as $field => $responses) {
+		# If any elements end up with values split into different fields, adjust the results for that field into a hierarchy
+		$fields = array ();
+		$missingFields = array ();
+		$results = array ();
+		$nestedFields = array ();
+		foreach ($this->elements as $field => $elementAttributes) {
 			
-			# Skip this field if not required
-			if ($ignoreFields && is_array ($ignoreFields) && in_array ($field, $ignoreFields)) {continue;}
+			# Skip discarded fields
+			if ($elementAttributes['discard']) {continue;}
 			
-			# Thrown an error if an unknown field is found
-			if (!isSet ($this->elements[$field])) {
-				$unknownFields[] = $field;
+			# Skip headings
+			if ($elementAttributes['type'] == 'heading') {continue;}
+			
+			# Skip hidden fields if required
+			if ($ignoreHidden && ($elementAttributes['type'] == 'hidden')) {continue;}
+			
+			# Checkbox fields require special handling
+			if (($elementAttributes['type'] == 'checkboxes')) {
+				if ($elementAttributes['values'] && is_array ($elementAttributes['values'])) {
+					
+					# Checkboxes stored as individual headings in a CSV
+					foreach ($elementAttributes['values'] as $value => $visible) {
+						$keyNameNestedType = "{$field}: {$value}";	// Emulation of $nestParent handling in application::arrayToCsv ()
+						if (isSet ($rawData[$keyNameNestedType])) {
+							$results[$field][$value] = $rawData[$keyNameNestedType];
+							$nestedFields[$field] = true;
+						}
+					}
+					
+					# Otherwise deal with compiled, comma-separated SET lists, by looping through each selection list and break it down into values, to create a tally of the selected values, using the same data structure as above
+					if (!isSet ($nestedFields[$field])) {
+						foreach ($rawData[$field] as $index => $selectionGroupString) {
+							$selections = explode (',', $selectionGroupString);	// Note that SET values cannot contain a comma so this is entirely safe
+							foreach ($elementAttributes['values'] as $value => $visible) {
+								$results[$field][$value][$index] = (in_array ($value, $selections) ? 1 : NULL);
+							}
+						}
+					}
+					
+					# Move to the next field
+					continue;
+				}
+			}
+			
+			# Skip if the field does not exist in the raw data
+			if (!isSet ($rawData[$field])) {
+				$missingFields[] = $field;
 				continue;
 			}
+			
+			# Add the raw data into the results as a normal field
+			$results[$field] = $rawData[$field];
+		}
+		
+		# Loop through the fields to compile their records into data
+		$output = array ();
+		$unknownValues = array ();
+		foreach ($this->elements as $field => $attributes) {
+			
+			# Show headings if necessary
+			if (($attributes['type'] == 'heading') && $showHeadings) {
+				$output[$field]['results'] = $attributes['html'];
+				continue;
+			}
+			
+			# Skip if the data is not in the results
+			if (!isSet ($results[$field])) {continue;}
+			
+			# Skip this field if not required
+			if ($ignoreFields) {
+				if (is_array ($ignoreFields) && in_array ($field, $ignoreFields)) {continue;}
+			}
+			
+			# Get the responses for this field
+			$responses = $results[$field];
 			
 			# Create the heading
 			$output[$field]['heading'] = (isSet ($this->elements[$field]['title']) ? $this->elements[$field]['title'] : '[No heading]');
@@ -2985,11 +3054,12 @@ class form
 				continue;
 			}
 			
-			# Determine if this field is a chart type
-			$isChartType = (isSet ($this->elements[$field]) && (($this->elements[$field]['type'] == 'radiobuttons') || ($this->elements[$field]['type'] == 'select')));
+			# Determine if this field is a chart type or a table chart type
+			$isPieChartType = (isSet ($this->elements[$field]) && (($this->elements[$field]['type'] == 'radiobuttons') || ($this->elements[$field]['type'] == 'select')));
+			$isTableChartType = ($attributes['type'] == 'checkboxes');
 			
 			# Render the chart types
-			if ($isChartType) {
+			if ($isPieChartType) {
 				
 				# Count the number of instances of each responses; the NULL check is a workaround to avoid the "Can only count STRING and INTEGER values!" error from array_count_values
 				#!# Other checks needed for e.g. BINARY values?
@@ -3034,11 +3104,11 @@ class form
 					}
 					
 					# Create the main columns
-					$table[$value][''] = $visible;	// Heading would be 'Response'
+					$table[$value][''] = $this->specialchars ($visible);	// Heading would be 'Response'
 					$table[$value]['Respondents'] = $respondents[$value];
 					
 					# Show percentages if required
-					$percentages[$value] = round (($respondents[$value] / $totalResponses) * 100);
+					$percentages[$value] = round ((($respondents[$value] / $totalResponses) * 100), $chartPercentagePrecision);
 					if ($showPercentages) {
 						$table[$value]['Percentage'] = ($totalResponses ? $percentages[$value] . '%' : 'n/a');
 					}
@@ -3056,16 +3126,44 @@ class form
 					}
 				}
 				
+			# Render the table types
+			} else if ($isTableChartType) {
+				
+				# Compile the results
+				$table = array ();
+				foreach ($this->elements[$field]['values'] as $value => $visible) {
+					
+					# Determine the numeric number of respondents for this value
+					# Add the value
+					$table[$value][''] = $this->specialchars ($value);
+					$table[$value]['respondents'] = (array_key_exists ($value, $responses) ? array_sum ($responses[$value]) : 0);
+					
+					# Show percentages if required
+					$totalResponses = count ($responses[$value]);
+					$percentages[$value] = round ((($table[$value]['respondents'] / $totalResponses) * 100), $chartPercentagePrecision);
+					if ($showPercentages) {
+						$table[$value]['percentage'] = $percentages[$value] . '%';
+						$table[$value]['chart'] = "<div style=\"width: {$percentages[$value]}%\">{$percentages[$value]}%</div>";
+					}
+				}
+				
+				# Convert the data into an HTML table
+				$output[$field]['results'] = application::htmlTable ($table, array (), $tableChartClass, $showKey = false, false, $allowHtml = true, false, $addCellClasses = true, false, array (), false, $showTableHeadings);
+				
 			# Render the list types
 			} else {
+				
+				foreach ($responses as $index => $value) {
+					$responses[$index] = $this->specialchars ($value);
+				}
 				$output[$field]['results'] = application::htmlUl ($responses, 1, $ulClass, $ulIgnoreEmpty);
 			}
 		}
 		
-		# Throw a setup error if unknown (and non-ignored) fields are found
-		if ($unknownFields) {
+		# Throw a setup error if expected fields are not in the CSV (if this happens, it indicates a programming error)
+		if ($missingFields) {
 			#!# Need to have ->specialchars applied to the fieldnames
-			$this->formSetupErrors['resultReaderUnknownFields'] = 'The following unknown fields were found in the result data: <strong>' . implode ('</strong>, <strong>', $unknownFields) . '</strong>; please synchronise the fieldnames or set the result reader to ignore these fields and retry.';
+			$this->formSetupErrors['resultReaderMissingFields'] = 'The following fields were not found in the result data: <strong>' . implode ('</strong>, <strong>', $missingFields) . '</strong>; please check the data source or consult the author of the webform system.';
 		}
 		
 		# Throw a setup error if unknown values are found
@@ -3083,8 +3181,10 @@ class form
 		# Compile the HTML
 		$html  = '';
 		foreach ($output as $field => $results) {
-			$fieldEscaped = $this->specialchars ($field);
-			$html .= "\n\n<{$heading} id=\"{$fieldEscaped}\">" . ($anchors ? "<a href=\"#{$fieldEscaped}\">#</a> " : '') . $this->specialchars ($results['heading']) . "</{$heading}>";
+			if (isSet ($results['heading'])) {
+				$fieldEscaped = $this->specialchars ($field);
+				$html .= "\n\n<{$heading} id=\"{$fieldEscaped}\">" . ($anchors ? "<a href=\"#{$fieldEscaped}\">#</a> " : '') . $this->specialchars ($results['heading']) . "</{$heading}>";
+			}
 			$html .= "\n" . $results['results'];
 		}
 		

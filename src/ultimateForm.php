@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.5
+ * @version 1.13.6
  */
 class form
 {
@@ -2059,13 +2059,15 @@ class form
 		if ($arguments['required'] > $arguments['subfields']) {$this->formSetupErrors['uploadSubfieldsMinimumMismatch'] = "The required minimum number of files which the user must upload (<strong>{$arguments['required']}</strong>) specified in the <strong>{$arguments['name']}</strong> upload element is above the number of files actually available to be specified for upload (<strong>{$arguments['subfields']}</strong>).";}
 		
 		# Check that the selected directory exists and is writable (or create it)
-		if (!is_dir ($arguments['directory'])) {
-			if (!application::directoryIsWritable ($arguments['directory'])) {
-				$this->formSetupErrors['directoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> upload element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
-			} else {
-				#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
-				#!# umask seems to have no effect - needs testing
-				mkdir ($arguments['directory'], 0755, $recursive = true);
+		if ($arguments['directory']) {
+			if (!is_dir ($arguments['directory']) || !is_writeable ($arguments['directory'])) {
+				if (!application::directoryIsWritable ($arguments['directory'])) {
+					$this->formSetupErrors['directoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> upload element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
+				} else {
+					#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
+					#!# umask seems to have no effect - needs testing
+					mkdir ($arguments['directory'], 0755, $recursive = true);
+				}
 			}
 		}
 		
@@ -3154,7 +3156,7 @@ class form
 			} else {
 				
 				foreach ($responses as $index => $value) {
-					$responses[$index] = $this->specialchars ($value);
+					$responses[$index] = nl2br ($this->specialchars (trim ($value)));
 				}
 				$output[$field]['results'] = application::htmlUl ($responses, 1, $ulClass, $ulIgnoreEmpty);
 			}

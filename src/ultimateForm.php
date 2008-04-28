@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.6
+ * @version 1.13.7
  */
 class form
 {
@@ -5157,6 +5157,7 @@ class form
 			'prefix'	=> false,	// What to prefix all field names with (plus _ implied)
 			#!# Change to default to true in a later release once existing applications migrated over
 			'intelligence'	=> false,		// Whether to enable intelligent field setup, e.g. password/file*/photograph* become relevant fields and key fields are handled as non-editable
+			'floatChopTrailingZeros' => true,	// Whether to replace trailing zeros at the end of a value where there is a decimal point
 		);
 		
 		# Merge the arguments
@@ -5431,6 +5432,12 @@ class form
 				
 				# FLOAT (numeric with decimal point) field
 				case (eregi ('float\(([0-9]+),([0-9]+)\)', $type, $matches)):
+					if ($floatChopTrailingZeros) {
+						if (substr_count ($standardAttributes['default'], '.')) {
+							$standardAttributes['default'] = ereg_replace ('0+$', '', $standardAttributes['default']);
+							$standardAttributes['default'] = ereg_replace ('\.$', '', $standardAttributes['default']);
+						}
+					}
 					$this->input ($standardAttributes + array (
 						'maxlength' => ((int) $matches[1] + 1),	// FLOAT(M,D) means "up to M digits in total, of which D digits may be after the decimal point", so maxlength is M + 1 (for the decimal point)
 						'regexp' => '^([0-9]+)(\.?)([0-9]{0,' . $matches[2] . '})$',

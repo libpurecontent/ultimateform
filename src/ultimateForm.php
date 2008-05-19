@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.7
+ * @version 1.13.8
  */
 class form
 {
@@ -1030,6 +1030,7 @@ class form
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'get'					=> false,	# Whether a URL-supplied GET value should be used as the initial value (e.g. 'key' here would look in $_GET['key'] and supply that as the default)
 			'append'				=> '',		# HTML appended to the widget
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
@@ -1050,6 +1051,15 @@ class form
 		
 		$arguments = $widget->getArguments ();
 		
+		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
+		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		
+		# Use the 'get' supplied value if required
+		#!# Apply this to checkboxes and radio buttons also
+		if ($arguments['get']) {
+			$arguments['default'] = application::urlSuppliedValue ($arguments['get'], array_keys ($arguments['values']));
+		}
+		
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
 		$arguments['default'] = application::ensureArray ($arguments['default']);
 		
@@ -1060,9 +1070,6 @@ class form
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
 		
 		$elementValue = $widget->getValue ();
-		
-		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
-		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
 		
 		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
 		if (application::isMultidimensionalArray ($arguments['values'])) {
@@ -1092,20 +1099,6 @@ class form
 			$this->formSetupErrors['defaultTooMany'] = "In the <strong>{$arguments['name']}</strong> element, $totalDefaults total initial values were assigned but the form has been set up to allow only one item to be selected by the user.";
 		}
 		
-		# Perform substitution of the special syntax to set the value of a URL-supplied GET value as the initial value; if the supplied item is not present, ignore it; otherwise replace the default(s) array with the single selected item; this can only be applied once
-		#!# Apply this to checkboxes and radio buttons also
-		#!# Need to make 'url:$' in the values array not allowable as a genuine option]
-		$identifier = 'url:$';
-		foreach ($arguments['default'] as $key => $defaultValue) {
-			if (substr ($defaultValue, 0, strlen ($identifier)) == $identifier) {
-				$urlArgumentKey = substr ($defaultValue, strlen ($identifier));
-				# Ensure that the URL supplied is one of the possible values, or delete the identifier key entirely
-				if (!$arguments['default'][$key] = application::urlSuppliedValue ($urlArgumentKey, array_keys ($arguments['values']))) {
-					unset ($arguments['default'][$key]);
-				}
-			}
-		}
-		
 		# Ensure that all initial values are in the array of values
 		$this->ensureDefaultsAvailable ($arguments);
 		
@@ -1114,11 +1107,8 @@ class form
 		
 		# Loop through each element value to check that it is in the available values, and just discard without comment any that are not
 		foreach ($elementValue as $index => $value) {
-			#!# This check against the identifier is a poor fix and should be done better architecturally
-			if (!substr ($value, 0, strlen ($identifier)) == $identifier) {
-				if (!array_key_exists ($value, $arguments['values'])) {
-					unset ($elementValue[$index]);
-				}
+			if (!array_key_exists ($value, $arguments['values'])) {
+				unset ($elementValue[$index]);
 			}
 		}
 		

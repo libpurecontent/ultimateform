@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.8
+ * @version 1.13.9
  */
 class form
 {
@@ -3218,7 +3218,10 @@ class form
 		
 		# Open the surrounding <div> if relevant
 		#!# This should not be done if the form is successful
-		if ($this->settings['div']) {$this->html .= "\n\n<div class=\"{$this->settings['div']}\">";}
+		if ($this->settings['div']) {
+			$scaffoldHtml = "\n\n<div class=\"{$this->settings['div']}\">";
+			$this->html .= $scaffoldHtml;
+		}
 		
 		# Show the presentation matrix if required (this is allowed to bypass the form setup so that the administrator can see what corrections are needed)
 		if ($this->settings['displayPresentationMatrix']) {$this->displayPresentationMatrix ();}
@@ -3313,7 +3316,13 @@ class form
 		# Close the surrounding <div> if relevant
 		#!# This should not be done if the form is successful
 		if ($this->settings['div']) {
+			$scaffoldHtml .= "\n\n</div>";
 			$this->html .= "\n\n</div>";
+		}
+		
+		# If no HTML has been added, clear the surrounding div
+		if ($this->html == $html . $scaffoldHtml) {
+			$this->html = $html;
 		}
 		
 		# Deal with the HTML

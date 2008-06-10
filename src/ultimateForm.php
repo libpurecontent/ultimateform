@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.9
+ * @version 1.13.10
  */
 class form
 {
@@ -1054,6 +1054,12 @@ class form
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
 		
+		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
+		if (application::isMultidimensionalArray ($arguments['values'])) {
+			$arguments['_valuesMultidimensional'] = $arguments['values'];
+			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
+		}
+		
 		# Use the 'get' supplied value if required
 		#!# Apply this to checkboxes and radio buttons also
 		if ($arguments['get']) {
@@ -1070,12 +1076,6 @@ class form
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
 		
 		$elementValue = $widget->getValue ();
-		
-		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
-		if (application::isMultidimensionalArray ($arguments['values'])) {
-			$arguments['_valuesMultidimensional'] = $arguments['values'];
-			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
-		}
 		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {
@@ -1452,6 +1452,7 @@ class form
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
+			#!# Missing this value out causes errors lower
 			'values'				=> array (),# Simple array of selectable values
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
@@ -1652,6 +1653,7 @@ class form
 			#!# Not correct - needs multisplit into boolean
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : $datatype),
 			'groupValidation' => 'compiled',
+			'total' => $checkedTally,
 		);
 	}
 	
@@ -4051,10 +4053,10 @@ class form
 	
 	
 	# Function to register a group validation check
-	function validation ($type, $fields)
+	function validation ($type, $fields, $parameter = false)
 	{
 		# Register the (now validated) validation rule
-		$this->validationRules[] = array ('type' => $type, 'fields' => $fields);
+		$this->validationRules[] = array ('type' => $type, 'fields' => $fields, 'parameter' => $parameter);
 	}
 	
 	
@@ -4070,14 +4072,15 @@ class form
 			'same'		=> 'The values for each of the sections %fields must be the same.',
 			'either'	=> 'One of the sections %fields must be completed.',
 			'all'		=> 'The values for all of the sections %fields must be completed if one of them is.',
+			'total'		=> 'In the sections %fields, the total number of items selected must be exactly %parameter.',
 		);
 		
-		# Loop through each registered rule
+		# Loop through each registered rule to check for setup problems (but do not perform the validations themselves)
 		foreach ($this->validationRules as $validationRule) {
 			
 			# Ensure the validation is a valid type
 			if (!array_key_exists ($validationRule['type'], $this->validationTypes)) {
-				$this->formSetupErrors['validationTypeInvalid'] = "The group validation type '<strong>{$validationRule['type']}</strong>' is not a supported type.";
+//				$this->formSetupErrors['validationTypeInvalid'] = "The group validation type '<strong>{$validationRule['type']}</strong>' is not a supported type.";
 				return;
 			}
 			
@@ -4090,6 +4093,19 @@ class form
 			# Ensure the specified fields exist
 			if ($missing = array_diff ($validationRule['fields'], array_keys ($this->elements))) {
 				$this->formSetupErrors['validationFieldsAbsent'] = 'The field ' . (count ($missing) > 1 ? 'names' : 'name') . " '<strong>" . implode ("</strong>', '<strong>", $missing) . "</strong>' " . (count ($missing) > 1 ? 'names' : 'was') . " specified for a validation rule, but no such " . (count ($missing) > 1 ? 'elements exist' : 'element exists') . '.';
+			}
+			
+			# Ensure that the total field has a third parameter and that all the fields being request supply a 'total' parameter in $this->elements
+			if ($validationRule['type'] == 'total') {
+				if (!is_numeric ($validationRule['parameter'])) {
+					$this->formSetupErrors['validationTotalParameterNonNumeric'] = "The 'maximum' validation rule requires a third, numeric parameter.";
+				} else {
+					foreach ($validationRule['fields'] as $field) {
+						if (isSet ($this->elements[$field]) && !array_key_exists ('total', $this->elements[$field])) {
+							$this->formSetupErrors['validationTotalFieldMismatch'] = "Not all the fields selected for the 'maximum' validation rule support totals";
+						}
+					}
+				}
 			}
 		}
 	}
@@ -4104,6 +4120,7 @@ class form
 	
 	
 	# Function to run group validation checks
+	#!# Refactor this so that each check is its own function
 	function _groupValidationChecks ()
 	{
 		# Don't do any processing if no rules exist
@@ -4130,6 +4147,14 @@ class form
 				}
 			}
 			
+			# For the 'total' check, get the totals from each group
+			$total = 0;
+			if ($rule['type'] == 'total') {
+				foreach ($rule['fields'] as $field) {
+					$total += $this->elements[$field]['total'];
+				}
+			}
+			
 			# Check the rule
 			#!# Ideally refactor to avoid the same list of cases specified as $this->validationTypes
 			if (
@@ -4137,8 +4162,9 @@ class form
 				|| ( ($rule['type'] == 'same')      && ((count ($values) > 1) && count (array_unique ($values)) != 1) )
 				|| ( ($rule['type'] == 'either')    && (application::allArrayElementsEmpty ($values)) )
 				|| ( ($rule['type'] == 'all')       && $nonEmptyValues && $emptyValues )
+				|| ( ($rule['type'] == 'total')     && ($total != $rule['parameter']) )
 			) {
-				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace ('%fields', $this->_fieldListString ($rule['fields']), $this->validationTypes[$rule['type']]);
+				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace (array ('%fields', '%parameter'), array ($this->_fieldListString ($rule['fields']), $rule['parameter']), $this->validationTypes[$rule['type']]);
 			}
 		}
 		

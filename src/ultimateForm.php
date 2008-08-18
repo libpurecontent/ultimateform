@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.10
+ * @version 1.13.11
  */
 class form
 {
@@ -5288,7 +5288,7 @@ class form
 				'name' => $fieldName,	// Internal widget name
 				'title' => $title,	// Visible name
 				'required' => ($fieldAttributes['Null'] != 'YES'),	// Whether a required field
-				'default' => ($value === '0' ? '' : $value),	// #!# Cheat for unassigned joins
+				'default' => $value,
 				'datatype' => $fieldAttributes['Type'],
 				'description' => ($commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : ''),
 			);
@@ -5464,8 +5464,8 @@ class form
 						}
 					}
 					$this->input ($standardAttributes + array (
-						'maxlength' => ((int) $matches[1] + 1),	// FLOAT(M,D) means "up to M digits in total, of which D digits may be after the decimal point", so maxlength is M + 1 (for the decimal point)
-						'regexp' => '^([0-9]+)(\.?)([0-9]{0,' . $matches[2] . '})$',
+						'maxlength' => ((int) $matches[1] + 2),	// FLOAT(M,D) means "up to M digits in total, of which D digits may be after the decimal point", so maxlength is M + 1 (for the decimal point) + 1 (for a negative sign)
+						'regexp' => '^(-?)([0-9]{0,' . ($matches[1] - $matches[2]) . '})((\.)([0-9]{0,' . $matches[2] . '})$|$)',
 					));
 					break;
 				

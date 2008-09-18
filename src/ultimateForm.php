@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.11
+ * @version 1.13.12
  */
 class form
 {
@@ -189,7 +189,7 @@ class form
 		'browser'							=> false,							# Whether to expose the submitter's browser (user-agent) string in the e-mail output format
 		'passwordGeneratedLength'			=> 6,								# Length of a generated password
 		'antispam'							=> false,							# Global setting for anti-spam checking
-		'antispamRegexp'					=> '~(a href=|<a |\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
+		'antispamRegexp'					=> '~(a href=|<a |<script|<url|\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
 	);
 	
 	
@@ -1486,6 +1486,12 @@ class form
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
 		
+		# Check that the array of values is not empty
+		if (empty ($arguments['values'])) {
+			$this->formSetupErrors['checkboxesNoValues'] = 'No values have been set for the set of checkboxes.';
+			return false;
+		}
+		
 		# Apply truncation if necessary
 		$arguments['values'] = $widget->truncate ($arguments['values']);
 		
@@ -1496,9 +1502,6 @@ class form
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
 		*/
-		
-		# Check that the array of values is not empty
-		if (empty ($arguments['values'])) {$this->formSetupErrors['checkboxesNoValues'] = 'No values have been set for the set of checkboxes.';}
 		
 		# Check that the given minimum required is not more than the number of checkboxes actually available
 		$totalSubItems = count ($arguments['values']);
@@ -1628,6 +1631,7 @@ class form
 		}
 		
 		# Compile the datatype
+		$checkboxDatatypes = array ();
 		foreach ($arguments['values'] as $key => $value) {
 			#!# NOT NULL handling needs to be inserted
 			$checkboxDatatypes[] = "`" . /* $arguments['name'] . '-' . */ str_replace ("'", "\'", $key) . "` " . "ENUM ('true', 'false')" . " COMMENT '" . (addslashes ($arguments['title'])) . "'";
@@ -2078,7 +2082,7 @@ class form
 		for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
 			
 			# Continue further processing if the file has been uploaded
-			if (isSet ($elementValue[$subfield])) {
+			if (isSet ($elementValue[$subfield]) && is_array ($elementValue[$subfield]) && array_key_exists ('name', $elementValue[$subfield])) {	// 'name' should always exist but it won't if a form spammer submits this as an input rather than upload
 				
 				# Add the apparently uploaded file (irrespective of whether it passes other checks)
 				$elementValue[$subfield]['_directory'] = $arguments['directory'];	// Cache the directory for later use

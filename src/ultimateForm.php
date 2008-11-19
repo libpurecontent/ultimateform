@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.12
+ * @version 1.13.13
  */
 class form
 {
@@ -923,7 +923,7 @@ class form
 				'join-classes' => true,
 				'join-styles' => true,
 				'logical-emphasis' => true,
-				'merge-divs'	=> true,
+				'merge-divs'	=> false,
 				'word-2000'	=> true,
 				'indent'	=> false,
 				'indent-spaces'	=> 4,

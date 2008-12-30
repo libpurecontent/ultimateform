@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.13
+ * @version 1.13.14
  */
 class form
 {
@@ -804,6 +804,7 @@ class form
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links (as made within the editing system) or false
 			'directoryIndex' => 'index.html',		// Default directory index name
 			'imageAlignmentByClass'	=> true,		// Replace align="foo" with class="foo" for images
+			'nofixTag'	=> '<!-- nofix -->',	// Special marker which indicates that the HTML should not be cleaned (or false to disable)
 			'replacements' => array (),	// Regexp replacements to add before standard replacements are done
 		);
 		
@@ -833,7 +834,7 @@ class form
 		$elementValue = $widget->getValue ();
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid), or clean it if posted
-		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments, str_replace ('-', '', strtolower ($this->settings['charset']))));
+		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments, $arguments['nofixTag'], str_replace ('-', '', strtolower ($this->settings['charset']))));
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
@@ -892,8 +893,12 @@ class form
 	
 	
 	# Function to clean the content
-	function richtextClean ($content, &$arguments, $charset = 'utf8')
+	function richtextClean ($content, &$arguments, $nofixTag = '<!-- nofix -->', $charset = 'utf8')
 	{
+		# Determine whether the <!-- nofix --> tag is present at the start and therefore whether the content should be cleaned
+		$nofixPresent = ($nofixTag && (substr ($content, 0, strlen ($nofixTag)) == $nofixTag));	// ereg/preg_match are not used as otherwise escaping may be needed
+		$cleanHtml = !$nofixPresent;
+		
 		# Cache wanted characters stripped by tidy's 'bare' option
 		$cache = array (
 			'&#8211;' => '__NDASH',
@@ -905,10 +910,12 @@ class form
 			'<p style="clear: left;">' => '__PSTYLECLEARLEFT',
 			'<p style="clear: right;">' => '__PSTYLECLEARRIGHT',
 		);
-		$content = str_replace (array_keys ($cache), array_values ($cache), $content);
+		if ($cleanHtml) {
+			$content = str_replace (array_keys ($cache), array_values ($cache), $content);
+		}
 		
 		# If the tidy extension is not available (e.g. PHP4), perform cleaning with the Tidy API
-		if (function_exists ('tidy_parse_string')) {
+		if ($cleanHtml && function_exists ('tidy_parse_string')) {
 			
 			# Set options, as at http://tidy.sourceforge.net/docs/quickref.html
 			$parameters = array (
@@ -940,7 +947,9 @@ class form
 		}
 		
 		# Resubstitute the cached items
-		$content = str_replace (array_values ($cache), array_keys ($cache), $content);
+		if ($cleanHtml) {
+			$content = str_replace (array_values ($cache), array_keys ($cache), $content);
+		}
 		
 		# Start an array of regexp replacements
 		$replacements = $arguments['replacements'];	// By default an empty array
@@ -953,27 +962,33 @@ class form
 		}
 		
 		# Define main regexp replacements
+		if ($cleanHtml) {
+			$replacements += array (
+				'<\?xml:namespace([^>]*)>' => '',	// Remove Word XML namespace tags
+				'<o:p> </o:p>'	=> '',	// WordHTML characters
+				'<o:p></o:p>'	=> '',	// WordHTML characters
+				'<o:p />'	=> '',	// WordHTML characters
+				' class="c([0-9])"'     => '',  // Word classes
+				'<p> </p>'      => '',  // Empty paragraph
+				'<div> </div>'  => '',  // Empty divs
+				'<span>([^<]*)</span>' => '<TEMP2span>\\1</TEMP2span>',	// Protect FIR-style spans
+				"</?span([^>]*)>"	=> '',	// Remove other spans
+				'[[:space:]]*<h([1-6]{1})([^>]*)>[[:space:]]</h([1-6]{1})>[[:space:]]*' => '',	// Headings containing only whitespace
+				'[[:space:]]+</li>'     => '</li>',     // Whitespace before list item closing tags
+				'[[:space:]]+</h'       => '</h',       // Whitespace before heading closing tags
+				'<h([2-6]+)'	=> "\n<h\\1",	// Line breaks before headings 2-6
+				'<br /></h([1-6]+)>'	=> "</h\\1>",	// Pointless line breaks just before a heading closing tag
+				'</h([1-6]+)>'	=> "</h\\1>\n",	// Line breaks after all headings
+				"<(li|tr|/tr|tbody|/tbody)"	=> "\t<\\1",	// Indent level-two tags
+				"<td"	=> "\t\t<td",	// Double-indent level-three tags
+				'<h([1-6]+) id="Heading([0-9]+)">'      => '<h\\1>',    // Headings from R2Net converter
+			);
+		}
+		
+		# Non- HTML-cleaning replacements
 		$replacements += array (
-			'<\?xml:namespace([^>]*)>' => '',	// Remove Word XML namespace tags
-			'<o:p> </o:p>'	=> '',	// WordHTML characters
-			'<o:p></o:p>'	=> '',	// WordHTML characters
-			'<o:p />'	=> '',	// WordHTML characters
-			' class="c([0-9])"'     => '',  // Word classes
-			'<p> </p>'      => '',  // Empty paragraph
-			'<div> </div>'  => '',  // Empty divs
-			'<span>([^<]*)</span>' => '<TEMP2span>\\1</TEMP2span>',	// Protect FIR-style spans
-			"</?span([^>]*)>"	=> '',	// Remove other spans
-			'[[:space:]]*<h([1-6]{1})([^>]*)>[[:space:]]</h([1-6]{1})>[[:space:]]*' => '',	// Headings containing only whitespace
-			'[[:space:]]+</li>'     => '</li>',     // Whitespace before list item closing tags
-			'[[:space:]]+</h'       => '</h',       // Whitespace before heading closing tags
-			'<h([2-6]+)'	=> "\n<h\\1",	// Line breaks before headings 2-6
-			'<br /></h([1-6]+)>'	=> "</h\\1>",	// Pointless line breaks just before a heading closing tag
-			'</h([1-6]+)>'	=> "</h\\1>\n",	// Line breaks after all headings
-			"<(li|tr|/tr|tbody|/tbody)"	=> "\t<\\1",	// Indent level-two tags
-			"<td"	=> "\t\t<td",	// Double-indent level-three tags
 			" href=\"{$arguments['editorBasePath']}editor/"	=> ' href=\"',	// Workaround for Editor basepath bug
-			' href="([^("|/)]*)/' . $arguments['directoryIndex'] . '"'	=> ' href="\1/"',	// Chop off directory index links
-			'<h([1-6]+) id="Heading([0-9]+)">'      => '<h\\1>',    // Headings from R2Net converter
+			' href="([^"]*)/' . $arguments['directoryIndex'] . '"'	=> ' href="\1/"',	// Chop off directory index links
 		);
 		
 		# Obfuscate e-mail addresses
@@ -992,7 +1007,7 @@ class form
 		}
 		
 		# Ensure links to pages outside the page are in a new window
-		if ($arguments['externalLinksTarget']) {
+		if ($cleanHtml && $arguments['externalLinksTarget']) {
 			$replacements += array (
 				'<a target="([^"]*)" href="([^"]*)"([^>]*)>' => '<a href="\2" target="\1"\3>',	// Move existing target to the end
 				'<a href="(http:|https:)//([^"]*)"([^>]*)>' => '<a href="\1//\2" target="' . $arguments['externalLinksTarget'] . '"\3>',	// Add external links
@@ -1001,9 +1016,11 @@ class form
 		}
 		
 		# Replacement of image alignment with a similarly-named class
-		if ($arguments['imageAlignmentByClass']) {
+		if ($cleanHtml && $arguments['imageAlignmentByClass']) {
 			$replacements += array (
-				'<img([^>]*) align="(left|center|centre|right)"([^>]*)>' => '<img\1 class="\2"\3>',
+				'<img([^>]*) align="(left|middle|center|centre|right)" ([^>]*)class="([^"]*)"([^>]*)>' => '<img\1 class="\4 \2"\5 \3>',
+				'<img([^>]*) class="([^"]*)" ([^>]*)align="(left|middle|center|centre|right)"([^>]*)>' => '<img\1 class="\2 \4"\5 \3>',
+				'<img([^>]*) align="(left|middle|center|centre|right)"([^>]*)>' => '<img\1 class="\2"\3>',
 			);
 		}
 		
@@ -1720,7 +1737,14 @@ class form
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = timedate::getDateTimeArray ((($arguments['level'] == 'time') ? '0000-00-00 ' : '') . $arguments['default']);}
 		
 		# Obtain the value of the form submission (which may be empty)  (ensure that a full date and time array exists to prevent undefined offsets in case an incomplete set has been posted)
-		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ('year' => '', 'month' => '', 'day' => '', 'time' => ''));
+		$value = (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
+		$fields = array ('time', 'day', 'month', 'year', );
+		foreach ($fields as $field) {
+			if (!isSet ($value[$field])) {
+				$value[$field] = '';
+			}
+		}
+		$widget->setValue ($value);
 		
 		$elementValue = $widget->getValue ();
 		
@@ -1732,6 +1756,17 @@ class form
 			$elementValue = timedate::getDateTimeArray ((($arguments['level'] == 'time') ? '0000-00-00 ' : '') . $arguments['default']);
 		} else {
  			
+			# Ensure all numeric fields are numeric, and reset to an empty string if so
+			$fields = array ('day', 'month', 'year', );
+			foreach ($fields as $field) {
+				if (isSet ($elementValue[$field]) && !empty ($elementValue[$field])) {
+					$elementValue[$field] = trim ($elementValue[$field]);
+					if (!ctype_digit ($elementValue[$field])) {
+						$elementValue[$field] = '';
+					}
+				}
+			}
+			
 			# Check whether all fields are empty, starting with assuming all fields are not incomplete
 			#!# This section needs serious (switch-based?) refactoring
 			$allFieldsIncomplete = false;
@@ -3224,8 +3259,9 @@ class form
 		
 		# Open the surrounding <div> if relevant
 		#!# This should not be done if the form is successful
+		$scaffoldHtml  = '';
 		if ($this->settings['div']) {
-			$scaffoldHtml = "\n\n<div class=\"{$this->settings['div']}\">";
+			$scaffoldHtml .= "\n\n<div class=\"{$this->settings['div']}\">";
 			$this->html .= $scaffoldHtml;
 		}
 		

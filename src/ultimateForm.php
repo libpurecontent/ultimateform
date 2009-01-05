@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.14
+ * @version 1.13.15
  */
 class form
 {
@@ -1989,6 +1989,7 @@ class form
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
 			'disallowedExtensions'	=> array (),# Simple array of disallowed file extensions (Single-item string also acceptable)
 			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required)
+			'mime'					=> false,	# Whether to enable the MIME Type check
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
 			'lowercaseExtension'	=> false,	# Force the file extension to be lowercased
@@ -2054,9 +2055,17 @@ class form
 			$arguments['unzip'] = false;
 		}
 		
-		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
+		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary, and lowercase (and then unique) the extensions lists
 		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
-		$arguments['allowedExtensions'] = application::ensureArray ($arguments['allowedExtensions']);
+		foreach ($arguments['disallowedExtensions'] as $index => $extension) {
+			$arguments['disallowedExtensions'][$index] = strtolower ($extension);
+		}
+		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
+		$arguments['allowedExtensions'] = array_unique ($arguments['allowedExtensions']);
+		foreach ($arguments['allowedExtensions'] as $index => $extension) {
+			$arguments['allowedExtensions'][$index] = strtolower ($extension);
+		}
+		$arguments['allowedExtensions'] = array_unique ($arguments['allowedExtensions']);
 		
 		# Ensure zip files can be uploaded if unzipping is enabled, by adding it to the list of allowed extensions if such a list is defined
 		#!# Allowing zip files but having a list of allowed extensions means that people can zip up a non-allowed extension
@@ -2098,6 +2107,31 @@ class form
 					#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
 					#!# umask seems to have no effect - needs testing
 					mkdir ($arguments['directory'], 0755, $recursive = true);
+				}
+			}
+		}
+		
+		# Check that, if MIME Type checking is wanted, and the file extension check is in place, that all are supported
+		$mimeTypes = array ();
+		if ($arguments['mime']) {
+			if (!$arguments['allowedExtensions']) {
+				$this->formSetupErrors['uploadMimeNoExtensions'] = "MIME Type checking was requested but allowedExtensions has not been set.";
+				$arguments['mime'] = false;
+			}
+			if (!function_exists ('mime_content_type')) {
+				$this->formSetupErrors['uploadMimeExtensionsMismatch'] = "MIME Type checking was requested but is not available on this server platform.";
+				$arguments['mime'] = false;
+			} else {
+				$this->mimeTypes = application::mimeTypeExtensions ();
+				if ($arguments['allowedExtensions']) {
+					$inBoth = array_intersect ($arguments['allowedExtensions'], array_keys ($this->mimeTypes));
+					if (count ($inBoth) != count ($arguments['allowedExtensions'])) {
+						$arguments['mime'] = false;	// Disable execution of the mime block below
+						$this->formSetupErrors['uploadMimeExtensionsMismatch'] = "MIME Type checking was requested for the <strong>{$arguments['name']}</strong> upload element, but not all of the allowedExtensions are supported in the MIME checking list";
+					}
+				}
+				foreach ($arguments['allowedExtensions'] as $extension) {
+					$mimeTypes[] = $this->mimeTypes[$extension];
 				}
 			}
 		}
@@ -2144,7 +2178,7 @@ class form
 			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is bogus (non-standard and seemingly not supported by any browsers), so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would expose to the user the size of the PHP ini setting
 			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
 			if ($arguments['editable']) {
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . $widget->tabindexHtml ($subfield) . ' />';
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . $widget->tabindexHtml ($subfield) . ($mimeTypes ? ' accept="' . implode (', ', $mimeTypes) . '"' : '') . ' />';
 				$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
 			} else {
 				if ($arguments['default'] && isSet ($arguments['default'][$subfield])) {
@@ -2166,6 +2200,11 @@ class form
 		# If fields which have an invalid extension have been found, throw a user error
 		if (isSet ($filenameInvalidSubfields)) {
 			$elementProblems['fileExtensionMismatch'] = (count ($filenameInvalidSubfields) > 1 ? 'The files <em>' : 'The file <em>') . implode ('</em>, <em>', $filenameInvalidSubfields) . (count ($filenameInvalidSubfields) > 1 ? '</em> do not' : '</em> does not') . ' comply with the specified file extension rules for this section.';
+		}
+		
+		# If fields which have an invalid MIME Type have been found, throw a user error
+		if (isSet ($filenameInvalidMimeTypes)) {
+			$elementProblems['fileMimeTypeMismatch'] = (count ($filenameInvalidMimeTypes) > 1 ? 'The files <em>' : 'The file <em>') . implode ('</em>, <em>', $filenameInvalidMimeTypes) . (count ($filenameInvalidMimeTypes) > 1 ? '</em> do not' : '</em> does not') . ' appear to be valid.';
 		}
 		
 		# If any files have been uploaded, the user will need to re-select them.
@@ -2241,6 +2280,7 @@ class form
 			#!# Not finished
 #			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'unzip'	=> $arguments['unzip'],
+			'mime' => $arguments['mime'],
 			'subfields' => $arguments['subfields'],
 			'default'	=> $arguments['default'],
 		);
@@ -4989,8 +5029,7 @@ class form
 				$attributes = $this->form[$name][$subfield];
 				
 				# Get the file extension
-				$pathinfo = pathinfo ($attributes['name']);
-				$fileExtension = (isSet ($pathinfo['extension']) ? '.' . $pathinfo['extension'] : '');
+				$fileExtension = pathinfo ($attributes['name'], PATHINFO_EXTENSION);
 				
 				# Lowercase the extension if necessary
 				if ($arguments['lowercaseExtension']) {
@@ -5040,6 +5079,17 @@ class form
 					# Fix up the file permission
 					umask (0);
 					chmod ($destination, 0664);
+					
+					# Do MIME Type checks (and by now we can be sure that the extension supplied is in the MIME Types list), doing a mime_content_type() check as the value of $elementValue[$subfield]['type'] is not trustworthy and easily fiddled (changing the file extension is enough to fake this)
+					if ($arguments['mime']) {
+						$extension = pathinfo ($destination, PATHINFO_EXTENSION);	// Best of methods listed at www.cowburn.info/2008/01/13/get-file-extension-comparison/
+						$mimeTypeDeclared = $this->mimeTypes[$extension];
+						$mimeTypeActual = mime_content_type ($destination);
+						if ($mimeTypeDeclared != $mimeTypeActual) {
+							$failures[$filename] = $attributes;
+							continue;
+						}
+					}
 					
 					# Create an array of any successful file uploads. For security reasons, if the filename is modified to prevent accidental overwrites, the original filename is not modified here
 					#!# There needs to be a differential between presented and actual data in cases where a different filename is actually written to the disk
@@ -5931,7 +5981,7 @@ class formWidget
 #!# Add links to the id="$name" form elements in cases of USER errors (not for the templating mode though)
 #!# Need to prevent the form code itself being overwritable by uploads or CSV writing, by doing a check on the filenames
 #!# Add <label> and (where appropriate) <fieldset> support throughout - see also http://www.aplus.co.yu/css/styling-form-fields/ ; http://www.bobbyvandersluis.com/articles/formlayout.php ; http://www.simplebits.com/notebook/2003/09/16/simplequiz_part_vi_formatting.html ; http://www.htmldog.com/guides/htmladvanced/forms/ ; checkbox & radiobutton have some infrastructure written (but commented out) already
-#!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp e.g. accept="list_of_mime_types" for type=file
+#!# Full support for all attributes listed at http://www.w3schools.com/tags/tag_input.asp
 #!# Number validation: validate numbers with strval() and intval() or floatval() - www.onlamp.com/pub/a/php/2004/08/26/PHPformhandling.html
 #!# Move to in_array with strict third parameter (see fix put in for 1.9.9 for radiobuttons)
 # Remove display_errors checking misfeature or consider renaming as disableDisplayErrorsCheck

@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.15
+ * @version 1.13.16
  */
 class form
 {
@@ -190,6 +190,7 @@ class form
 		'passwordGeneratedLength'			=> 6,								# Length of a generated password
 		'antispam'							=> false,							# Global setting for anti-spam checking
 		'antispamRegexp'					=> '~(a href=|<a |<script|<url|\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
+		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 	);
 	
 	
@@ -389,8 +390,8 @@ class form
 					$doRetrieval = false;
 				} else {
 					#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
-					#!# umask seems to have no effect - needs testing
-					mkdir ($arguments['retrieval'], 0755, $recursive = true);
+					umask (0);
+					mkdir ($arguments['retrieval'], $this->settings['directoryPermissions'], $recursive = true);
 				}
 			}
 			
@@ -2105,8 +2106,8 @@ class form
 					$this->formSetupErrors['directoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> upload element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
 				} else {
 					#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
-					#!# umask seems to have no effect - needs testing
-					mkdir ($arguments['directory'], 0755, $recursive = true);
+					umask (0);
+					mkdir ($arguments['directory'], $this->settings['directoryPermissions'], $recursive = true);
 				}
 			}
 		}
@@ -5028,8 +5029,11 @@ class form
 				# Get the attributes for this sub-element
 				$attributes = $this->form[$name][$subfield];
 				
-				# Get the file extension
+				# Get the file extension preceeded by a dot
 				$fileExtension = pathinfo ($attributes['name'], PATHINFO_EXTENSION);
+				if (!empty ($fileExtension)) {
+					$fileExtension = '.' . $fileExtension;
+				}
 				
 				# Lowercase the extension if necessary
 				if ($arguments['lowercaseExtension']) {
@@ -5188,8 +5192,8 @@ class form
 			# Ensure the directory exists
 			$targetDirectory = dirname ($directory . $zipEntryName) . '/';
 			if (!is_dir ($targetDirectory)) {
-				umask (0007);
-				if (!mkdir ($targetDirectory, 0777, true)) {
+				umask (0);
+				if (!mkdir ($targetDirectory, $this->settings['directoryPermissions'], true)) {
 					$deleteAfterUnzipping = false;	// Don't delete the source file if this fails
 					continue;
 				}

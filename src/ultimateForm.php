@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.16
+ * @version 1.13.17
  */
 class form
 {
@@ -271,6 +271,7 @@ class form
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
+			'url'					=> false,	# Turns the widget into a URL field where a HEAD request is made to check that the URL exists; either true (which means 200, 302, 304) or a list like array (200, 301, 302, 304, )
 			'retrieval'				=> false,	# Turns the widget into a URL field where the specified page/file is then retrieved and saved to the directory stated
 			'disallow'				=> false,	# Regular expression against which the submission must not validate
 			'antispam'				=> $this->settings['antispam'],		# Whether to switch on anti-spam checking
@@ -291,6 +292,21 @@ class form
 		# Add in email-specific defaults
 		if ($functionName == 'email') {
 			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation e-mail field
+		}
+		
+		# Add a regexp check if using URL handling (retrieval or URL HEAD check)
+		#!# This change in v. 1.13.16 of moving this before the arguments are set, because the defaults get amended, points to the need for auditing of similar cases in case they are not being amended
+		if ((isSet ($suppliedArguments['retrieval']) && $suppliedArguments['retrieval']) || (isSet ($suppliedArguments['url']) && $suppliedArguments['url'])) {
+			
+			# If no regexp has been set, add a basic URL syntax check
+			#!# Ideally this should be replaced when multiple regexps allowed
+			if (empty ($suppliedArguments['regexp']) && empty ($suppliedArguments['regexpi'])) {
+				if (!extension_loaded ('openssl')) {
+					$this->formSetupErrors['urlHttps'] = 'URL handling has been requested but the OpenSSL extension is not loaded, meaning that https requests will fail. Either compile in the OpenSSL module, or explicitly set the regexpi for the field.';
+				} else {
+					$argumentDefaults['regexpi'] = '^(http|https)://(.+)\.(.+)';
+				}
+			}
 		}
 		
 		# Create a new form widget
@@ -338,7 +354,7 @@ class form
 		$widget->checkMaxLength ();
 		
 		# Perform pattern checks
-		$widget->regexpCheck ();
+		$regexpCheck = $widget->regexpCheck ();
 		
 		# Clean to numeric if required
 		$widget->cleanToNumeric ();
@@ -363,40 +379,32 @@ class form
 		$this->form[$arguments['name']] = $elementValue;
 		
 		# Do retrieval if required
-		$doRetrieval = false;
-		if ($arguments['retrieval'] && $this->form[$arguments['name']] && !$widget->getElementProblems (false)) {
+		if (($arguments['retrieval'] || $arguments['url']) && $this->form[$arguments['name']] && !$widget->getElementProblems (false)) {
 			
 			# Do not use with e-mail/password types
 			if ($functionName != 'input') {
-				$this->formSetupErrors['retrievalInputOnly'] = 'URL retrieval can only be used on a standard input field type.';
-				$doRetrieval = false;
+				$this->formSetupErrors['urlHandlingInputOnly'] = 'URL handling can only be used on a standard input field type.';
+				$arguments['retrieval'] = false;
 			}
 			
 			# Do not use with e-mail/password types
 			if (!ini_get ('allow_url_fopen')) {
-				$this->formSetupErrors['retrievalAllowUrlFopenOff'] = 'URL retrieval cannot be done as the server configuration disallows external file opening.';
-			}
-			
-			# If no regexp has been set, add a basic URL syntax check
-			#!# Ideally this should be replaced when multiple regexps allowed
-			if (empty ($arguments['regexp']) && empty ($arguments['regexpi'])) {
-				$arguments['regexpi'] = '^(http|https)://';
+				$this->formSetupErrors['urlHandlingAllowUrlFopenOff'] = 'URL handling cannot be done as the server configuration disallows external file opening.';
 			}
 			
 			# Check that the selected directory exists and is writable (or create it)
-			if (!is_dir ($arguments['retrieval'])) {
-				if (!application::directoryIsWritable ($arguments['retrieval'])) {
-					$this->formSetupErrors['retrievalDirectoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> input URL-retrieval element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
-					$doRetrieval = false;
-				} else {
-					#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
-					umask (0);
-					mkdir ($arguments['retrieval'], $this->settings['directoryPermissions'], $recursive = true);
+			if ($arguments['retrieval']) {
+				if (!is_dir ($arguments['retrieval'])) {
+					if (!application::directoryIsWritable ($arguments['retrieval'])) {
+						$this->formSetupErrors['urlHandlingDirectoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> input URL-retrieval element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
+						$arguments['retrieval'] = false;
+					} else {
+						#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
+						umask (0);
+						mkdir ($arguments['retrieval'], $this->settings['directoryPermissions'], $recursive = true);
+					}
 				}
 			}
-			
-			# Confirm setup is OK
-			$doRetrieval = true;
 		}
 		
 		# Define the widget's core HTML
@@ -419,15 +427,34 @@ class form
 			}
 			
 			# Do URL retrieval if OK
-			#!# Ideally this perhaps ought to be like doUploads, which is run only at the end
-			if ($doRetrieval) {
+			#!# This ought to be like doUploads, which is run only at the end
+			if ($arguments['retrieval'] && $regexpCheck) {
 				$saveLocation = $arguments['retrieval'] . basename ($elementValue);
 				#!# This next line should be replaced with some variant of urlencode that doesn't swallow / or :
 				$elementValue = str_replace (' ', '%20', $elementValue);
 				if (!$fileContents = @file_get_contents ($elementValue)) {
-					$elementProblems['retrievalFailure'] = "URL retrieval failed; possibly the URL you quoted does not exists, or the server is blocking file downloads somehow.";
+					$elementProblems['retrievalFailure'] = "URL retrieval failed; possibly the URL you quoted does not exist, or the server is blocking file downloads somehow.";
 				} else {
 					file_put_contents ($saveLocation, $fileContents);
+				}
+			}
+			
+			# Do URL HEAD request if required and if the regexp check has passed
+			if ($arguments['url'] && $regexpCheck) {
+				$urlOk = false;
+				$response = false;
+				if ($headers = get_headers ($elementValue)) {
+					$response = $headers[0];
+					if (ereg (' ([0-9]+) ', $response, $matches)) {
+						$httpResponse = $matches[1];
+						$validResponses = (is_array ($arguments['url']) ? $arguments['url'] : array (200 /* OK */, 302 /* Found */, 304 /* Not Modified */));	// See http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html for responses
+						if (in_array ($httpResponse, $validResponses)) {
+							$urlOk = true;
+						}
+					}
+				}
+				if (!$urlOk) {
+					$elementProblems['urlFailure'] = "URL check failed; possibly the URL you quoted does not exist or has a redirection in place." . ($response ? ' The response from the site was: <em>' . htmlspecialchars ($response) . '</em>.' : '') . ' Please check the URL carefully and retry.';
 				}
 			}
 		}
@@ -5879,18 +5906,20 @@ class formWidget
 	function regexpCheck ()
 	{
 		# End if the form is empty; strlen is used rather than a boolean check, as a submission of the string '0' will otherwise fail this check incorrectly
-		if (strlen ($this->value) == 0) {return;}
+		if (!strlen ($this->value)) {return false;}
 		
 		# Regexp checks (for non-e-mail types)
 		#!# Allow flexible array ($regexp => $errorMessage) syntax, as with disallow
 		if (strlen ($this->arguments['regexp'])) {
 			if (!ereg ($this->arguments['regexp'], $this->value)) {
 				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
+				return false;
 			}
 		}
 		if (strlen ($this->arguments['regexpi'])) {
 			if (!eregi ($this->arguments['regexpi'], $this->value)) {
 				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
+				return false;
 			}
 		}
 		
@@ -5910,6 +5939,7 @@ class formWidget
 			# Perform the check
 			if (ereg ($disallowRegexp, $this->value)) {
 				$this->elementProblems['failsDisallow'] = $disallowErrorMessage;
+				return false;
 			}
 		}
 		
@@ -5917,8 +5947,12 @@ class formWidget
 		if ($this->functionName == 'email') {
 			if (!application::validEmail ($this->value)) {
 				$this->elementProblems['invalidEmail'] = 'The e-mail address you gave appears to be invalid.';
+				return false;
 			}
 		}
+		
+		# Otherwise signal OK
+		return true;
 	}
 	
 	

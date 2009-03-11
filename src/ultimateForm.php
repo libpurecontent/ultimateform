@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.17
+ * @version 1.13.18
  */
 class form
 {
@@ -200,6 +200,7 @@ class form
 	 * Constructor
 	 * @param array $arguments Settings
 	 */
+	#!# Change this to the PHP5 __construct syntax
 	function form ($suppliedArguments = array ())
 	{
 		# Load the application support library which itself requires the pureContent framework file, pureContent.php; this will clean up $_SERVER
@@ -806,6 +807,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'editorBasePath'		=> '/_fckeditor/',	# Location of the editor files
 			'editorToolbarSet'		=> 'pureContent',	# Editor toolbar set
+			'CKFinder'						=> false,	// Whether to use CKFinder or the standard finder
 			'editorConfig'				=> array (	# Editor configuration - see http://wiki.fckeditor.net/Developer's_Guide/Configuration/Configurations_Settings
 				'CustomConfigurationsPath'	=> '/_fckeditor/fckconfig-customised.js',
 				'FontFormats'				=> 'p;h1;h2;h3;h4;h5;h6;pre',
@@ -822,12 +824,13 @@ class form
 				'FirefoxSpellChecker'		=> true,	// Enable Firefox 2's spell checker
 				'ForcePasteAsPlainText'		=> false,	// Discard all formatting when pasting text
 				'BaseHref'					=> $_SERVER['_PAGE_URL'],		// Current location (enables relative images to be correct)
-				'CKFinderLinkBrowserURL'			=> '/_ckfinder/ckfinder.html',
-				'CKFinderImageBrowserURL'			=> '/_ckfinder/ckfinder.html',
+				'CKFinderLinkBrowserURL'	=> '/_ckfinder/ckfinder.html',
+				'CKFinderImageBrowserURL'	=> '/_ckfinder/ckfinder.html',
+				'CKFinderAccessControl'		=> false,	// Access Control List (ACL) passed to CKFinder in the format it requires - false to disable or an array (empty/populated) to enable
+				'CKFinderStartupPath'		=> false,		// CKFinder startup path, or false to disable
 				//'FormatIndentator'			=> '	', // Tabs - still doesn't work in FCKeditor
 				// "ToolbarSets['pureContent']" => "[ ['Source'], ['Cut','Copy','Paste','PasteText','PasteWord','-','SpellCheck'], ['Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'], ['Bold','Italic','StrikeThrough','-','Subscript','Superscript'], ['OrderedList','UnorderedList','-','Outdent','Indent'], ['Link','Unlink','Anchor'], ['Image','Table','Rule','SpecialChar'/*,'ImageManager','UniversalKey'*/], /*['Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden']*/ [/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-'], ['Print','About'] ] ;",
 			),
-			'CKFinder'						=> false,	// Whether to use CKFinder
 			'protectEmailAddresses' => true,	// Whether to obfuscate e-mail addresses
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links (as made within the editing system) or false
 			'directoryIndex' => 'index.html',		// Default directory index name
@@ -873,6 +876,20 @@ class form
 				$arguments['editorConfig']['ImageBrowserURL'] = $arguments['editorConfig']['CKFinderImageBrowserURL'];
 				unset ($arguments['editorConfig']['CKFinderLinkBrowserURL']);
 				unset ($arguments['editorConfig']['CKFinderImageBrowserURL']);
+				
+				# Use the ACL functionality if required, by writing it into the session
+				#!# Ideally, CKFinder would have a better way of providing a configuration directly, or pureContentEditor could have a callback that is queried, but this would mean changing all cases of 'echo' and have a non-interactive mode setting in the constructor call
+				if (is_array ($arguments['editorConfig']['CKFinderAccessControl'])) {
+					if (!isset ($_SESSION)) {session_start ();}
+					$_SESSION['CKFinderAccessControl'] = $arguments['editorConfig']['CKFinderAccessControl'];
+				}
+				
+				# Use the startup path functionality if required, by writing it into the session
+				#!# Not currently supported in ckfinder_1.3-patched/config.php
+				if ($arguments['editorConfig']['CKFinderStartupPath'] !== false) {
+					if (!isset ($_SESSION)) {session_start ();}
+					$_SESSION['CKFinderStartupPath'] = $arguments['editorConfig']['CKFinderStartupPath'];
+				}
 			}
 			
 			# Define the widget's core HTML by instantiating the richtext editor module and setting required options
@@ -5309,6 +5326,7 @@ class form
 		# Merge the arguments
 		$arguments = application::assignArguments ($this->formSetupErrors, $suppliedArguments, $argumentDefaults, 'dataBinding');
 		foreach ($arguments as $key => $value) {
+			#!# Refactor below to use $arguments array as with other parts of ultimateForm
 			$$key = $value;
 		}
 		

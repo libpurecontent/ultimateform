@@ -59,8 +59,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-8, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.18
+ * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
+ * @version 1.13.19
  */
 class form
 {
@@ -826,6 +826,7 @@ class form
 				'BaseHref'					=> $_SERVER['_PAGE_URL'],		// Current location (enables relative images to be correct)
 				'CKFinderLinkBrowserURL'	=> '/_ckfinder/ckfinder.html',
 				'CKFinderImageBrowserURL'	=> '/_ckfinder/ckfinder.html',
+				'CKFinderFlashBrowserURL'	=> '/_ckfinder/ckfinder.html',
 				'CKFinderAccessControl'		=> false,	// Access Control List (ACL) passed to CKFinder in the format it requires - false to disable or an array (empty/populated) to enable
 				'CKFinderStartupPath'		=> false,		// CKFinder startup path, or false to disable
 				//'FormatIndentator'			=> '	', // Tabs - still doesn't work in FCKeditor
@@ -874,8 +875,10 @@ class form
 			if ($arguments['CKFinder']) {
 				$arguments['editorConfig']['LinkBrowserURL'] = $arguments['editorConfig']['CKFinderLinkBrowserURL'];
 				$arguments['editorConfig']['ImageBrowserURL'] = $arguments['editorConfig']['CKFinderImageBrowserURL'];
+				$arguments['editorConfig']['FlashBrowserURL'] = $arguments['editorConfig']['CKFinderFlashBrowserURL'];
 				unset ($arguments['editorConfig']['CKFinderLinkBrowserURL']);
 				unset ($arguments['editorConfig']['CKFinderImageBrowserURL']);
+				unset ($arguments['editorConfig']['CKFinderFlashBrowserURL']);
 				
 				# Use the ACL functionality if required, by writing it into the session
 				#!# Ideally, CKFinder would have a better way of providing a configuration directly, or pureContentEditor could have a callback that is queried, but this would mean changing all cases of 'echo' and have a non-interactive mode setting in the constructor call

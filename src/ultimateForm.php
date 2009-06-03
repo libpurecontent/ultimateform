@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.19
+ * @version 1.13.20
  */
 class form
 {
@@ -1221,7 +1221,7 @@ class form
 			if (!isSet ($arguments['_valuesMultidimensional'])) {
 				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 				foreach ($arguments['valuesWithNull'] as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . $this->specialchars ($visible) . '</option>';
+					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . $this->nameIdHtml ($arguments['name'], false, $value, true) . '>' . $this->specialchars ($visible) . '</option>';
 				}
 			} else {
 				
@@ -1817,6 +1817,7 @@ class form
 			
 			# Check whether all fields are empty, starting with assuming all fields are not incomplete
 			#!# This section needs serious (switch-based?) refactoring
+			#!# Check about empty(0)
 			$allFieldsIncomplete = false;
 			if ($arguments['level'] == 'datetime') {
 				if ((empty ($elementValue['day'])) && (empty ($elementValue['month'])) && (empty ($elementValue['year'])) && (empty ($elementValue['time']))) {$allFieldsIncomplete = true;}
@@ -1983,8 +1984,7 @@ class form
 			$data['compiled'] = '';
 			
 			# If all items are not empty then produce compiled and presented versions
-			#!# This needs to be ALWAYS assigned in case $data['compiled'] and $data['presented'] are referred to later
-			if (!application::allArrayElementsEmpty ($this->form[$arguments['name']])) {
+			if (!$allFieldsIncomplete && !isSet ($elementProblems)) {
 				
 				# Make the compiled version be in SQL format, i.e. YYYY-MM-DD HH:MM:SS
 				$data['compiled'] = (($arguments['level'] == 'time') ? $this->form[$arguments['name']]['time'] : $this->form[$arguments['name']]['year'] . (($arguments['level'] == 'year') ? '' : '-' . $this->form[$arguments['name']]['month'] . '-' . sprintf ('%02s', $this->form[$arguments['name']]['day'])) . (($arguments['level'] == 'datetime') ? ' ' . $this->form[$arguments['name']]['time'] : ''));
@@ -2295,6 +2295,8 @@ class form
 		
 		# Assign half-validated data, for the purposes of the groupValidation check; note that this could be tricked, but should be good enough in most cases, and certainly better than nothing
 		$data['presented'] = $totalApparentlyUploadedFiles;
+		#!# This is a workaround for when using getUnfinalisedData, to prevent offsets
+		$data['rawcomponents'] = $totalApparentlyUploadedFiles;
 		
 		# Register the attachments, and disable unzipping
 		#!# Ideally unzipping should be done after a zip file is e-mailed, but this would require much refactoring of the output processing, i.e. (i) upload, (ii) attach attachments, (iii) unzip
@@ -3318,19 +3320,32 @@ class form
 	## Main processing ##
 	
 	
-	# Function to return the submitted but pre-finalised data, for use in adding additional checks
-	function getUnfinalisedData ()
+	# Function to return the submitted but pre-finalised data, for use in adding additional checks; effectively this provides a kind of callback facility
+	public function getUnfinalisedData ()
 	{
-		# Return the form data
-		return ($this->formPosted ? $this->form : array ());
+		# Return the form data, or an empty array (evaluating to false) if not posted
+		return ($this->formPosted ? $this->getData () : array ());
 	}
 	
 	
-	# Compatibility name
-	#!# DEPRECATED - remove in future
-	function processForm ()
+	# Function to extract the values from submitted data
+	private function getData ()
 	{
-		return $this->process ();
+		# Get the presentation defaults
+		$presentationDefaults = $this->presentationDefaults ($returnFullAvailabilityArray = false, $includeDescriptions = false);
+		
+		# Loop through each field and obtain the value
+		$result = array ();
+		foreach ($this->elements as $name => $element) {
+			if (isSet ($element['data'])) {
+				$widgetType = $element['type'];
+				$defaultProcessingPresentationType = $presentationDefaults[$widgetType]['processing'];
+				$result[$name] = $element['data'][$defaultProcessingPresentationType];
+			}
+		}
+		
+		# Return the data
+		return $result;
 	}
 	
 	
@@ -5650,6 +5665,7 @@ class form
 					if ($setSupportSupplied > $setSupportMax) {
 						$this->formSetupErrors['DatabindingSetExcessive'] = "{$setSupportSupplied} values were supplied for the {$fieldName} dataBinding 'SET' field but a maximum of only {$setSupportMax} are supported.";
 					} else {
+						#!# This one is inconsistent; however, pollenDatabase.php assumes that override values take precedence over $values coming from the eregi match here
 						$this->checkboxes (array_merge ($standardAttributes, array (
 							'values' => $values,
 							'output' => array ('processing' => 'special-setdatatype'),

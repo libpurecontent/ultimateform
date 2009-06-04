@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.20
+ * @version 1.13.21
  */
 class form
 {
@@ -3149,6 +3149,7 @@ class form
 		# Loop through the fields to compile their records into data
 		$output = array ();
 		$unknownValues = array ();
+		$noResponse = '<span class="comment"><em>[No response]</em></span>';
 		foreach ($this->elements as $field => $attributes) {
 			
 			# Show headings if necessary
@@ -3200,7 +3201,7 @@ class form
 				$nullAvailable = false;
 				if (!$this->elements[$field]['required']) {
 					$nullAvailable = true;
-					$this->elements[$field]['values'][''] = '<span class="comment"><em>[No response]</em></span>';
+					$this->elements[$field]['values'][''] = $noResponse;
 				}
 				
 				# Check for values in the submissions that are not in the available values and compile a list of these
@@ -3227,7 +3228,8 @@ class form
 					}
 					
 					# Create the main columns
-					$table[$value][''] = $this->specialchars ($visible);	// Heading would be 'Response'
+					#!# This solution is a little bit hacky
+					$table[$value][''] = ($visible == $noResponse ? $visible : $this->specialchars ($visible));	// Heading would be 'Response'
 					$table[$value]['Respondents'] = $respondents[$value];
 					
 					# Show percentages if required

@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.21
+ * @version 1.13.22
  */
 class form
 {
@@ -2103,15 +2103,15 @@ class form
 			$arguments['unzip'] = false;
 		}
 		
-		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary, and lowercase (and then unique) the extensions lists
+		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary, and lowercase (and then unique) the extensions lists, ensuring each starts with .
 		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
 		foreach ($arguments['disallowedExtensions'] as $index => $extension) {
-			$arguments['disallowedExtensions'][$index] = strtolower ($extension);
+			$arguments['disallowedExtensions'][$index] = (substr ($extension, 0, 1) != '.' ? '.' : '') . strtolower ($extension);
 		}
 		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
 		$arguments['allowedExtensions'] = array_unique ($arguments['allowedExtensions']);
 		foreach ($arguments['allowedExtensions'] as $index => $extension) {
-			$arguments['allowedExtensions'][$index] = strtolower ($extension);
+			$arguments['allowedExtensions'][$index] = (substr ($extension, 0, 1) != '.' ? '.' : '') . strtolower ($extension);
 		}
 		$arguments['allowedExtensions'] = array_unique ($arguments['allowedExtensions']);
 		
@@ -5638,7 +5638,7 @@ class form
 					break;
 				
 				# INT (numeric) field
-				case (eregi ('int\(([0-9]+)\)', $type, $matches)):
+				case (eregi ('(int\(([0-9]+)\)', $type, $matches)):
 					$this->input ($standardAttributes + array (
 						'enforceNumeric' => true,
 						'regexp' => '^([0-9]*)$',

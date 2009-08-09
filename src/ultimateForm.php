@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.22
+ * @version 1.13.23
  */
 class form
 {
@@ -3491,7 +3491,9 @@ class form
 			}
 			
 			# Add on the remainder into a new group, called '0'
-			$groupedData[0] = $data;
+			if ($data) {
+				$groupedData[0] = $data;
+			}
 			$data = $groupedData;
 		}
 		
@@ -5638,11 +5640,13 @@ class form
 					break;
 				
 				# INT (numeric) field
-				case (eregi ('(int\(([0-9]+)\)', $type, $matches)):
+				case (eregi ('(int|tinyint|smallint|mediumint|bigint)\(([0-9]+)\)', $type, $matches)):
 					$this->input ($standardAttributes + array (
 						'enforceNumeric' => true,
 						'regexp' => '^([0-9]*)$',
-						'maxlength' => $matches[1],
+						#!# Make these recognise types without the numeric value after
+						'maxlength' => $matches[2],
+						'size' => $matches[2] + 1,
 					));
 					break;
 				

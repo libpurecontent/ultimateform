@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.13.23
+ * @version 1.14.0
  */
 class form
 {
@@ -446,7 +446,7 @@ class form
 				$response = false;
 				if ($headers = get_headers ($elementValue)) {
 					$response = $headers[0];
-					if (ereg (' ([0-9]+) ', $response, $matches)) {
+					if (preg_match ('/ ([0-9]+) /', $response, $matches)) {
 						$httpResponse = $matches[1];
 						$validResponses = (is_array ($arguments['url']) ? $arguments['url'] : array (200 /* OK */, 302 /* Found */, 304 /* Not Modified */));	// See http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html for responses
 						if (in_array ($httpResponse, $validResponses)) {
@@ -604,10 +604,10 @@ class form
 				
 				# If the line does not validate against a specified regexp, add the line to a list of lines containing a problem then move onto the next line
 				if ($arguments['regexp'] || $arguments['regexpi']) {
-					if ($arguments['regexp'] && (!ereg ($arguments['regexp'], $line))) {
+					if ($arguments['regexp'] && (!application::pereg ($arguments['regexp'], $line))) {
 						$problemLines[] = $i;
 						continue;
-					} else if ($arguments['regexpi'] && (!eregi ($arguments['regexpi'], $line))) {
+					} else if ($arguments['regexpi'] && (!application::peregi ($arguments['regexpi'], $line))) {
 						$problemLines[] = $i;
 						continue;
 					}
@@ -623,7 +623,7 @@ class form
 							break;
 						}
 					}
-					if (ereg ($disallowRegexp, $line)) {
+					if (application::pereg ($disallowRegexp, $line)) {
 						$disallowProblemLines[] = $i;
 						continue;
 					}
@@ -1021,9 +1021,9 @@ class form
 				'<div> </div>'  => '',  // Empty divs
 				'<span>([^<]*)</span>' => '<TEMP2span>\\1</TEMP2span>',	// Protect FIR-style spans
 				"</?span([^>]*)>"	=> '',	// Remove other spans
-				'[[:space:]]*<h([1-6]{1})([^>]*)>[[:space:]]</h([1-6]{1})>[[:space:]]*' => '',	// Headings containing only whitespace
-				'[[:space:]]+</li>'     => '</li>',     // Whitespace before list item closing tags
-				'[[:space:]]+</h'       => '</h',       // Whitespace before heading closing tags
+				'\s*<h([1-6]{1})([^>]*)>\s</h([1-6]{1})>\s*' => '',	// Headings containing only whitespace
+				'\s+</li>'     => '</li>',     // Whitespace before list item closing tags
+				'\s+</h'       => '</h',       // Whitespace before heading closing tags
 				'<h([2-6]+)'	=> "\n<h\\1",	// Line breaks before headings 2-6
 				'<br /></h([1-6]+)>'	=> "</h\\1>",	// Pointless line breaks just before a heading closing tag
 				'</h([1-6]+)>'	=> "</h\\1>\n",	// Line breaks after all headings
@@ -1074,7 +1074,8 @@ class form
 		
 		# Perform the replacements
 		foreach ($replacements as $find => $replace) {
-			$content = eregi_replace ($find, $replace, $content);
+			#!# Migrate to direct preg_replace
+			$content = application::peregi_replace ($find, $replace, $content);
 		}
 		
 		# Return the tidied and adjusted content
@@ -2699,7 +2700,7 @@ class form
 		
 		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
 		$this->configureResultEmailedSubjectTitle['email'] = $subjectTitle;
-		if (ereg ('\{([^\} ]+)\}', $subjectTitle, $matches)) {
+		if (preg_match ('/\{([^\} ]+)\}/', $subjectTitle, $matches)) {
 			$element = $matches[1];
 			if (isSet ($this->elements[$element]) && ($this->elements[$element]['type'] == 'input')) {
 				$this->configureResultEmailedSubjectTitle['email'] = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $subjectTitle);
@@ -2863,7 +2864,7 @@ class form
 		
 		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
 		$this->configureResultEmailedSubjectTitle['confirmationEmail'] = $subjectTitle;
-		if (ereg ('\{([^\} ]+)\}', $subjectTitle, $matches)) {
+		if (preg_match ('/\{([^\} ]+)\}/', $subjectTitle, $matches)) {
 			$element = $matches[1];
 			if (isSet ($this->elements[$element]) && ($this->elements[$element]['type'] == 'input')) {
 				$this->configureResultEmailedSubjectTitle['confirmationEmail'] = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $subjectTitle);
@@ -3484,7 +3485,7 @@ class form
 		if ($this->prefixedGroups) {
 			foreach ($this->prefixedGroups as $group => $fields) {
 				foreach ($fields as $field) {
-					$unprefixedFieldname = ereg_replace ("^{$group}_", '', $field);
+					$unprefixedFieldname = preg_replace ("/^{$group}_/", '', $field);
 					$groupedData[$group][$unprefixedFieldname] = $data[$field];
 					unset ($data[$field]);
 				}
@@ -3834,7 +3835,7 @@ class form
 		# Disallow _heading at the start of an element
 		#!# This will also be listed alongside the 'Element names cannot start with _heading'.. warning
 		foreach ($this->elements as $name => $elementAttributes) {
-			if (ereg ('^_heading', $name)) {
+			if (preg_match ('/^_heading/', $name)) {
 				if ($elementAttributes['type'] != 'heading') {
 					$disallowedelementNames[] = $name;
 				}
@@ -3940,7 +3941,7 @@ class form
 						$formHtml .= "\n\t";
 						if ($this->settings['displayTitles']) {
 							$formHtml .= $elementAttributes['title'] . '<br />';
-							if ($displayRestriction) {$formHtml .= "<br /><span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ')</span>';}
+							if ($displayRestriction) {$formHtml .= "<br /><span class=\"restriction\">(" . preg_replace ("/\n/", '<br />', $elementAttributes['restriction']) . ')</span>';}
 						}
 						$formHtml .= $elementAttributes['html'];
 						#!# Need to have looped through each $elementAttributes['description'] and remove that column if there are no descriptions at all
@@ -3960,7 +3961,7 @@ class form
 							if ($displayRestriction) {
 								$formHtml .= "<span class=\"label\">";
 								$formHtml .= "\n\t\t" . $elementAttributes['title'];
-								$formHtml .= "\n\t\t<span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ')</span>';
+								$formHtml .= "\n\t\t<span class=\"restriction\">(" . preg_replace ("/\n/", '<br />', $elementAttributes['restriction']) . ')</span>';
 								$formHtml .= "\n\t</span>";
 							} else {
 								$formHtml .= "<span class=\"label\">" . $elementAttributes['title'] . '</span>';
@@ -3990,7 +3991,7 @@ class form
 						$formHtml .= "\n\t\t";
 						if ($this->settings['displayTitles']) {
 							$formHtml .= "<td class=\"title\">" . ($elementAttributes['title'] == '' ? '&nbsp;' : $elementAttributes['title']);
-							if ($displayRestriction) {$formHtml .= "<br />\n\t\t\t<span class=\"restriction\">(" . ereg_replace ("\n", '<br />', $elementAttributes['restriction']) . ")</span>\n\t\t";}
+							if ($displayRestriction) {$formHtml .= "<br />\n\t\t\t<span class=\"restriction\">(" . preg_replace ("/\n/", '<br />', $elementAttributes['restriction']) . ")</span>\n\t\t";}
 							$formHtml .= '</td>';
 						}
 						$formHtml .= "\n\t\t<td class=\"data\">" . $elementAttributes['html'] . '</td>';
@@ -4379,7 +4380,7 @@ class form
 			# Slightly hacky special case: for a select type in multiple mode, replace in the defaults the multiple output format instead
 			if (($attributes['type'] == 'select') && ($attributes['multiple'])) {
 				foreach ($defaults as $outputType => $outputFormat) {
-					if (ereg ("^([a-z]+) \[when in 'multiple' mode\]$", $outputType, $matches)) {
+					if (preg_match ("/^([a-z]+) \[when in 'multiple' mode\]$/", $outputType, $matches)) {
 						$replacementType = $matches[1];
 						$defaults[$replacementType] = $defaults[$outputType];
 						unset ($defaults[$outputType]);
@@ -5475,7 +5476,7 @@ class form
 			if ($intelligence) {
 				
 				# Fields with 'password' in become password fields, with a proxied confirmation widget
-				if (eregi ('password', $fieldName)) {
+				if (preg_match ('/password/i', $fieldName)) {
 					$forceType = 'password';
 					$standardAttributes['confirmation'] = true;
 					if ($data) {
@@ -5484,24 +5485,24 @@ class form
 				}
 				
 				# Richtext fields - text fields with html/richtext in fieldname
-				if (eregi ('(html|richtext)', $fieldName) && (strtolower ($fieldAttributes['Type']) == 'text')) {
+				if (preg_match ('/(html|richtext)/i', $fieldName) && (strtolower ($fieldAttributes['Type']) == 'text')) {
 					$forceType = 'richtext';
 					
 					# Use basic toolbar set for fieldnames containing 'basic/mini/simple'
-					if (eregi ('(basic|mini|simple)', $fieldName)) {
+					if (preg_match ('/(basic|mini|simple)/i', $fieldName)) {
 						$standardAttributes['editorToolbarSet'] = 'Basic';
 					}
 				}
 				
 				# Website fields - for fieldnames containing 'url/website/http'
-				if (eregi ('(url|website|http)', $fieldName)) {
+				if (preg_match ('/(url|website|http)/i', $fieldName)) {
 					$forceType = 'input';
 					$standardAttributes['regexp'] = '^(http|https)://';
 					$standardAttributes['description'] = 'Must begin http://';	// ' or https://' not added to this description just to keep it simple
 				}
 				
 				# Upload fields - fieldname containing photograph/upload or starting/ending with file/document
-				if (eregi ('(photograph|upload|^file|^document|file$|document$)', $fieldName)) {
+				if (preg_match ('/(photograph|upload|^file|^document|file$|document$)/i', $fieldName)) {
 					$forceType = 'upload';
 					$standardAttributes['flatten'] = true;	// Flatten the output so it's a string not an array
 					$standardAttributes['subfields'] = 1;	// Specify 1 subfield (which is already the default anyway)
@@ -5598,7 +5599,7 @@ class form
 				
 				# Force to a specified type if required
 				case ($forceType):
-					if (($forceType == 'checkboxes' || $forceType == 'radiobuttons' || $forceType == 'select') && eregi ('(enum|set)\(\'(.*)\'\)', $type, $matches)) {
+					if (($forceType == 'checkboxes' || $forceType == 'radiobuttons' || $forceType == 'select') && preg_match ('/(enum|set)\(\'(.*)\'\)/i', $type, $matches)) {
 						$values = explode ("','", $matches[2]);
 						$this->$forceType ($standardAttributes + array (
 							'values' => $values,
@@ -5617,11 +5618,11 @@ class form
 					break;
 				
 				# FLOAT (numeric with decimal point) field
-				case (eregi ('float\(([0-9]+),([0-9]+)\)', $type, $matches)):
+				case (preg_match ('/float\(([0-9]+),([0-9]+)\)/i', $type, $matches)):
 					if ($floatChopTrailingZeros) {
 						if (substr_count ($standardAttributes['default'], '.')) {
-							$standardAttributes['default'] = ereg_replace ('0+$', '', $standardAttributes['default']);
-							$standardAttributes['default'] = ereg_replace ('\.$', '', $standardAttributes['default']);
+							$standardAttributes['default'] = preg_replace ('/0+$/', '', $standardAttributes['default']);
+							$standardAttributes['default'] = preg_replace ('/\.$/', '', $standardAttributes['default']);
 						}
 					}
 					$this->input ($standardAttributes + array (
@@ -5631,7 +5632,7 @@ class form
 					break;
 				
 				# CHAR/VARCHAR (character) field
-				case (eregi ('(char|varchar)\(([0-9]+)\)', $type, $matches)):
+				case (preg_match ('/(char|varchar)\(([0-9]+)\)/i', $type, $matches)):
 					$this->input ($standardAttributes + array (
 						'maxlength' => $matches[2],
 						# Set the size if a (numeric) value is given and the required size is greater than the size specified
@@ -5640,7 +5641,7 @@ class form
 					break;
 				
 				# INT (numeric) field
-				case (eregi ('(int|tinyint|smallint|mediumint|bigint)\(([0-9]+)\)', $type, $matches)):
+				case (preg_match ('/(int|tinyint|smallint|mediumint|bigint)\(([0-9]+)\)/i', $type, $matches)):
 					$this->input ($standardAttributes + array (
 						'enforceNumeric' => true,
 						'regexp' => '^([0-9]*)$',
@@ -5651,7 +5652,7 @@ class form
 					break;
 				
 				# ENUM (selection) field - explode the matches and insert as values
-				case (eregi ('enum\(\'(.*)\'\)', $type, $matches)):
+				case (preg_match ('/enum\(\'(.*)\'\)/i', $type, $matches)):
 					$values = explode ("','", $matches[1]);
 					foreach ($values as $index => $value) {
 						$values[$index] = str_replace ("''", "'", $value);
@@ -5664,7 +5665,7 @@ class form
 					break;
 				
 				# SET (multiple item) field - explode the matches and insert as values
-				case (eregi ('set\(\'(.*)\'\)', $type, $matches)):
+				case (preg_match ('/set\(\'(.*)\'\)/i', $type, $matches)):
 					$values = explode ("','", $matches[1]);
 					$setSupportMax = 64;	// MySQL supports max 64 values for SET; #!# This value should be changeable in settings as different database vendor might be in use
 					$setSupportSupplied = count ($values);
@@ -5681,7 +5682,7 @@ class form
 					break;
 				
 				# DATE (date) field
-				case (eregi ('year\(([2|4])\)', $type, $matches)):
+				case (preg_match ('/year\(([2|4])\)/i', $type, $matches)):
 					$type = 'year';
 				case (strtolower ($type) == 'time'):
 				case (strtolower ($type) == 'date'):
@@ -5859,7 +5860,7 @@ class formWidget
 	function preventMultilineSubmissions ()
 	{
 		# Throw an error if an \n or \r line break is found
-		if (ereg ("([\n\r]+)", $this->value)) {
+		if (preg_match ("/([\n\r]+)/", $this->value)) {
 			$this->elementProblems['multilineSubmission'] = 'Line breaks are not allowed in field types that do not support these.';
 		}
 	}
@@ -5882,25 +5883,25 @@ class formWidget
 		$data = $this->value;
 		
 		#!# Replace with something like this line? :
-		#$this->form[$name] = ereg_replace ('[^0-9\. ]', '', trim ($this->form[$name]));
+		#$this->form[$name] = preg_replace ('/[^0-9\. ]/', '', trim ($this->form[$name]));
 		
 		# Strip replace windows carriage returns with a new line (multiple new lines will be stripped later)
-		$data = ereg_replace ("\r", "\n", $data);
+		$data = str_replace ("\r\n", "\n", $data);
 		# Turn commas into spaces
-		$data = ereg_replace (",", " ", $data);
+		$data = str_replace (',', ' ', $data);
 		# Strip non-numeric characters
-		$data = ereg_replace ("[^-0-9\.\n\t ]", "", $data);
+		$data = preg_replace ("/[^-0-9\.\n\t ]/", '', $data);
 		# Replace tabs and duplicated spaces with a single space
-		$data = ereg_replace ("\t", " ", $data);
+		$data = str_replace ("\t", ' ', $data);
 		# Replace tabs and duplicated spaces with a single space
-		$data = ereg_replace ("[ \t]+", " ", $data);
+		$data = preg_replace ("/[ \t]+/", ' ', $data);
 		# Remove space at the start and the end
 		$data = trim ($data);
 		# Collapse duplicated newlines
-		$data = ereg_replace ("[\n]+", "\n", $data);
+		$data = preg_replace ("/[\n]+/", "\n", $data);
 		# Remove any space at the start or end of each line
-		$data = ereg_replace ("\n ", "\n", $data);
-		$data = ereg_replace (" \n", "\n", $data);
+		$data = str_replace ("\n ", "\n", $data);
+		$data = str_replace (" \n", "\n", $data);
 		
 		# Re-assign the data
 		#!# Remove these
@@ -5954,13 +5955,13 @@ class formWidget
 		# Regexp checks (for non-e-mail types)
 		#!# Allow flexible array ($regexp => $errorMessage) syntax, as with disallow
 		if (strlen ($this->arguments['regexp'])) {
-			if (!ereg ($this->arguments['regexp'], $this->value)) {
+			if (!application::pereg ($this->arguments['regexp'], $this->value)) {
 				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
 				return false;
 			}
 		}
 		if (strlen ($this->arguments['regexpi'])) {
-			if (!eregi ($this->arguments['regexpi'], $this->value)) {
+			if (!application::peregi ($this->arguments['regexpi'], $this->value)) {
 				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
 				return false;
 			}
@@ -5980,7 +5981,7 @@ class formWidget
 			}
 			
 			# Perform the check
-			if (ereg ($disallowRegexp, $this->value)) {
+			if (application::pereg ($disallowRegexp, $this->value)) {
 				$this->elementProblems['failsDisallow'] = $disallowErrorMessage;
 				return false;
 			}

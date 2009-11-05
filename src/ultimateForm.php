@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.0
+ * @version 1.14.1
  */
 class form
 {
@@ -1530,6 +1530,7 @@ class form
 			'default'			=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
+			'columns'				=> false,	# Split into columns
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
@@ -1580,11 +1581,17 @@ class form
 		# Start a tally to check the number of checkboxes checked
 		$checkedTally = 0;
 		
+		# Determine whether to use columns, and ensure there are no more than the number of arguments, then set the number per column
+		if ($splitIntoColumns = ($arguments['columns'] && ctype_digit ((string) $arguments['columns']) && ($arguments['columns'] > 1) ? min ($arguments['columns'], count ($arguments['values'])) : false)) {
+			$splitIntoColumns = ceil (count ($arguments['values']) / $splitIntoColumns);
+		}
+		
 		# Loop through each pre-defined element subname to construct the HTML
 		$widgetHtml = '';
 		if ($arguments['editable']) {
 			/* #!# Write branching code around here which uses _valuesMultidimensional, when implementing fieldset grouping */
 			$subwidgetIndex = 1;
+			if ($splitIntoColumns) {$widgetHtml .= "\n\t\t\t<table class=\"checkboxcolumns\">\n\t\t\t\t<tr>\n\t\t\t\t\t<td>";}
 			foreach ($arguments['values'] as $value => $visible) {
 				
 				# If the form is not posted, assign the initial value (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
@@ -1613,12 +1620,20 @@ class form
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
 //				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . $this->specialchars ($visible) . '</label>';
-				$widgetHtml .= "\n\t\t\t" . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . $this->specialchars ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . $this->specialchars ($visible) . '</label>';
 				
-				# Add a line break if required
+				# Add a line/column breaks when required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
+				if ($splitIntoColumns) {
+					if (($subwidgetIndex % $splitIntoColumns) == 0) {
+						if ($subwidgetIndex != count ($arguments['values'])) { // Don't add at the end if the number is an exact multiplier
+							$widgetHtml .= "\n\t\t\t\t\t</td>\n\t\t\t\t\t<td>";
+						}
+					}
+				}
 				$subwidgetIndex++;
 			}
+			if ($splitIntoColumns) {$widgetHtml .= "\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n\t\t\t</table>\n\t\t";}
 		} else {
 			
 			# Loop through each default argument (if any) to prepare them

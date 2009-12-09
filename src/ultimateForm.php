@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.1
+ * @version 1.14.2
  */
 class form
 {
@@ -1101,6 +1101,7 @@ class form
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'multiple'				=> false,	# Whether to create a multiple-mode select box
+			'expandable'			=> false,	# Whether a multiple-select box should be converted to a set of single boxes whose number can be incremented by pressing a + button
 			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
 			'size'			=> 5,		# Number of rows visible in multiple mode (optional; defaults to 1)
 			'default'				=> array (),# Pre-selected item(s)
@@ -1126,6 +1127,37 @@ class form
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
 		
+		# If using a expandable widget-set, ensure that other arguments are sane
+		$subwidgets = 1;
+		if ($arguments['expandable']) {
+			if (!$arguments['multiple']) {
+				$this->formSetupErrors['expandableNotMultiple'] = 'An expandable select widget-set was requested, but the widget-type is not set as multiple, which is required.';
+				$arguments['expandable'] = false;
+			}
+			if (!$arguments['editable']) {
+				$this->formSetupErrors['expandableNotEditable'] = 'An expandable select widget-set was requested, but the widget-type is set as non-editable.';
+				$arguments['expandable'] = false;
+			}
+			
+			# Determine the number of widgets to display
+			$subwidgets = 1;
+			if ($arguments['required'] && is_numeric ($arguments['required'])) {
+				$subwidgets = $arguments['required'];
+			}
+			if (isSet ($this->collection['__subwidgets'])) {
+				if (ctype_digit ($this->collection['__subwidgets'])) {
+					$subwidgets = $this->collection['__subwidgets'];
+					if (isSet ($this->collection['__refresh'])) {
+						$subwidgets++;
+					}
+				}
+			}
+			$totalAvailableOptions = count ($arguments['values']);
+			if ($subwidgets > $totalAvailableOptions) {	// Ensure there are never any more than the available options
+				$subwidgets = $totalAvailableOptions;
+			}
+		}
+		
 		# Use the 'get' supplied value if required
 		#!# Apply this to checkboxes and radio buttons also
 		if ($arguments['get']) {
@@ -1138,8 +1170,30 @@ class form
 		# If the widget is not editable, fix the form value to the default
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
 		
-		# Obtain the value of the form submission (which may be empty)
-		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
+		# Obtain the value of the form submission (which may be empty); if using expandable widgets, emulate the format of a single multiple widget
+		if ($arguments['expandable']) {
+			$value = array ();
+			$allNonZeroSoFar = true;
+			for ($subwidget = 0; $subwidget < $subwidgets; $subwidget++) {
+				$subwidgetName = $arguments['name'] . ($arguments['expandable'] ? "_{$subwidget}" : '');
+				if (isSet ($this->form[$subwidgetName]) && isSet ($this->form[$subwidgetName][0])) {
+					$subwidgetValue = $this->form[$subwidgetName][0];
+					if ($value && $subwidgetValue && in_array ($subwidgetValue, $value)) {
+						$elementProblems['expandableValuesDuplicated'] = "In the <strong>{$arguments['name']}</strong> element, you selected the same value twice.";
+					}
+					if (!$subwidgetValue) {
+						$allNonZeroSoFar = false;
+					}
+					$value[$subwidget] = $subwidgetValue;
+				}
+				if (!$allNonZeroSoFar && $subwidgetValue) {
+					$elementProblems['expandableValuesMissingInSequence'] = "In the <strong>{$arguments['name']}</strong> element, you left out a value in sequence.";
+				}
+			}
+		} else {
+			$value = (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
+		}
+		$widget->setValue ($value);
 		
 		$elementValue = $widget->getValue ();
 		
@@ -1202,45 +1256,67 @@ class form
 		
 		# Describe restrictions on the widget
 		if ($arguments['multiple']) {
-			$restriction = (($arguments['required'] > 1) ? "Minimum {$arguments['required']} required; use Control/Shift" : 'Use Control/Shift for multiple');
+			$restriction = (($arguments['required'] > 1) ? "Minimum {$arguments['required']} required." : '') . ($arguments['expandable'] ? '' : ' Use Control/Shift for multiple');
 		}
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
 			
-			# Add a null field to the selection if in multiple mode and a value is required (for single fields, null is helpful; for multiple not required, some users may not know how to de-select a field)
-			#!# Creates error if formSetupErrors['selectNoValues'] thrown - shouldn't be getting this far
-			if (!$arguments['multiple'] || !$arguments['required']) {
-				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
-				if (isSet ($arguments['_valuesMultidimensional'])) {
-					$arguments['_valuesMultidimensional'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
-				}
-			}
-			
-			# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-			$widgetHtml = "\n\t\t\t<select" . $this->nameIdHtml ($arguments['name'], true) . (($arguments['multiple']) ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . $widget->tabindexHtml () . '>';
-			if (!isSet ($arguments['_valuesMultidimensional'])) {
-				$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
-				foreach ($arguments['valuesWithNull'] as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . $this->nameIdHtml ($arguments['name'], false, $value, true) . '>' . $this->specialchars ($visible) . '</option>';
-				}
-			} else {
+			# Create each widget for this set (normally one, but could be more if in expandable mode)
+			$subwidgetHtml = array ();
+			$subwidgetsAreMultiple = ($arguments['expandable'] ? false : $arguments['multiple']);
+			for ($subwidget = 0; $subwidget < $subwidgets; $subwidget++) {
+				$subwidgetName = $arguments['name'] . ($arguments['expandable'] ? "_{$subwidget}" : '');
 				
-				# Multidimensional version, which adds optgroup labels
-				foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
-					if (is_array ($mainValue)) {
-						$widgetHtml .= "\n\t\t\t\t\t<optgroup label=\"$key\">";
-						foreach ($mainValue as $value => $visible) {
-							$widgetHtml .= "\n\t\t\t\t\t\t" . '<option value="' . $this->specialchars ($value) . '"' . (in_array ($value, $elementValue) ? ' selected="selected"' : '') . '>' . $this->specialchars ($visible) . '</option>';
-						}
-						$widgetHtml .= "\n\t\t\t\t\t</optgroup>";
-					} else {
-						$widgetHtml .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($key) . '"' . (in_array ($key, $elementValue) ? ' selected="selected"' : '') . '>' . $this->specialchars ($mainValue) . '</option>';
+				# Add a null field to the selection if in multiple mode and a value is required (for single fields, null is helpful; for multiple not required, some users may not know how to de-select a field)
+				#!# Creates error if formSetupErrors['selectNoValues'] thrown - shouldn't be getting this far
+				if (!$subwidgetsAreMultiple || !$arguments['required']) {
+					$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
+					if (isSet ($arguments['_valuesMultidimensional'])) {
+						$arguments['_valuesMultidimensional'] = array ('' => $arguments['nullText']) + $arguments['_valuesMultidimensional'];
 					}
 				}
+				
+				# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
+				$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . $widget->tabindexHtml () . '>';
+				if (!isSet ($arguments['_valuesMultidimensional'])) {
+					$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
+					foreach ($arguments['valuesWithNull'] as $availableValue => $visible) {
+						$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
+						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true) . '>' . $this->specialchars ($visible) . '</option>';
+					}
+				} else {
+					
+					# Multidimensional version, which adds optgroup labels
+					foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
+						if (is_array ($mainValue)) {
+							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t<optgroup label=\"{$key}\">";
+							foreach ($mainValue as $availableValue => $visible) {
+								$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . $this->specialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . $this->specialchars ($visible) . '</option>';
+							}
+							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t</optgroup>";
+						} else {
+							$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $key);
+							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . $this->specialchars ($mainValue) . '</option>';
+						}
+					}
+				}
+				$subwidgetHtml[$subwidget] .= "\n\t\t\t</select>\n\t\t";
 			}
-			$widgetHtml .= "\n\t\t\t</select>\n\t\t";
-		} else {
+			
+			# Add an expansion button at the end
+			if ($arguments['expandable']) {
+				#!# Need to deny __refresh and __subwidgets as a reserved form name
+				$refreshButton  = '<input type="hidden" value="' . $subwidgets . '" name="__subwidgets" />';
+				$refreshButton .= '<input type="submit" value="&#10010;" title="Add another item" name="__refresh" class="refresh" />';
+				$arguments['append'] = $refreshButton . $arguments['append'];
+			}
+			
+			# Compile the subwidgets into a single widget HTML block
+			$widgetHtml  = implode ("\t<br />", $subwidgetHtml);
+			
+		} else {	// i.e. Non-editable
 			
 			# Loop through each default argument (if any) to prepare them
 			#!# All this stuff isn't even needed if errors have been found
@@ -1320,6 +1396,18 @@ class form
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => 'compiled',
 		);
+	}
+	
+	
+	# Helper function for select fields to determe whether a value is selected
+	function select_isSelected ($expandable, $elementValue, $subwidget, $availableValue)
+	{
+		if ($expandable) {
+			$isSelected = (isSet ($elementValue[$subwidget]) ? ($availableValue == $elementValue[$subwidget]) : false);
+		} else {
+			$isSelected = (in_array ($availableValue, $elementValue));
+		}
+		return $isSelected;
 	}
 	
 	

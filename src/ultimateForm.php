@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.2
+ * @version 1.14.3
  */
 class form
 {
@@ -132,7 +132,6 @@ class form
 		'displayTemplatePatternSpecial'		=> '{[[%element]]}',				# The pattern used for signifying element name special item positions (e.g. submit, reset, problems) when templating
 		'classShowType'						=> true,							# Whether to include the widget type within the class list for the container of the widget (e.g. tr in 'tables' mode)
 		'debug'								=> false,							# Whether to switch on debugging
-		'developmentEnvironment'			=> false,							# Whether to run in development mode
 		'displayColons'						=> true,							# Whether to show colons after the initial description
 		'whiteSpaceTrimSurrounding'			=> true,							# Whether to trim surrounding white space in any forms which are submitted
 		'whiteSpaceCheatAllowed'			=> false,							# Whether to allow people to cheat submitting whitespace only in required fields
@@ -3875,11 +3874,6 @@ class form
 		
 		# Check that global user variables cannot be imported into the program
 		if ((bool) ini_get ('register_globals')) {$this->formSetupErrors['environmentRegisterGlobals'] = 'The PHP configuration setting register_globals must be set to <strong>off</strong>.';}
-		
-		# Check that raw PHP errors are not set to display on the screen
-		if (!$this->settings['developmentEnvironment']) {
-			if ((bool) ini_get ('display_errors')) {$this->formSetupErrors['environmentDisplayErrors'] = 'The PHP configuration setting display_errors must be set to <strong>false</strong>.';}
-		}
 		
 		# Check that magic_quotes are switched off; escaping of user input is handled manually
 		#!# Replace these with data cleaning methods

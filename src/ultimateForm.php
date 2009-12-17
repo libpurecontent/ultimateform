@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.3
+ * @version 1.14.4
  */
 class form
 {
@@ -5739,9 +5739,10 @@ class form
 				
 				# INT (numeric) field
 				case (preg_match ('/(int|tinyint|smallint|mediumint|bigint)\(([0-9]+)\)/i', $type, $matches)):
+					$unsigned = substr_count (strtolower ($type), ' unsigned');
 					$this->input ($standardAttributes + array (
 						'enforceNumeric' => true,
-						'regexp' => '^([0-9]*)$',
+						'regexp' => ($unsigned ? '^([0-9]*)$' : '^([-0-9]*)$'),
 						#!# Make these recognise types without the numeric value after
 						'maxlength' => $matches[2],
 						'size' => $matches[2] + 1,

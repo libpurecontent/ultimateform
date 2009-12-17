@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.4
+ * @version 1.14.5
  */
 class form
 {
@@ -1143,10 +1143,12 @@ class form
 			if ($arguments['required'] && is_numeric ($arguments['required'])) {
 				$subwidgets = $arguments['required'];
 			}
-			if (isSet ($this->collection['__subwidgets'])) {
-				if (ctype_digit ($this->collection['__subwidgets'])) {
-					$subwidgets = $this->collection['__subwidgets'];
-					if (isSet ($this->collection['__refresh'])) {
+			$checkForSubwidgetsWidgetName = '__subwidgets_' . $this->cleanId ($arguments['name']);
+			if (isSet ($this->collection[$checkForSubwidgetsWidgetName])) {
+				if (ctype_digit ($this->collection[$checkForSubwidgetsWidgetName])) {
+					$subwidgets = $this->collection[$checkForSubwidgetsWidgetName];
+					$checkForRefreshWidgetName = '__refresh_' . $this->cleanId ($arguments['name']);
+					if (isSet ($this->collection[$checkForRefreshWidgetName])) {
 						$subwidgets++;
 					}
 				}
@@ -1306,9 +1308,9 @@ class form
 			
 			# Add an expansion button at the end
 			if ($arguments['expandable']) {
-				#!# Need to deny __refresh and __subwidgets as a reserved form name
-				$refreshButton  = '<input type="hidden" value="' . $subwidgets . '" name="__subwidgets" />';
-				$refreshButton .= '<input type="submit" value="&#10010;" title="Add another item" name="__refresh" class="refresh" />';
+				#!# Need to deny __refresh_<cleaned-id> and __subwidgets_<cleaned-id> as a reserved form name
+				$refreshButton  = '<input type="hidden" value="' . $subwidgets . '" name="__subwidgets_' . $this->cleanId ($arguments['name']) . '" />';
+				$refreshButton .= '<input type="submit" value="&#10010;" title="Add another item" name="__refresh_' . $this->cleanId ($arguments['name']) . '" class="refresh" />';
 				$arguments['append'] = $refreshButton . $arguments['append'];
 			}
 			
@@ -3518,9 +3520,23 @@ class form
 			}
 		}
 		
+		# Determine if any kind of refresh button has been selected (either a __refresh or __refresh_<cleaned-id> expandable type)
+		$formRefreshed = false;
+		if (isSet ($this->collection['__refresh'])) {
+			$formRefreshed = true;
+		} else {
+			foreach ($this->elements as $name => $elementAttributes) {
+				$checkForRefreshWidgetName = '__refresh_' . $this->cleanId ($name);	// e.g. if a select widget called 'foo' has the 'expandable' attribute set, then check for __refresh_foo
+				if (isSet ($this->collection[$checkForRefreshWidgetName])) {
+					$formRefreshed = true;
+					break;
+				}
+			}
+		}
+		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		$elementProblems = $this->getElementProblems ();
-		if (!$this->formPosted || $elementProblems || isSet ($this->collection['__refresh']) || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
+		if (!$this->formPosted || $elementProblems || $formRefreshed || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
 			
 			# Run the callback function if one is set
 			if ($this->settings['callback']) {
@@ -3528,13 +3544,13 @@ class form
 			}
 			
 			# Add a note about refreshing
-			if (isSet ($this->collection['__refresh'])) {
+			if ($formRefreshed) {
 				$this->html .= '<p><em>The form below has been refreshed but not yet submitted.</em></p>';
 			}
 			
 			# Display the form and any problems then end
 			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
-			if (!$this->formPosted || $elementProblems || isSet ($this->collection['__refresh'])) {
+			if (!$this->formPosted || $elementProblems || $formRefreshed) {
 				#!# This should not be done if the form is successful
 				if ($this->settings['div']) {$this->html .= "\n</div>";}
 				if ($showHtmlDirectly) {echo $this->html;}
@@ -6033,7 +6049,9 @@ class formWidget
 	function truncate ($values)
 	{
 		# Loop through and truncating the value's numeric length if necessary
+		#!# Needs to take account of multi-dimensional selects
 		foreach ($values as $key => $value) {
+			#!# Should use a proper &hellip; unicode symbol rather than three dots (...)
 			$values[$key] = ($this->arguments['truncate'] && (is_numeric ($this->arguments['truncate'])) ? substr ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ...' : '') : $value);
 		}
 		

@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.5
+ * @version 1.14.6
  */
 class form
 {
@@ -1167,6 +1167,16 @@ class form
 		
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
 		$arguments['default'] = application::ensureArray ($arguments['default']);
+		
+		# Increase the number of default widgets to the number of defaults if any are set
+		if ($arguments['expandable']) {
+			if ($arguments['default']) {
+				$totalDefaults = count ($arguments['default']);
+				if ($totalDefaults > $subwidgets) {
+					$subwidgets = $totalDefaults;
+				}
+			}
+		}
 		
 		# If the widget is not editable, fix the form value to the default
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
@@ -2578,6 +2588,11 @@ class form
 		# Convert to an array (for this local function only) if not already
 		if (!is_array ($arguments['default'])) {
 			$arguments['default'] = application::ensureArray ($arguments['default']);
+		}
+		
+		# Ensure values are not duplicated
+		if (count ($arguments['default']) != count (array_unique ($arguments['default']))) {
+			$this->formSetupErrors['defaultContainsDuplicates'] = "In the <strong>{$arguments['name']}</strong> element, the default values contain duplicates.";
 		}
 		
 		# For an array of defaults, check through each

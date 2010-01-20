@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.6
+ * @version 1.14.7
  */
 class form
 {
@@ -137,7 +137,7 @@ class form
 		'whiteSpaceCheatAllowed'			=> false,							# Whether to allow people to cheat submitting whitespace only in required fields
 		'reappear'							=> false,							# Whether to keep the form visible after successful submission (useful for search forms, etc., that should reappear)
 		'formCompleteText'					=> 'Many thanks for your input.',	# The form completion text (or false if not to display it at all)
-		'submitButtonAtEnd'					=> true,							# Whether the submit button appears at the end or the start of the form
+		'submitButtonPosition'				=> 'end',							# Whether the submit button appears at the end or the start/end/both of the form
 		'submitButtonText'					=> 'Submit!',						# The form submit button text
 		'submitButtonAccesskey'				=> 's',								# The form submit button accesskey
 		'submitButtonTabindex'				=> false,							# The form submit button tabindex (if any)
@@ -3868,7 +3868,12 @@ class form
 			}
 		}
 		
-		# Define special placemarker names and whether they are required
+		# Construct an array of missing elements if there are any; labels are considered optional
+		if ($missingElements) {
+			$this->formSetupErrors['templateElementsNotFoundWidget'] = 'The following element ' . ((count ($missingElements) == 1) ? 'string was' : 'strings were') . ' not present once only in the template you specified: ' . implode (', ', $missingElements);
+		}
+		
+		# Define special placemarker names and whether they are required; these can appear more than once
 		$specials = array (
 			'PROBLEMS' => true,				// Placemarker for the element problems box
 			'SUBMIT' => true,				// Placemarker for the submit button
@@ -3880,16 +3885,19 @@ class form
 		}
 		
 		# Loop through each special, allocating its replacement shortcut and checking it exists if necessary
+		$missingElements = array ();
 		foreach ($specials as $special => $required) {
 			$this->displayTemplateElementReplacementsSpecials[$special] = str_replace ($placemarker, $special, $this->settings['displayTemplatePatternSpecial']);
-			if ($required && (substr_count ($this->displayTemplateContents, $this->displayTemplateElementReplacementsSpecials[$special]) !== 1)) {
-				$missingElements[] = $this->displayTemplateElementReplacementsSpecials[$special];
+			if ($required) {
+				if (!substr_count ($this->displayTemplateContents, $this->displayTemplateElementReplacementsSpecials[$special])) {
+					$missingElements[] = $this->displayTemplateElementReplacementsSpecials[$special];
+				}
 			}
 		}
 		
 		# Construct an array of missing elements if there are any; labels are considered optional
 		if ($missingElements) {
-			$this->formSetupErrors['templateElementsNotFound'] = 'The following element ' . ((count ($missingElements) == 1) ? 'string was' : 'strings were') . ' not present once only in the template you specified: ' . implode (', ', $missingElements);
+			$this->formSetupErrors['templateElementsNotFoundSpecials'] = 'The following element ' . ((count ($missingElements) == 1) ? 'string was' : 'strings were') . ' not present at least once in the template you specified: ' . implode (', ', $missingElements);
 		}
 	}
 	
@@ -4154,7 +4162,17 @@ class form
 			if ($this->settings['refreshButton']) {
 				$refreshButtonHtml = "\n\n" . '<p class="refresh">' . $refreshButtonHtml . '</p>';
 			}
-			$formHtml = ((!$this->settings['submitButtonAtEnd']) ? ($formButtonHtml . $formHtml) : ($formHtml . $formButtonHtml));
+			switch ($this->settings['submitButtonPosition']) {
+				case 'start':
+					$formHtml = $formButtonHtml . $formHtml;
+					break;
+				case 'both':
+					$formHtml = $formButtonHtml . $formHtml . $formButtonHtml;
+					break;
+				case 'end':	// Fall-through
+				default:
+					$formHtml = $formHtml . $formButtonHtml;
+			}
 			if ($this->settings['refreshButton']) {
 				$formHtml = ((!$this->settings['refreshButtonAtEnd']) ? ($refreshButtonHtml . $formHtml) : ($formHtml . $refreshButtonHtml));
 			}

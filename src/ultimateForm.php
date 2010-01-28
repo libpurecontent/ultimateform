@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.8
+ * @version 1.14.9
  */
 class form
 {
@@ -2572,13 +2572,38 @@ class form
 	function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false)
 	{
 		# Create the name and ID and compile the HTML
-		$name = ' name="' .              ($this->settings['name'] ? "{$this->settings['name']}[{$widgetName}]" : $widgetName) . ($multiple ? '[]' : '') . ($nameAppend ? "[{$subitem}]" : '') . '"';
+		# http://htmlhelp.com/reference/html40/attrs.html says that "Also note that while NAME may contain entities, the ID attribute value may not."
+		$widgetNameCleaned = htmlspecialchars ($widgetName);
+		$subitemCleaned = htmlspecialchars ($subitem);
+		$name = ' name="' .              ($this->settings['name'] ? "{$this->settings['name']}[{$widgetNameCleaned}]" : $widgetName) . ($multiple ? '[]' : '') . ($nameAppend ? "[{$subitemCleaned}]" : '') . '"';
 		if ($subitem !== false) {$widgetName .= "_{$subitem}";}
 		$id   = ' id="' . $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$widgetName}]" : $widgetName) . '"';
 		$html = $name . $id;
 		
 		# Return the HTML
 		return $html;
+	}
+	
+	
+	# Function to clean an HTML id attribute
+	function cleanId ($id)
+	{
+		# Replace non-allowed characters
+		# http://htmlhelp.com/reference/html40/attrs.html states:
+		# - "Also note that while NAME may contain entities, the ID attribute value may not."
+		# - "The attribute's value must begin with a letter in the range A-Z or a-z and may be followed by letters (A-Za-z), digits (0-9), hyphens ("-"), underscores ("_"), colons (":"), and periods ("."). The value is case-sensitive."
+		$id = preg_replace ('/[^-_:.a-zA-Z0-9]/','_', $id);	// The unicode semantics flag /u is NOT enabled, as this makes the function return false when a non-Unicode string is added
+		
+		# Ensure the first character is valid
+		#!# Currently this routine doesn't ensure that the first is A-Z or a-z, though often the elements will have form_ added anyway
+		
+		# Chop off any trailing _
+		while (substr ($id, -1) == '_') {
+			$id = substr ($id, 0, -1);
+		}
+		
+		# Return the cleaned ID
+		return $id;
 	}
 	
 	
@@ -2635,25 +2660,6 @@ class form
 		
 		# Return the arranged values
 		return $values;
-	}
-	
-	
-	# Function to clean an HTML id attribute
-	function cleanId ($id)
-	{
-		# Define the replacements
-		$replacements = array (' ', ',', '', '!', '(', ')', '[', ']');
-		
-		# Perform the replacements
-		$id = str_replace ($replacements, '_', $id);
-		
-		# Chop off any final _
-		while (substr ($id, -1) == '_') {
-			$id = substr ($id, 0, -1);
-		}
-		
-		# Return the cleaned ID
-		return $id;
 	}
 	
 	

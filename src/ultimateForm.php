@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.7
+ * @version 1.14.8
  */
 class form
 {
@@ -1345,7 +1345,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], $arguments['multiple']) . ' type="hidden" value="' . $this->specialchars ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], true /* True should be used so that the _POST is the same structure (which is useful if the user is capturing that data before using its API), even though this is actually ignored in processing */) . ' type="hidden" value="' . $this->specialchars ($value) . '" />';
 				}
 			}
 			

@@ -59,8 +59,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-9, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.9
+ * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
+ * @version 1.14.10
  */
 class form
 {
@@ -190,6 +190,7 @@ class form
 		'antispam'							=> false,							# Global setting for anti-spam checking
 		'antispamRegexp'					=> '~(a href=|<a |<script|<url|\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
+		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
 	);
 	
 	
@@ -3623,10 +3624,20 @@ class form
 		# If the data is grouped, rearrange it into groups first
 		if ($this->prefixedGroups) {
 			foreach ($this->prefixedGroups as $group => $fields) {
+				$thisGroupEmpty = true;	// Flag to detect all fields in the group being not completed
 				foreach ($fields as $field) {
+					#!# Currently this will NOT filter data which is in array format, e.g. a select field with the default output type
+					if ($data[$field]) {$thisGroupEmpty = false;}
 					$unprefixedFieldname = preg_replace ("/^{$group}_/", '', $field);
 					$groupedData[$group][$unprefixedFieldname] = $data[$field];
 					unset ($data[$field]);
+				}
+				
+				# Omit this group of fields in the output if it is empty
+				if ($this->settings['prefixedGroupsFilterEmpty']) {
+					if ($thisGroupEmpty) {
+						unset ($groupedData[$group]);
+					}
 				}
 			}
 			

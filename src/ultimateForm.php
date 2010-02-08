@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.10
+ * @version 1.14.11
  */
 class form
 {
@@ -1635,6 +1635,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'entities'				=> true,	# Convert HTML in label to entity equivalents
 		);
 		
 		# Create a new form widget
@@ -1720,7 +1721,7 @@ class form
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
 //				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . $this->specialchars ($visible) . '</label>';
-				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . $this->specialchars ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? $this->specialchars ($visible) : $visible) . '</label>';
 				
 				# Add a line/column breaks when required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}

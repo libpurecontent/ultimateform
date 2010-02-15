@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.11
+ * @version 1.14.12
  */
 class form
 {
@@ -281,6 +281,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'confirmation'			=> false,	# Whether to generate a confirmation field
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'several'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with space/commas)
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
@@ -293,6 +294,8 @@ class form
 		# Add in email-specific defaults
 		if ($functionName == 'email') {
 			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation e-mail field
+		} else {
+			$argumentDefaults['several'] = false;	# Ensure this option is disabled for non-email types
 		}
 		
 		# Add a regexp check if using URL handling (retrieval or URL HEAD check)
@@ -3569,6 +3572,7 @@ class form
 			# Add a note about refreshing
 			if ($formRefreshed) {
 				$this->html .= '<p><em>The form below has been refreshed but not yet submitted.</em></p>';
+				$this->elementProblems = array ();	// Clear the element problems list in case this is being shown in templating mode
 			}
 			
 			# Display the form and any problems then end
@@ -5505,7 +5509,7 @@ class form
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
 			'commentsAsDescription' => false,	// Whether to use column comments for the description field rather than for the title field
 			'prefix'	=> false,	// What to prefix all field names with (plus _ implied)
-			#!# Change to default to true in a later release once existing applications migrated over
+			'prefixTitleSuffix'	=> false,	// What to suffix all field titles with
 			'intelligence'	=> false,		// Whether to enable intelligent field setup, e.g. password/file*/photograph* become relevant fields and key fields are handled as non-editable
 			'floatChopTrailingZeros' => true,	// Whether to replace trailing zeros at the end of a value where there is a decimal point
 		);
@@ -5735,6 +5739,9 @@ class form
 			if ($prefix) {	// This will automatically prevent the string '0' anyway
 				if ($prefix === '0') {
 					$this->formSetupErrors['dataBindingPrefix'] = "A databinding prefix cannot be called '0'";
+				}
+				if ($prefixTitleSuffix) {
+					$standardAttributes['title'] .= $prefixTitleSuffix;	// e.g. a field whose title is "Name" gets a title of "Name (1)" if prefixTitleSuffix = ' (1)'
 				}
 				$standardAttributes['name'] = $prefix . '_' . $standardAttributes['name'];
 				//$standardAttributes['unprefixed'] = $standardAttributes['name'];
@@ -6156,8 +6163,24 @@ class formWidget
 		
 		# E-mail check (for e-mail type)
 		if ($this->functionName == 'email') {
-			if (!application::validEmail ($this->value)) {
-				$this->elementProblems['invalidEmail'] = 'The e-mail address you gave appears to be invalid.';
+			
+			# Do splitting if required, by comma/semi-colon/space with any spaces surrounding
+			$addresses = array ($this->value);	// By default, make it a list of one
+			if ($this->arguments['several']) {
+				$addresses = application::emailListStringToArray ($this->value);
+			}
+			
+			# Loop through each address (which may be just one)
+			$invalidAddresses = array ();
+			foreach ($addresses as $address) {
+				if (!application::validEmail ($address)) {
+					$invalidAddresses[] = $address;
+				}
+			}
+			
+			# Report if invalid
+			if ($invalidAddresses) {
+				$this->elementProblems['invalidEmail'] = (count ($addresses) == 1 ? 'The e-mail address' : (count ($invalidAddresses) == 1 ? 'An e-mail address' : 'Some e-mail addresses')) . ' (' . htmlspecialchars (implode (', ', $invalidAddresses)) . ') you gave ' . (count ($invalidAddresses) == 1 ? 'appears' : 'appear') . ' to be invalid.';
 				return false;
 			}
 		}

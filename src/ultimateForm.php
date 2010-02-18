@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.12
+ * @version 1.14.13
  */
 class form
 {
@@ -4388,6 +4388,7 @@ class form
 			'same'		=> 'The values for each of the sections %fields must be the same.',
 			'either'	=> 'One of the sections %fields must be completed.',
 			'all'		=> 'The values for all of the sections %fields must be completed if one of them is.',
+			'master'	=> 'The value for the field %fields must be completed if any of the other %parameter fields are completed.',
 			'total'		=> 'In the sections %fields, the total number of items selected must be exactly %parameter.',
 		);
 		
@@ -4455,11 +4456,11 @@ class form
 			# Make an array of non-empty values for use with the 'different' check
 			$nonEmptyValues = array ();
 			$emptyValues = array ();
-			foreach ($values as $value) {
+			foreach ($values as $name => $value) {
 				if (empty ($value)) {
-					$emptyValues[] = $value;
+					$emptyValues[$name] = $value;
 				} else {
-					$nonEmptyValues[] = $value;
+					$nonEmptyValues[$name] = $value;
 				}
 			}
 			
@@ -4471,6 +4472,16 @@ class form
 				}
 			}
 			
+			# For the 'master' check, we are going to need the name of the master field which will be checked against
+			if ($rule['type'] == 'master') {
+				foreach ($rule['fields'] as $field) {
+					$firstField = $field;
+					break;
+				}
+				$rule['parameter'] = count ($rule['fields']) - 1;
+				$rule['fields'] = array ($field);	// Overwrite for the purposes of the error message
+			}
+			
 			# Check the rule
 			#!# Ideally refactor to avoid the same list of cases specified as $this->validationTypes
 			if (
@@ -4479,6 +4490,7 @@ class form
 				|| ( ($rule['type'] == 'either')    && (application::allArrayElementsEmpty ($values)) )
 				|| ( ($rule['type'] == 'all')       && $nonEmptyValues && $emptyValues )
 				|| ( ($rule['type'] == 'total')     && ($total != $rule['parameter']) )
+				|| ( ($rule['type'] == 'master')    && $nonEmptyValues && array_key_exists ($firstField, $emptyValues) )
 			) {
 				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace (array ('%fields', '%parameter'), array ($this->_fieldListString ($rule['fields']), $rule['parameter']), $this->validationTypes[$rule['type']]);
 			}

@@ -60,7 +60,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.13
+ * @version 1.14.14
  */
 class form
 {
@@ -3375,10 +3375,29 @@ class form
 				
 				# Add a piechart if wanted and wrap it in a div/table as required
 				if ($piecharts) {
+					
+					# Find a suitable separator by checking a string made up of all the keys and values; by default , is used, but if that exists in any string, try others
+					$string = '';
+					foreach ($percentages as $key => $value) {
+						$string .= $key . $value;
+					}
+					$ok = false;
+					$separator = ',';
+					$comma = ',';
+					while (!$ok) {
+						$separator .= $comma;	// Add on another comma
+						if (!substr_count ($string, $separator)) {	// If neither key nor value has the separator, then choose it
+							$ok = true;
+							// Therefore this separator will be used
+						}
+					}
+					$separatorQueryString = ($separator != $comma ? "separator={$separator}&amp;" : '');
+					
+					# Write the HTML
 					if ($piechartDiv) {
-						$output[$field]['results'] = "\n<div class=\"surveyresults\">\n\t<div class=\"surveyresultstable\">{$output[$field]['results']}\n\t</div>\n\t<div class=\"surveyresultspiechart\">\n\t\t<img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?values=" . $this->specialchars (implode (',', array_values ($percentages)) . '&desc=' . implode (',', array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" />\n\t</div>\n</div>";
+						$output[$field]['results'] = "\n<div class=\"surveyresults\">\n\t<div class=\"surveyresultstable\">{$output[$field]['results']}\n\t</div>\n\t<div class=\"surveyresultspiechart\">\n\t\t<img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?{$separatorQueryString}values=" . $this->specialchars (implode ($separator, array_values ($percentages)) . '&desc=' . implode ($separator, array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" />\n\t</div>\n</div>";
 					} else {
-						$output[$field]['results'] = "\n<table class=\"surveyresults\">\n\t<tr>\n\t\t<td class=\"surveyresultstable\">{$output[$field]['results']}</td>\n\t\t<td class=\"surveyresultspiechart\"><img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?values=" . $this->specialchars (implode (',', array_values ($percentages)) . '&desc=' . implode (',', array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" /></td>\n\t</tr>\n</table>";
+						$output[$field]['results'] = "\n<table class=\"surveyresults\">\n\t<tr>\n\t\t<td class=\"surveyresultstable\">{$output[$field]['results']}</td>\n\t\t<td class=\"surveyresultspiechart\"><img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?{$separatorQueryString}values=" . $this->specialchars (implode ($separator, array_values ($percentages)) . '&desc=' . implode ($separator, array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" /></td>\n\t</tr>\n</table>";
 					}
 				}
 				

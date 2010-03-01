@@ -26,6 +26,7 @@
  * - GET support available
  * - Uploaded files can be attached to e-mails
  * - Uploaded zip files can be automatically unzipped
+ * - UTF-8 character encoding
  * 
  * REQUIREMENTS:
  * - PHP5 or above (PHP4.3 will run with slight modification)
@@ -50,17 +51,11 @@
  * php_admin_value post_max_size 10M
  * </code>
  * 
- * CHARACTER ENCODING STRATEGY:
- * Because of changes in PHP 5.2.5, using htmlentities ($string, ENT_COMPAT, 'UTF-8') is no longer available. Instead:
- * - If UTF-8 is set as the 'charset' value, then htmlspecialchars only is applied when values are processed; and API-supplied values/defaults are up-converted if they are not UTF-8.
- * - Otherwise, htmlentities is applied as best as possible.
- * - Upconversion uses mb_string where possible, then iconv
- * 
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.14.14
+ * @version 1.15.0
  */
 class form
 {
@@ -181,9 +176,7 @@ class form
 		'attachments'						=> false,							# Whether to send uploaded file(s) as attachment(s) (they will not be unzipped)
 		'attachmentsMaxSize'				=> '10M',							# Total maximum attachment(s) size; attachments will be allowed into an e-mail until they reach this limit
 		'attachmentsDeleteIfMailed'			=> true,							# Whether to delete the uploaded file(s) if successfully mailed
-		'charset'							=> 'UTF-8',							# Encoding used in entity conversions; www.joelonsoftware.com/articles/unicode.html and www.phpwact.org/php/i18n/charsets are worth a read
 		'csvBom'							=> true,							# Whether to write a BOM at the start of a CSV file
-		'mailAsIso'							=> true,							# Whether to use ISO encoding in e-mails sent
 		'ip'								=> true,							# Whether to expose the submitter's IP address in the e-mail output format
 		'browser'							=> false,							# Whether to expose the submitter's browser (user-agent) string in the e-mail output format
 		'passwordGeneratedLength'			=> 6,								# Length of a generated password
@@ -413,11 +406,11 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . $this->specialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
+			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
 		} else {
-			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : $this->specialchars ($this->form[$arguments['name']]));
+			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlspecialchars ($this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
-			$hiddenInput = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . $this->specialchars ($this->form[$arguments['name']]) . '" />';
+			$hiddenInput = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 			$widgetHtml .= $hiddenInput;
 		}
 		
@@ -663,10 +656,10 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . $widget->tabindexHtml () . '>' . $this->specialchars ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
-			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br ($this->specialchars ($this->form[$arguments['name']])));
-			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . $this->specialchars ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlspecialchars ($this->form[$arguments['name']])));
+			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Get the posted data
@@ -869,7 +862,7 @@ class form
 		$elementValue = $widget->getValue ();
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid), or clean it if posted
-		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments, $arguments['nofixTag'], str_replace ('-', '', strtolower ($this->settings['charset']))));
+		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments, $arguments['nofixTag']));
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
@@ -911,7 +904,7 @@ class form
 			$widgetHtml = $editor->CreateHtml ();
 		} else {
 			$widgetHtml = $this->form[$arguments['name']];
-			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . $this->specialchars ($this->form[$arguments['name']]) . '" />';
+			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -1298,7 +1291,7 @@ class form
 					$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 					foreach ($arguments['valuesWithNull'] as $availableValue => $visible) {
 						$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true) . '>' . $this->specialchars ($visible) . '</option>';
+						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true) . '>' . htmlspecialchars ($visible) . '</option>';
 					}
 				} else {
 					
@@ -1308,12 +1301,12 @@ class form
 							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t<optgroup label=\"{$key}\">";
 							foreach ($mainValue as $availableValue => $visible) {
 								$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . $this->specialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . $this->specialchars ($visible) . '</option>';
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . htmlspecialchars ($visible) . '</option>';
 							}
 							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t</optgroup>";
 						} else {
 							$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $key);
-							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . $this->specialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . $this->specialchars ($mainValue) . '</option>';
+							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . htmlspecialchars ($mainValue) . '</option>';
 						}
 					}
 				}
@@ -1349,7 +1342,7 @@ class form
 				$widgetHtml .= "\n\t\t\t<span class=\"comment\">(None)</span>";
 			} else {
 				foreach ($presentableDefaults as $value => $visible) {
-					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], true /* True should be used so that the _POST is the same structure (which is useful if the user is capturing that data before using its API), even though this is actually ignored in processing */) . ' type="hidden" value="' . $this->specialchars ($value) . '" />';
+					$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], true /* True should be used so that the _POST is the same structure (which is useful if the user is capturing that data before using its API), even though this is actually ignored in processing */) . ' type="hidden" value="' . htmlspecialchars ($value) . '" />';
 				}
 			}
 			
@@ -1544,7 +1537,7 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . $this->specialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? $this->specialchars ($visible) : $visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1558,8 +1551,8 @@ class form
 				foreach ($arguments['values'] as $value => $visible) {
 					if ($value == $elementValue) {	// This loop is done to prevent offsets which may still arise due to the 'defaultMissingFromValuesArray' error not resulting in further termination of widget production
 						#!# Offset generated here if editable false and the preset value not present
-						$widgetHtml  = $this->specialchars ($arguments['values'][$elementValue]);
-						$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], false, $elementValue) . ' type="hidden" value="' . $this->specialchars ($elementValue) . '" />';
+						$widgetHtml  = htmlspecialchars ($arguments['values'][$elementValue]);
+						$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name'], false, $elementValue) . ' type="hidden" value="' . htmlspecialchars ($elementValue) . '" />';
 					}
 				}
 			}
@@ -1723,8 +1716,8 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-//				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . $this->specialchars ($visible) . '</label>';
-				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? $this->specialchars ($visible) : $visible) . '</label>';
+//				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
 				
 				# Add a line/column breaks when required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1890,7 +1883,7 @@ class form
 		
 		# Check the level is supported
 		if (!array_key_exists ($arguments['level'], $levels)) {
-			$this->formSetupErrors['levelInvalid'] = "An invalid 'level' (" . $this->specialchars ($arguments['level']) . ') was specified in the ' . $this->specialchars ($arguments['name']) . ' datetime widget.';
+			$this->formSetupErrors['levelInvalid'] = "An invalid 'level' (" . htmlspecialchars ($arguments['level']) . ') was specified in the ' . htmlspecialchars ($arguments['name']) . ' datetime widget.';
 			#!# Really this should end at this point rather than adding a fake reassignment
 			$arguments['level'] = 'datetime';
 		}
@@ -2083,7 +2076,7 @@ class form
 			
 			# Non-editable version
 			$widgetHtml  = timedate::presentDateFromArray ($elementValue, $arguments['level']) . ($isTimestamp ? '<br /><span class="comment">' . (($arguments['level'] != 'time') ? '(Current date' . (($arguments['level'] == 'datetime') ? ' and time' : '') : '(Current time') . ')' . '</span>' : '');
-			$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . $this->specialchars ($arguments['default']) . '" />';
+			$widgetHtml .= "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($arguments['default']) . '" />';
 		}
 		
 		# Re-assign back the value
@@ -2340,7 +2333,7 @@ class form
 			
 			# Where default file(s) are/is expected, show - for the current subfield - the filename for each file (or that there is no file)
 			if ($arguments['default']) {
-				$widgetHtml .= '<p class="currentfile' . ($subfield > 0 ? ' currentfilenext' : '') . '">' . (isSet ($arguments['default'][$subfield]) ? 'Current file: <span class="filename">' . $this->specialchars (basename ($arguments['default'][$subfield]['name'])) . '</span>' : '<span class="comment">(No current file)</span>') . "</p>\n\t\t\t";
+				$widgetHtml .= '<p class="currentfile' . ($subfield > 0 ? ' currentfilenext' : '') . '">' . (isSet ($arguments['default'][$subfield]) ? 'Current file: <span class="filename">' . htmlspecialchars (basename ($arguments['default'][$subfield]['name'])) . '</span>' : '<span class="comment">(No current file)</span>') . "</p>\n\t\t\t";
 			}
 			
 			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is bogus (non-standard and seemingly not supported by any browsers), so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would expose to the user the size of the PHP ini setting
@@ -2350,7 +2343,7 @@ class form
 				$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
 			} else {
 				if ($arguments['default'] && isSet ($arguments['default'][$subfield])) {
-					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . ' type="hidden" value="' . $this->specialchars (basename ($arguments['default'][$subfield]['name'])) . '" />' . "\n\t\t\t";
+					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . ' type="hidden" value="' . htmlspecialchars (basename ($arguments['default'][$subfield]['name'])) . '" />' . "\n\t\t\t";
 				}
 			}
 		}
@@ -3360,7 +3353,7 @@ class form
 					
 					# Create the main columns
 					#!# This solution is a little bit hacky
-					$table[$value][''] = ($visible == $noResponse ? $visible : $this->specialchars ($visible));	// Heading would be 'Response'
+					$table[$value][''] = ($visible == $noResponse ? $visible : htmlspecialchars ($visible));	// Heading would be 'Response'
 					$table[$value]['Respondents'] = $respondents[$value];
 					
 					# Show percentages if required
@@ -3395,9 +3388,9 @@ class form
 					
 					# Write the HTML
 					if ($piechartDiv) {
-						$output[$field]['results'] = "\n<div class=\"surveyresults\">\n\t<div class=\"surveyresultstable\">{$output[$field]['results']}\n\t</div>\n\t<div class=\"surveyresultspiechart\">\n\t\t<img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?{$separatorQueryString}values=" . $this->specialchars (implode ($separator, array_values ($percentages)) . '&desc=' . implode ($separator, array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" />\n\t</div>\n</div>";
+						$output[$field]['results'] = "\n<div class=\"surveyresults\">\n\t<div class=\"surveyresultstable\">{$output[$field]['results']}\n\t</div>\n\t<div class=\"surveyresultspiechart\">\n\t\t<img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?{$separatorQueryString}values=" . htmlspecialchars (implode ($separator, array_values ($percentages)) . '&desc=' . implode ($separator, array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" />\n\t</div>\n</div>";
 					} else {
-						$output[$field]['results'] = "\n<table class=\"surveyresults\">\n\t<tr>\n\t\t<td class=\"surveyresultstable\">{$output[$field]['results']}</td>\n\t\t<td class=\"surveyresultspiechart\"><img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?{$separatorQueryString}values=" . $this->specialchars (implode ($separator, array_values ($percentages)) . '&desc=' . implode ($separator, array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" /></td>\n\t</tr>\n</table>";
+						$output[$field]['results'] = "\n<table class=\"surveyresults\">\n\t<tr>\n\t\t<td class=\"surveyresultstable\">{$output[$field]['results']}</td>\n\t\t<td class=\"surveyresultspiechart\"><img width=\"{$piechartWidth}\" height=\"{$piechartHeight}\" src=\"{$piechartStub}?{$separatorQueryString}values=" . htmlspecialchars (implode ($separator, array_values ($percentages)) . '&desc=' . implode ($separator, array_keys ($percentages))) . "&amp;width={$piechartWidth}&amp;height={$piechartHeight}\" alt=\"Piechart of results\" /></td>\n\t</tr>\n</table>";
 					}
 				}
 				
@@ -3410,7 +3403,7 @@ class form
 					
 					# Determine the numeric number of respondents for this value
 					# Add the value
-					$table[$value][''] = $this->specialchars ($value);
+					$table[$value][''] = htmlspecialchars ($value);
 					$table[$value]['respondents'] = (array_key_exists ($value, $responses) ? array_sum ($responses[$value]) : 0);
 					
 					# Show percentages if required
@@ -3429,7 +3422,7 @@ class form
 			} else {
 				
 				foreach ($responses as $index => $value) {
-					$responses[$index] = nl2br ($this->specialchars (trim ($value)));
+					$responses[$index] = nl2br (htmlspecialchars (trim ($value)));
 				}
 				$output[$field]['results'] = application::htmlUl ($responses, 1, $ulClass, $ulIgnoreEmpty);
 			}
@@ -3443,7 +3436,7 @@ class form
 		
 		# Throw a setup error if unknown values are found
 		if ($unknownValues) {
-			$this->formSetupErrors['resultReaderUnknownValues'] = 'The following unknown values were found in the result data: <strong>' . $this->specialchars (implode ('</strong>, <strong>', $unknownValues)) . '</strong>.';
+			$this->formSetupErrors['resultReaderUnknownValues'] = 'The following unknown values were found in the result data: <strong>' . htmlspecialchars (implode ('</strong>, <strong>', $unknownValues)) . '</strong>.';
 		}
 		
 		# End if there are form setup errors and report these
@@ -3457,8 +3450,8 @@ class form
 		$html  = '';
 		foreach ($output as $field => $results) {
 			if (isSet ($results['heading'])) {
-				$fieldEscaped = $this->specialchars ($field);
-				$html .= "\n\n<{$heading} id=\"{$fieldEscaped}\">" . ($anchors ? "<a href=\"#{$fieldEscaped}\">#</a> " : '') . $this->specialchars ($results['heading']) . "</{$heading}>";
+				$fieldEscaped = htmlspecialchars ($field);
+				$html .= "\n\n<{$heading} id=\"{$fieldEscaped}\">" . ($anchors ? "<a href=\"#{$fieldEscaped}\">#</a> " : '') . htmlspecialchars ($results['heading']) . "</{$heading}>";
 			}
 			$html .= "\n" . $results['results'];
 		}
@@ -3792,7 +3785,7 @@ class form
 			}
 			if ($this->settings['mailAdminErrors']) {
 				$administrator = (application::validEmail ($this->settings['mailAdminErrors']) ? $this->settings['mailAdminErrors'] : $_SERVER['SERVER_ADMIN']);
-				mail (
+				application::utf8Mail (
 					$administrator,
 					'Form setup error',
 					wordwrap ("The webform at \n" . $_SERVER['_PAGE_URL'] . "\nreports the following ultimateForm setup misconfiguration:\n\n" . implode ("\n", $errorTexts)),
@@ -4045,7 +4038,7 @@ class form
 		if (($this->settings['display'] != 'template') && ($this->settings['requiredFieldIndicator'] === 'top')) {$html .= $requiredFieldIndicatorHtml;}
 		
 		# Start the constructed form HTML
-		$html .= "\n" . '<form method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="' . $this->settings['charset'] . '">';
+		$html .= "\n" . '<form method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
 		
 		# Start the HTML
 		$formHtml = '';
@@ -4849,7 +4842,7 @@ class form
 				
 				$html .= "\n\t" . '<tr>';
 				$html .= "\n\t\t" . "<td class=\"displayformat\"><em>$displayFormat</em></td>";
-				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . $this->specialchars ($presentationMatrix[$type]['_descriptions'][$default]) . ']--></td>';
+				$html .= "\n\t\t" . "<td class=\"defaultdisplayformat\"><strong>$default</strong><!-- [" . htmlspecialchars ($presentationMatrix[$type]['_descriptions'][$default]) . ']--></td>';
 				$html .= "\n\t\t" . "<td>$others</td>";
 				$html .= "\n\t" . '</tr>';
 			}
@@ -4932,7 +4925,7 @@ class form
 			# Compile the HTML
 			$html .= "\n\t<tr>";
 			$html .= "\n\t\t" . '<td class="key">' . (isSet ($this->elements[$name]['title']) ? $this->elements[$name]['title'] : $name) . ':</td>';
-			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), $this->specialchars ($data))) . '</td>';
+			$html .= "\n\t\t" . '<td class="value' . (empty ($data) ? ' comment' : '') . '">' . (empty ($data) ? ($this->elements[$name]['type'] == 'hidden' ? '(Hidden data submitted)' : '(No data submitted)') : str_replace (array ("\n", "\t"), array ('<br />', str_repeat ('&nbsp;', 4)), htmlspecialchars ($data))) . '</td>';
 			$html .= "\n\t</tr>";
 		}
 		$html .= "\n" . '</table>';
@@ -5042,18 +5035,18 @@ class form
 			list ($message, $additionalHeaders) = $this->attachmentsMessage ($message, $additionalHeaders, $introductoryText, $resultLines);
 		}
 		
-		# Mail message encoding
-		if ($this->settings['mailAsIso']) {
-			$message = application::unicodeToIso ($message);
-		}
+		# Determine whether to add plain-text headers
+		$includeMimeContentTypeHeaders = ($this->attachments ? false : true);
 		
 		# Send the e-mail
 		#!# Add an @ and a message if sending fails (marking whether the info has been logged in other ways)
-		$success = mail (
+		$success = application::utf8Mail (
 			$recipient,
 			$this->configureResultEmailedSubjectTitle[$outputType],
 			$message,
-			$additionalHeaders
+			$additionalHeaders,
+			NULL,
+			$includeMimeContentTypeHeaders
 		);
 		
 		# Delete the attachments that have been mailed, if required
@@ -5067,12 +5060,12 @@ class form
 		
 		# Confirm sending (or an error) for the confirmation e-mail type
 		if ($outputType == 'confirmationEmail') {
-			$this->html .= "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', $this->specialchars ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
+			$this->html .= "\n\n" . '<p class="' . ($success ? 'success' : 'error') . '">' . ($success ? 'A confirmation e-mail has been sent' : 'There was a problem sending a confirmation e-mail') . ' to the address you gave (' . $presentedData[$name] = str_replace ('@', '<span>&#64;</span>', htmlspecialchars ($this->configureResultConfirmationEmailRecipient)) . ').</p>';
 		}
 	}
 	
 	
-	# Function to add attachments; useful articles explaining the background at www.zend.com/zend/spotlight/sendmimeemailpart1.php and www.hollowearth.co.uk/tech/php/email_attachments.php
+	# Function to add attachments; useful articles explaining the background at www.zend.com/zend/spotlight/sendmimeemailpart1.php and www.hollowearth.co.uk/tech/php/email_attachments.php and http://snipplr.com/view/2686/send-multipart-encoded-mail-with-attachments/
 	function attachmentsMessage ($message, $additionalHeaders, $introductoryText, $resultLines)
 	{
 		# Get the maximum total attachment size, per attachment, converting it to bytes, or explicitly false for no limit
@@ -5101,59 +5094,51 @@ class form
 		# If attachments were successfully read, add them to the e-mail
 		if ($this->attachments) {
 			
+			# Set the end-of-line
+			$eol = "\r\n";
+			
 			# Set the MIME boundary, a unique string
 			$mimeBoundary = '<<<--==+X[' . md5( time ()). ']';
 			
 			# Add MIME headers
-			$additionalHeaders .= "MIME-Version: 1.0\r\n";
-			$additionalHeaders .= "Content-Type: multipart/mixed;\r\n";
-			$additionalHeaders .= ' boundary="' . $mimeBoundary . '"';
+			$additionalHeaders .= "MIME-Version: 1.0" . $eol;
+			$additionalHeaders .= "Content-Type: multipart/related; boundary=\"{$mimeBoundary}\"" . $eol;
 			
 			# Push the attachment stuff into the main message area, starting with the MIME introduction
-			$message  = "\r\n";
-			$message .= "This is a multi-part message in MIME format.\r\n";
-			$message .= "\r\n";
-			$message .= '--' . $mimeBoundary . "\r\n";
+			$message  = $eol;
+			$message .= 'This is a multi-part message in MIME format.' . $eol;
+			$message .= $eol;
+			$message .= '--' . $mimeBoundary . $eol;
 			
 			# Main message 'attachment'
-			$message .= "Content-Type: text/plain; charset=\"iso-8859-1\"\r\n";
-			$message .= "Content-Transfer-Encoding: 7bit\r\n";
-			$message .= "\r\n";
-			$message .= wordwrap ($introductoryText . "\n\n" . ($totalAttachments == 1 ? 'There is also an attachment.' : "There are also {$totalAttachments} attachments.") . ($totalAttachmentsDifference ? ' ' . ($totalAttachmentsDifference == 1 ? 'One other submitted file was too large to e-mail, so it has' : "{$totalAttachmentsDifference} other submitted files were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' : '') . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "\r\n\r\n\r\n" . "\r\n";
+			$message .= 'Content-type: text/plain; charset="UTF-8"' . $eol;
+			$message .= "Content-Transfer-Encoding: 8bit" . $eol;
+			$message .= $eol;
+			$message .= wordwrap ($introductoryText . "\n\n" . ($totalAttachments == 1 ? 'There is also an attachment.' : "There are also {$totalAttachments} attachments.") . ($totalAttachmentsDifference ? ' ' . ($totalAttachmentsDifference == 1 ? 'One other submitted file was too large to e-mail, so it has' : "{$totalAttachmentsDifference} other submitted files were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' : '') . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "{$eol}{$eol}{$eol}" . $eol;
 			$message .= '--' . $mimeBoundary;
 			
 			# Add each attachment, starting with a mini-header for each
 			foreach ($this->attachments as $index => $attachment) {
-				$message .= "\r\n";	// End of previous boundary
-				$message .= 'Content-Type: ' . ($attachment['type']) . ";\r\n";
-				$message .= ' name="' . $attachment['name'] . "\"\r\n";
-				$message .= "Content-Disposition: attachment;\r\n";
-				$message .= ' filename="' . $attachment['name'] . "\"\r\n";
-				$message .= "Content-Transfer-Encoding: base64\r\n";
-				$message .= "\r\n";
+				$message .= $eol;	// End of previous boundary
+				$message .= 'Content-Type: ' . ($attachment['type']) . '; name="' . $attachment['name'] . '"' . $eol;
+				$message .= "Content-Transfer-Encoding: base64" . $eol;
+				$message .= 'Content-Disposition: attachment; filename="' . $attachment['name'] . '"' . $eol;
+				$message .= $eol;
 				$message .= $attachment['_contents'];
-				$message .= "\r\n";
-				$message .= '--' . $mimeBoundary;	// \r\n is added in next iteration of loop
+				$message .= $eol;
+				$message .= '--' . $mimeBoundary;	// $eol is added in next iteration of loop
 			}
 			
 			# Finish the final boundary
-			$message .= '--';
+			$message .= '--' . $eol . $eol;
 		} else {
 			
 			# Say that there were no attachments but that the files were saved
-			$message  = wordwrap ($introductoryText . "\n\n" . ($totalAttachmentsOriginal == 1 ? 'There is also a submitted file, which was too large to e-mail, so it has' : "There are also {$totalAttachmentsOriginal} submitted files, which were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "\r\n\r\n\r\n" . "\r\n";
+			$message  = wordwrap ($introductoryText . "\n\n" . ($totalAttachmentsOriginal == 1 ? 'There is also a submitted file, which was too large to e-mail, so it has' : "There are also {$totalAttachmentsOriginal} submitted files, which were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "{$eol}{$eol}{$eol}" . $eol;
 		}
 		
 		# Return the message
 		return array ($message, $additionalHeaders);
-	}
-	
-	
-	# Function to deal with character/entity processing
-	function specialchars ($string)
-	{
-		# Hand off to the application library; basically this uses htmlentities for PHP <5.2.5 and otherwise converts text upto the charset then applies htmlspecialchars
-		return application::safetext ($string, $this->settings['charset']);
 	}
 	
 	
@@ -5200,7 +5185,7 @@ class form
 		$data = ((!file_exists ($this->configureResultFileFilename) || filesize ($this->configureResultFileFilename) == 0) ? $headerLine : '') . $dataLine;
 		
 		# Deal with unicode behaviour
-		$unicodeToIso = ($this->settings['charset'] != 'UTF-8');
+		$unicodeToIso = false;
 		$unicodeAddBom = $this->settings['csvBom'];
 		
 		#!# A check is needed to ensure the file being written to doesn't previously contain headings related to a different configuration
@@ -5968,12 +5953,12 @@ class formWidget
 	{
 		# Fix values list if there is one
 		if (isSet ($this->arguments['values'])) {
-			$this->arguments['values'] = application::convertToCharset ($this->arguments['values'], $this->settings['charset'], $convertKeys = true);
+			$this->arguments['values'] = application::convertToCharset ($this->arguments['values'], 'UTF-8', $convertKeys = true);
 		}
 		
 		# Fix default value(s)
 		if (isSet ($this->arguments['default'])) {
-			$this->arguments['default'] = application::convertToCharset ($this->arguments['default'], $this->settings['charset'], $convertKeys = true);
+			$this->arguments['default'] = application::convertToCharset ($this->arguments['default'], 'UTF-8', $convertKeys = true);
 		}
 	}
 	

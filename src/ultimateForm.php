@@ -55,7 +55,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.15.0
+ * @version 1.15.1
  */
 class form
 {
@@ -1291,7 +1291,7 @@ class form
 					$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
 					foreach ($arguments['valuesWithNull'] as $availableValue => $visible) {
 						$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true) . '>' . htmlspecialchars ($visible) . '</option>';
+						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true, $idOnly = true) . '>' . htmlspecialchars ($visible) . '</option>';
 					}
 				} else {
 					
@@ -2567,16 +2567,20 @@ class form
 	
 	
 	# Function to generate ID and name HTML
-	function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false)
+	function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false, $idOnly = false)
 	{
 		# Create the name and ID and compile the HTML
 		# http://htmlhelp.com/reference/html40/attrs.html says that "Also note that while NAME may contain entities, the ID attribute value may not."
+		# Note also that the <option> tag does not support the NAME attribute
 		$widgetNameCleaned = htmlspecialchars ($widgetName);
 		$subitemCleaned = htmlspecialchars ($subitem);
 		$name = ' name="' .              ($this->settings['name'] ? "{$this->settings['name']}[{$widgetNameCleaned}]" : $widgetName) . ($multiple ? '[]' : '') . ($nameAppend ? "[{$subitemCleaned}]" : '') . '"';
-		if ($subitem !== false) {$widgetName .= "_{$subitem}";}
+		if ($subitem !== false) {
+			$widgetName .= "_{$subitem}";
+			if (!strlen ($subitem)) {$widgetName .= '____NULL';}	// #!# Dirty fix - should really have a guarantee of uniqueness
+		}
 		$id   = ' id="' . $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$widgetName}]" : $widgetName) . '"';
-		$html = $name . $id;
+		$html = ($idOnly ? '' : $name) . $id;
 		
 		# Return the HTML
 		return $html;

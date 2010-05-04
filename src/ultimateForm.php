@@ -55,7 +55,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.15.1
+ * @version 1.15.2
  */
 class form
 {
@@ -1107,6 +1107,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'nullRequiredDefault'	=> true,	# Whether to add an empty value when the field is required and has a default
 		);
 		
 		# Create a new form widget
@@ -1288,7 +1289,11 @@ class form
 				# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
 				$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . $widget->tabindexHtml () . '>';
 				if (!isSet ($arguments['_valuesMultidimensional'])) {
-					$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
+					if ($arguments['required'] && $arguments['default'] && !$arguments['nullRequiredDefault']) {
+						$arguments['valuesWithNull'] = $arguments['values'];	// Do not add a null entry when a required field also has a default
+					} else {
+						$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
+					}
 					foreach ($arguments['valuesWithNull'] as $availableValue => $visible) {
 						$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
 						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true, $idOnly = true) . '>' . htmlspecialchars ($visible) . '</option>';

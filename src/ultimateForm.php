@@ -27,6 +27,7 @@
  * - Uploaded files can be attached to e-mails
  * - Uploaded zip files can be automatically unzipped
  * - UTF-8 character encoding
+ * - Unsaved data protection DHTML (if required)
  * 
  * REQUIREMENTS:
  * - PHP5 or above (PHP4.3 will run with slight modification)
@@ -55,7 +56,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.15.2
+ * @version 1.16.0
  */
 class form
 {
@@ -114,6 +115,7 @@ class form
 	var $argumentDefaults = array (
 		'get'								=> false,							# Enable GET support instead of (default) POST
 		'name'								=> 'form',							# Name of the form
+		'id'								=> false,							# Id of the form (or none)
 		'div'								=> 'ultimateform',					# The value of <div class=""> which surrounds the entire output (or false for none)
 		'displayPresentationMatrix'			=> false,							# Whether to show the presentation defaults
 		'displayTitles'						=> true,							# Whether to show user-supplied titles for each widget
@@ -184,6 +186,8 @@ class form
 		'antispamRegexp'					=> '~(a href=|<a |<script|<url|\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
+		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
+		'jQuery'							=> 'http://code.jquery.com/jquery-latest.js',	# If using DHTML features, where to load jQuery from (or false if already loaded elsewhere on the page)
 	);
 	
 	
@@ -4026,6 +4030,36 @@ class form
 	}
 	
 	
+	# Function to define DHTML for unsaved data protection - see http://stackoverflow.com/questions/140460/client-js-framework-for-unsaved-data-protection/2402725#2402725
+	function unsavedDataProtectionHtml ($formId)
+	{
+		# Determine the text to be used
+		$messageText = ($this->settings['unsavedDataProtection'] === true ? 'Leaving this page will cause edits to be lost. Press the submit button on the page if you wish to save your data.' : $this->settings['unsavedDataProtection']);
+		
+		# Build the HTML, loading jQuery if required
+		$html  = '';
+		if ($this->settings['jQuery']) {
+			$html .= "<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
+		}
+		$html .= "\n
+			<script type=\"text/javascript\">
+				function removeCheck() { window.onbeforeunload = null; }
+				$(document).ready(function() {
+				    $('#" . $formId . " :input').one('change', function() {
+				        window.onbeforeunload = function() {
+				            return '" . $messageText . "';
+				        }
+				    });
+				    $('#" . $formId . " input[type=submit]').click(function() { removeCheck() });
+				});
+			</script>
+		" . "\n\n";
+		
+		# Return the HTML
+		return $html;
+	}
+	
+	
 	/**
 	 * Function actually to display the form
 	 * @access private
@@ -4046,8 +4080,16 @@ class form
 		# Add the required field indicator display message if required
 		if (($this->settings['display'] != 'template') && ($this->settings['requiredFieldIndicator'] === 'top')) {$html .= $requiredFieldIndicatorHtml;}
 		
+		# Add unsaved data protection HTML if required, ensuring that an ID exists for the form tag
+		if ($this->settings['unsavedDataProtection']) {
+			if (!$this->settings['id']) {
+				$this->settings['id'] = 'ultimateForm';
+			}
+			$html .= $this->unsavedDataProtectionHtml ($this->settings['id']);
+		}
+		
 		# Start the constructed form HTML
-		$html .= "\n" . '<form method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
+		$html .= "\n" . '<form' . ($this->settings['id'] ? " id=\"{$this->settings['id']}\"" : '') . ' method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
 		
 		# Start the HTML
 		$formHtml = '';
@@ -4368,6 +4410,7 @@ class form
 		}
 		
 		# Run checks for multiple validation fields
+		#!# Failures in group validation will not appear in the same order as the widgets themselves
 		$this->elementProblems['group'] = $this->_groupValidationChecks ();
 		
 		# Add in externally-supplied problems (where the calling application has inserted data checked against ->getUnfinalisedData), which by default is an empty array
@@ -6291,7 +6334,6 @@ class formWidget
 #!# $resultLines[] should have the [techName] optional
 # Antispam Captcha option
 # Support for select::regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
-# Consider issue of null bytes in ereg - http://uk.php.net/manual/en/ref.regex.php#74258 - probably migrate to preg_ anyway, as PHP6 deprecates ereg
 # Consider grouping/fieldset and design issues at http://www.sitepoint.com/print/fancy-form-design-css/
 # Deal with widget name conversion of dot to underscore: http://uk2.php.net/manual/en/language.types.array.php#52124
 # Check more thoroughly against XSS at http://ha.ckers.org/xss.html

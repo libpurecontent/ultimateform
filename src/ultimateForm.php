@@ -56,7 +56,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.16.0
+ * @version 1.16.1
  */
 class form
 {
@@ -89,6 +89,7 @@ class form
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
 	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
+	var $jQuery = array ();						// Array of jQuery client functions, if any
 	
 	# Output configuration
 	var $configureResultEmailRecipient;							// The recipient of an e-mail
@@ -567,6 +568,12 @@ class form
 		# Enable maxlength checking
 		#!# A $restriction needs to be shown
 		$widget->checkMaxLength ();
+		
+		# Add jQuery-based checking of maxlength
+		if ($arguments['maxlength']) {
+			$id = $this->cleanId ("{$this->settings['name']}[{$arguments['name']}]");
+			$this->maxLengthJQuery ($id, $arguments['maxlength']);
+		}
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
@@ -2618,6 +2625,41 @@ class form
 	}
 	
 	
+	# Function to add jQuery-based maxlength checking; see http://stackoverflow.com/questions/1588521/
+	function maxLengthJQuery ($id, $characters)
+	{
+		# Add the main function
+		$this->jQuery[__FUNCTION__] = "
+			function limitChars(textid, limit, infodiv)
+			{
+				var text = $('#'+textid).val(); 
+				var textlength = text.length;
+				if(textlength > limit)
+				{
+					$('#' + infodiv).html('You cannot write more then '+limit+' characters!');
+					$('#'+textid).val(text.substr(0,limit));
+					return false;
+				}
+				else
+				{
+				$('#' + infodiv).html('You have '+ (limit - textlength) +' characters left.');
+				return true;
+				}
+			}
+		";
+		
+		# Add a per-widget call
+		$this->jQuery[__FUNCTION__ . $id] = "
+			$(function(){
+				$('#" . $id . "').keyup(function()
+				{
+					limitChars('" . $id . "', " . $characters . ", '" . $id . "__info');
+				})
+			});
+		";
+	}
+	
+	
 	# Function to ensure that all initial values are in the array of values
 	function ensureDefaultsAvailable ($arguments)
 	{
@@ -4031,32 +4073,23 @@ class form
 	
 	
 	# Function to define DHTML for unsaved data protection - see http://stackoverflow.com/questions/140460/client-js-framework-for-unsaved-data-protection/2402725#2402725
-	function unsavedDataProtectionHtml ($formId)
+	function unsavedDataProtectionJs ($formId)
 	{
 		# Determine the text to be used
 		$messageText = ($this->settings['unsavedDataProtection'] === true ? 'Leaving this page will cause edits to be lost. Press the submit button on the page if you wish to save your data.' : $this->settings['unsavedDataProtection']);
 		
-		# Build the HTML, loading jQuery if required
-		$html  = '';
-		if ($this->settings['jQuery']) {
-			$html .= "<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
-		}
-		$html .= "\n
-			<script type=\"text/javascript\">
-				function removeCheck() { window.onbeforeunload = null; }
-				$(document).ready(function() {
-				    $('#" . $formId . " :input').one('change', function() {
-				        window.onbeforeunload = function() {
-				            return '" . $messageText . "';
-				        }
-				    });
-				    $('#" . $formId . " input[type=submit]').click(function() { removeCheck() });
-				});
-			</script>
-		" . "\n\n";
-		
-		# Return the HTML
-		return $html;
+		# Create the jQuery code
+		$this->jQuery[__FUNCTION__] = "
+			function removeCheck() { window.onbeforeunload = null; }
+			$(document).ready(function() {
+			    $('#" . $formId . " :input').one('change', function() {
+			        window.onbeforeunload = function() {
+			            return '" . $messageText . "';
+			        }
+			    });
+			    $('#" . $formId . " input[type=submit]').click(function() { removeCheck() });
+			});
+		";
 	}
 	
 	
@@ -4085,8 +4118,11 @@ class form
 			if (!$this->settings['id']) {
 				$this->settings['id'] = 'ultimateForm';
 			}
-			$html .= $this->unsavedDataProtectionHtml ($this->settings['id']);
+			$this->unsavedDataProtectionJs ($this->settings['id']);
 		}
+		
+		# Load the jQuery library and client code if a widget/option has enabled its use and the setting for the source URL is specified
+		$html .= $this->jQuery ();
 		
 		# Start the constructed form HTML
 		$html .= "\n" . '<form' . ($this->settings['id'] ? " id=\"{$this->settings['id']}\"" : '') . ' method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
@@ -4286,6 +4322,32 @@ class form
 		
 		# Add the required field indicator display message if required
 		if (($this->settings['display'] != 'template') && ($this->settings['requiredFieldIndicator'] === 'bottom') || ($this->settings['requiredFieldIndicator'] === true)) {$html .= $requiredFieldIndicatorHtml;}
+		
+		# Return the HTML
+		return $html;
+	}
+	
+	
+	# Function to add jQuery code
+	function jQuery ()
+	{
+		# End if no jQuery use
+		if (!$this->jQuery) {return false;}
+		
+		# Start the HTML
+		$html  = '';
+		
+		# Add the library if required
+		if ($this->settings['jQuery']) {
+			$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
+		}
+		
+		# Add each client function
+		$html .= "\n<script type=\"text/javascript\">";
+		foreach ($this->jQuery as $key => $code) {
+			$html .= "\n" . $code;
+		}
+		$html .= "\n</script>\n\n";
 		
 		# Return the HTML
 		return $html;

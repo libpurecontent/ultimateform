@@ -56,7 +56,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.16.1
+ * @version 1.16.2
  */
 class form
 {
@@ -280,6 +280,7 @@ class form
 			'confirmation'			=> false,	# Whether to generate a confirmation field
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'several'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with space/commas)
+			'autocomplete'			=> false,	# URL of data provider
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
@@ -366,6 +367,9 @@ class form
 		
 		# Perform uniqueness check
 		$widget->uniquenessCheck ();
+		
+		# Add autocomplete functionality if required
+		$widget->autoComplete ();
 		
 		$elementValue = $widget->getValue ();
 		
@@ -541,6 +545,7 @@ class form
 			'minlength'				=> false,	# Minimum number of characters allowed
 			'maxlength'				=> false,	# Maximum number of characters allowed
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'autocomplete'			=> false,	# URL of data provider
 		);
 		
 		# Create a new form widget
@@ -574,6 +579,9 @@ class form
 			$id = $this->cleanId ("{$this->settings['name']}[{$arguments['name']}]");
 			$this->maxLengthJQuery ($id, $arguments['maxlength']);
 		}
+		
+		# Add autocomplete functionality if required
+		$widget->autoComplete ();
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
@@ -2622,6 +2630,35 @@ class form
 		
 		# Return the cleaned ID
 		return $id;
+	}
+	
+	
+	# Function to add jQuery-based autocomplete; see http://docs.jquery.com/Plugins/Autocomplete
+	function autocompleteJQuery ($id, $data)
+	{
+		# Add the main function
+		$this->jQuery[__FUNCTION__] = '
+			</script>
+			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.bgiframe.min.js"></script> 
+			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.ajaxQueue.js"></script> 
+			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.js"></script> 
+			<link rel="stylesheet" type="text/css" href="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.css" /> 
+			<script type="text/javascript">
+		';
+		
+		# Encode the data, if it is an array of values rather than a URL
+		if (is_array ($data)) {
+			$data = json_encode ($data);	// NB These are assumed to have entities already encoded if necessary, i.e. if HTML is supplied, the browser will interpret the HTML
+		} else {
+			$data = "'{$data}'";
+		}
+		
+		# Add a per-widget call
+		$this->jQuery[__FUNCTION__ . $id] = "
+			$(document).ready(function(){
+				$('#" . $id . "').autocomplete(" . $data . ");
+			});
+		";
 	}
 	
 	
@@ -5126,7 +5163,7 @@ class form
 		
 		# Define the additional headers
 		$sender = ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator);
-		$additionalHeaders  = 'From: Website feedback <' . $sender . ">\r\n";
+		$additionalHeaders  = 'From: ' . 'Website feedback <' . $sender . '>' . "\r\n";
 		if (($outputType == 'email') && isSet ($this->configureResultEmailCc)) {$additionalHeaders .= 'Cc: ' . implode (', ', $this->configureResultEmailCc) . "\r\n";}
 		
 		# Add the reply-to if it is set and is not empty and that it has been completed (e.g. in the case of a non-required field)
@@ -6037,7 +6074,10 @@ class formWidget
 	
 	
 	# Constructor
-	function formWidget (&$form, $suppliedArguments, $argumentDefaults, $functionName, $subargument = NULL, $arrayType = false) {
+	function formWidget (&$form, $suppliedArguments, $argumentDefaults, $functionName, $subargument = NULL, $arrayType = false)
+	{
+		# Inherit the form
+		$this->form =& $form;
 		
 		# Inherit the settings
 		$this->settings =& $form->settings;
@@ -6154,6 +6194,16 @@ class formWidget
 			if (strlen ($this->value) > $this->arguments['maxlength']) {
 				$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . strlen ($this->value) . '</strong>) than are allowed (<strong>' . $this->arguments['maxlength'] . '</strong>).';
 			}
+		}
+	}
+	
+	
+	# Function to add autocomplete functionality
+	function autocomplete ()
+	{
+		if ($this->arguments['autocomplete']) {
+			$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
+			$this->form->autocompleteJQuery ($id, $this->arguments['autocomplete']);
 		}
 	}
 	

@@ -28,6 +28,7 @@
  * - Uploaded zip files can be automatically unzipped
  * - UTF-8 character encoding
  * - Unsaved data protection DHTML (if required)
+ * - HTML5 widget support (partial)
  * 
  * REQUIREMENTS:
  * - PHP5 or above (PHP4.3 will run with slight modification)
@@ -56,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.16.3
+ * @version 1.17.0
  */
 class form
 {
@@ -267,6 +268,8 @@ class form
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
 			'minlength'				=> '',		# Minimum length (optional; defaults to no limit)
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
+			'placeholder'			=> '',		# HTML5 placeholder text
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
@@ -295,6 +298,19 @@ class form
 			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation e-mail field
 		} else {
 			$argumentDefaults['several'] = false;	# Ensure this option is disabled for non-email types
+		}
+		
+		# Add in URL-specific defaults
+		if ($functionName == 'url') {
+			$argumentDefaults['regexpi'] = '^(http|https)://(.+)\.(.+)';
+		}
+		
+		# Add in Number-specific defaults
+		#!# This needs to have min/max/step value validation and restriction text, and make enforceNumeric set numeric
+		if (($functionName == 'number') || ($functionName == 'range')) {
+			$argumentDefaults['min'] = false;
+			$argumentDefaults['max'] = false;
+			$argumentDefaults['step'] = false;
 		}
 		
 		# Add a regexp check if using URL handling (retrieval or URL HEAD check)
@@ -381,6 +397,7 @@ class form
 		if ($functionName == 'email') {$restriction = 'Must be valid';}
 		if (($arguments['regexp'] || $arguments['regexpi']) && ($functionName != 'email')) {$restriction = 'A specific pattern is required';}
 		
+		# Add a regexp check if using URL handling (retrieval or URL HEAD check)
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
@@ -415,7 +432,7 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'password' ? 'password' : 'text') . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
+			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? " step=\"{$arguments['step']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
 		} else {
 			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlspecialchars ($this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
@@ -497,7 +514,7 @@ class form
 	function password ($suppliedArguments)
 	{
 		# Pass through to the standard input widget, but in password mode
-		$this->input ($suppliedArguments, 'password');
+		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
 	
@@ -508,7 +525,73 @@ class form
 	function email ($suppliedArguments)
 	{
 		# Pass through to the standard input widget, but in password mode
-		$this->input ($suppliedArguments, 'email');
+		$this->input ($suppliedArguments, __FUNCTION__);
+	}
+	
+	
+	/**
+	 * Create a URL widget (same as an input widget but using the HTML5 'url' type)
+	 * @param array $arguments Supplied arguments same as input type
+	 */
+	function url ($suppliedArguments)
+	{
+		# Pass through to the standard input widget, but in password mode
+		$this->input ($suppliedArguments, __FUNCTION__);
+	}
+	
+	
+	/**
+	 * Create a Tel widget (same as an input widget but using the HTML5 'tel' type)
+	 * @param array $arguments Supplied arguments same as input type
+	 */
+	function tel ($suppliedArguments)
+	{
+		# Pass through to the standard input widget, but in password mode
+		$this->input ($suppliedArguments, __FUNCTION__);
+	}
+	
+	
+	/**
+	 * Create a Search widget (same as an input widget but using the HTML5 'search' type)
+	 * @param array $arguments Supplied arguments same as input type
+	 */
+	function search ($suppliedArguments)
+	{
+		# Pass through to the standard input widget, but in password mode
+		$this->input ($suppliedArguments, __FUNCTION__);
+	}
+	
+	
+	/**
+	 * Create a Number widget (same as an input widget but using the HTML5 'number' type)
+	 * @param array $arguments Supplied arguments same as input type
+	 */
+	function number ($suppliedArguments)
+	{
+		# Pass through to the standard input widget, but in password mode
+		$this->input ($suppliedArguments, __FUNCTION__);
+	}
+	
+	
+	/**
+	 * Create a Range widget (same as an input widget but using the HTML5 'range' type)
+	 * @param array $arguments Supplied arguments same as input type
+	 */
+	function range ($suppliedArguments)
+	{
+		# Pass through to the standard input widget, but in password mode
+		$this->input ($suppliedArguments, __FUNCTION__);
+	}
+	
+	
+	/**
+	 * Create a Color widget (same as an input widget but using the HTML5 'color' type)
+	 * @param array $arguments Supplied arguments same as input type
+	 */
+	function color ($suppliedArguments)
+	{
+		# Pass through to the standard input widget, but in password mode
+		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
 	
@@ -532,6 +615,7 @@ class form
 			'cols'					=> $this->settings['cols'],		# Number of columns (optional; defaults to 30)
 			'rows'					=> $this->settings['rows'],		# Number of rows (optional; defaults to 5)
 			'wrap'					=> false,	# Value for non-standard 'wrap' attribute
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> '',		# Default value (optional)
 			'regexp'				=> '',		# Case-sensitive regular expression(s) against which all lines of the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression(s) against which all lines of the submission must validate
@@ -675,7 +759,7 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
 			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlspecialchars ($this->form[$arguments['name']])));
 			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
@@ -818,6 +902,8 @@ class form
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'width'					=> '100%',		# Width
 			'height'				=> '400px',		# Height
+			#!# autofocus not yet supported in fckeditor itself
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> '',		# Default value (optional)
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'editorBasePath'		=> '/_fckeditor/',	# Location of the editor files
@@ -1119,6 +1205,7 @@ class form
 			'expandable'			=> false,	# Whether a multiple-select box should be converted to a set of single boxes whose number can be incremented by pressing a + button
 			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
 			'size'			=> 5,		# Number of rows visible in multiple mode (optional; defaults to 1)
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget
@@ -1227,7 +1314,7 @@ class form
 		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {
-			$this->formSetupErrors['selectNoValues'] = 'No values have been set as selection items.';
+			$this->formSetupErrors['selectNoValues'] = "No values have been set as selection items for the <strong>{$arguments['name']}</strong> element.";
 			return false;
 		}
 		
@@ -1306,7 +1393,7 @@ class form
 				}
 				
 				# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-				$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . $widget->tabindexHtml () . '>';
+				$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . '>';
 				if (!isSet ($arguments['_valuesMultidimensional'])) {
 					if ($arguments['required'] && $arguments['default'] && !$arguments['nullRequiredDefault']) {
 						$arguments['valuesWithNull'] = $arguments['values'];	// Do not add a null entry when a required field also has a default
@@ -1460,6 +1547,7 @@ class form
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> array (),# Pre-selected item
 			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
@@ -1492,7 +1580,7 @@ class form
 		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {
-			$this->formSetupErrors['radiobuttonsNoValues'] = 'No values have been set as selection items.';
+			$this->formSetupErrors['radiobuttonsNoValues'] = "No values have been set as selection items for the <strong>{$arguments['name']}</strong> element.";
 			return false;
 		}
 		
@@ -1557,11 +1645,13 @@ class form
 			
 			# Create the widget
 			/* #!# Write branching code around here which uses _valuesMultidimensional, when implementing fieldset grouping */
+			$firstItem = true;
 			foreach ($arguments['values'] as $value => $visible) {
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$firstItem = false;
 				
 				# Add a line break if required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1647,6 +1737,7 @@ class form
 			'output'				=> array (),# Presentation format
 			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
 			'maximum'		=> 0,		# The maximum number which must be selected (defaults to 0, i.e. no maximum checking done)
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'			=> array (),# Pre-selected item(s)
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
@@ -1741,7 +1832,7 @@ class form
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
 //				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
-				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . (($arguments['autofocus'] && $subwidgetIndex == 1)  ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
 				
 				# Add a line/column breaks when required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1868,6 +1959,7 @@ class form
 	 * Create a date/datetime widget set
 	 * @param array $arguments Supplied arguments - see template
 	 */
+	#!# Need to add HTML5 equivalents
 	function datetime ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
@@ -1881,6 +1973,7 @@ class form
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'level'					=> 'date',	# Whether to show 'datetime' / 'date' / 'time' / 'year' widget set
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> '',		# Initial value - either 'timestamp' or an SQL string
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
@@ -2064,18 +2157,21 @@ class form
 		if (($arguments['level'] == 'datetime') || ($arguments['level'] == 'time')) {$restriction = 'Time can be entered flexibly';}
 		
 		# Start to define the widget's core HTML
+		$firstSubwidget = true;
 		if ($arguments['editable']) {
 			$widgetHtml = '';
 			
 			# Start with the time if required
 			if (substr_count ($arguments['level'], 'time')) {	// datetime or time
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span>';
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'time', true) . ' type="text" size="10" value="' . $elementValue['time'] . '"' . $widget->tabindexHtml () . ' />';
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'time', true) . ' type="text" size="10" value="' . $elementValue['time'] . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . ' />';
+				$firstSubwidget = false;
 			}
 			
 			# Add the date and month input boxes; if the day or year are 0 then nothing will be displayed
 			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '"' . ($arguments['level'] == 'date' ? $widget->tabindexHtml () : '') . ' />&nbsp;';
+				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'date' ? $widget->tabindexHtml () : '') . ' />&nbsp;';
+				$firstSubwidget = false;
 				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
 				$widgetHtml .= "\n\t\t\t\t" . '<select' . $this->nameIdHtml ($arguments['name'], false, 'month', true) . '>';
 				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
@@ -2089,7 +2185,8 @@ class form
 			# Add the year box
 			if ($arguments['level'] != 'time') {
 				$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" ' . ($arguments['level'] == 'year' ? $widget->tabindexHtml () : '') . '/>' . "\n\t\t";
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" ' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'year' ? $widget->tabindexHtml () : '') . '/>' . "\n\t\t";
+				$firstSubwidget = false;
 			}
 			
 			# Surround with a fieldset if necessary
@@ -2163,6 +2260,7 @@ class form
 			'name'					=> NULL,	# Name of the element
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
+			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> false,	# Default value(s) (optional), i.e. the current filename(s) if any
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'append'				=> '',		# HTML appended to the widget
@@ -2363,7 +2461,7 @@ class form
 			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is bogus (non-standard and seemingly not supported by any browsers), so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would expose to the user the size of the PHP ini setting
 			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
 			if ($arguments['editable']) {
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . $widget->tabindexHtml ($subfield) . ($mimeTypes ? ' accept="' . implode (', ', $mimeTypes) . '"' : '') . ' />';
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($mimeTypes ? ' accept="' . implode (', ', $mimeTypes) . '"' : '') . ' />';
 				$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
 			} else {
 				if ($arguments['default'] && isSet ($arguments['default'][$subfield])) {
@@ -2637,6 +2735,7 @@ class form
 	function autocompleteJQuery ($id, $data)
 	{
 		# Add the main function
+		#!# Hacky closure of </script> at start
 		$this->jQuery[__FUNCTION__] = '
 			</script>
 			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.bgiframe.min.js"></script> 
@@ -2944,6 +3043,7 @@ class form
 		# If the field type is not suitable as an e-mail target, throw a setup error
 		if (!$this->elements[$recipient]['suitableAsEmailTarget']) {
 			$this->formSetupErrors['setOutputEmailElementInvalid'] = "The chosen field (<strong>$recipient</strong>) is not a valid field from which the recipient of the result-containing e-mail can be taken.";
+			application::dumpData ($this->elements[$recipient]);
 			return false;
 		}
 		
@@ -4823,6 +4923,8 @@ class form
 				'database'			=> array ('presented'),
 			),
 			
+			// url, tel, etc., are copied below after this block
+			
 			'password' => array (
 				'_descriptions' => array (
 					'compiled'		=> 'Show as unaltered string',
@@ -4865,7 +4967,7 @@ class form
 			'select' => array (
 				'_descriptions' => array (
 					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean true/false',
-					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
+					'compiled'		=> 'String of selected items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
 				'file'				=> array ('compiled', 'rawcomponents', 'presented'),
@@ -4912,6 +5014,12 @@ class form
 				'database'			=> array ('presented'),
 			),
 		);
+		
+		# Copy types to avoid re-stating them
+		$copyInputTypes = array ('url', 'tel', 'search', 'number', 'number', 'range', 'color');
+		foreach ($copyInputTypes as $copyInputType) {
+			$presentationDefaults[$copyInputType] = $presentationDefaults['input'];
+		}
 		
 		# If the array should return only the defaults rather than full availability, remove the non-defaults
 		if (!$returnFullAvailabilityArray) {
@@ -5833,6 +5941,17 @@ class form
 					}
 				}
 				
+				# HTML5 search/color fields become native fields
+				if (preg_match ('/search/i', $fieldName)) {
+					$forceType = 'search';
+				}
+				if (preg_match ('/(telephone|^tel$)/i', $fieldName)) {
+					$forceType = 'tel';
+				}
+				if (preg_match ('/(color|colour)/i', $fieldName)) {
+					$forceType = 'color';
+				}
+				
 				# Richtext fields - text fields with html/richtext in fieldname
 				if (preg_match ('/(html|richtext)/i', $fieldName) && (strtolower ($fieldAttributes['Type']) == 'text')) {
 					$forceType = 'richtext';
@@ -5845,7 +5964,7 @@ class form
 				
 				# Website fields - for fieldnames containing 'url/website/http'
 				if (preg_match ('/(url|website|http)/i', $fieldName)) {
-					$forceType = 'input';
+					$forceType = 'url';
 					$standardAttributes['regexp'] = '^(http|https)://';
 					$standardAttributes['description'] = 'Must begin http://';	// ' or https://' not added to this description just to keep it simple
 				}

@@ -56,7 +56,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.16.2
+ * @version 1.16.3
  */
 class form
 {
@@ -2988,9 +2988,15 @@ class form
 			return $_SERVER['SERVER_ADMIN'];
 		}
 		
+		# Add support for "Visible name <name@email>" rather than just "name@email", by extracting the e-mail section itself and caching the supplied string
+		$suppliedValue = $administrator;
+		if (preg_match ('/^(.+)<([^>]+)>$/', $administrator, $matches)) {
+			$administrator = $matches[2];
+		}
+		
 		# If an address is supplied, confirm it's valid
 		if (application::validEmail ($administrator)) {
-			return $administrator;
+			return $suppliedValue;
 		}
 		
 		# If the non-validated address includes an @ but is not a valid address, state this as an error
@@ -3012,7 +3018,7 @@ class form
 		}
 		
 		# Otherwise return what was supplied
-		return $administrator;
+		return $suppliedValue;
 	}
 	
 	
@@ -5161,9 +5167,17 @@ class form
 			$recipient = $this->configureResultConfirmationEmailRecipient;
 		}
 		
-		# Define the additional headers
+		# Add support for "Visible name <name@email>" rather than just "name@email"
 		$sender = ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator);
-		$additionalHeaders  = 'From: ' . 'Website feedback <' . $sender . '>' . "\r\n";
+		$emailName = 'Website feedback';
+		$emailAddress = $sender;
+		if (preg_match ('/^(.+)<([^>]+)>$/', $sender, $matches)) {
+			$emailName = $matches[1];
+			$emailAddress = $matches[2];
+		}
+		
+		# Define the additional headers
+		$additionalHeaders  = "From: {$emailName} <{$emailAddress}>\r\n";
 		if (($outputType == 'email') && isSet ($this->configureResultEmailCc)) {$additionalHeaders .= 'Cc: ' . implode (', ', $this->configureResultEmailCc) . "\r\n";}
 		
 		# Add the reply-to if it is set and is not empty and that it has been completed (e.g. in the case of a non-required field)

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.0
+ * @version 1.17.1
  */
 class form
 {
@@ -5931,6 +5931,11 @@ class form
 			
 			# Add intelligence rules if required
 			if ($intelligence) {
+				
+				# Fields with 'email' in become e-mail fields
+				if (preg_match ('/email/i', $fieldName)) {
+					$forceType = 'email';
+				}
 				
 				# Fields with 'password' in become password fields, with a proxied confirmation widget
 				if (preg_match ('/password/i', $fieldName)) {

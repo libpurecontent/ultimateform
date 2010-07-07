@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.1
+ * @version 1.17.2
  */
 class form
 {
@@ -90,7 +90,8 @@ class form
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
 	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
-	var $jQuery = array ();						// Array of jQuery client functions, if any
+	var $jQueryLibraries = array ();						// Array of jQuery client library loading HTML tags, if any, which are treated as plain HTML
+	var $jQueryCode = array ();						// Array of jQuery client code, if any, which will get wrapped in a script tag
 	
 	# Output configuration
 	var $configureResultEmailRecipient;							// The recipient of an e-mail
@@ -284,6 +285,7 @@ class form
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'several'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with space/commas)
 			'autocomplete'			=> false,	# URL of data provider
+			'autocompleteTokenised'	=> false,	# URL of data provider
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
@@ -385,7 +387,8 @@ class form
 		$widget->uniquenessCheck ();
 		
 		# Add autocomplete functionality if required
-		$widget->autoComplete ();
+		$widget->autocomplete ();
+		$widget->autocompleteTokenised ();
 		
 		$elementValue = $widget->getValue ();
 		
@@ -630,6 +633,7 @@ class form
 			'maxlength'				=> false,	# Maximum number of characters allowed
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'autocomplete'			=> false,	# URL of data provider
+			'autocompleteTokenised'	=> false,	# URL of data provider
 		);
 		
 		# Create a new form widget
@@ -665,7 +669,8 @@ class form
 		}
 		
 		# Add autocomplete functionality if required
-		$widget->autoComplete ();
+		$widget->autocomplete ();
+		$widget->autocompleteTokenised ($singleLine = false);
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
@@ -2735,14 +2740,11 @@ class form
 	function autocompleteJQuery ($id, $data)
 	{
 		# Add the main function
-		#!# Hacky closure of </script> at start
-		$this->jQuery[__FUNCTION__] = '
-			</script>
+		$this->jQueryLibraries[__FUNCTION__] = '
 			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.bgiframe.min.js"></script> 
 			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.ajaxQueue.js"></script> 
 			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.js"></script> 
 			<link rel="stylesheet" type="text/css" href="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.css" /> 
-			<script type="text/javascript">
 		';
 		
 		# Encode the data, if it is an array of values rather than a URL
@@ -2753,9 +2755,51 @@ class form
 		}
 		
 		# Add a per-widget call
-		$this->jQuery[__FUNCTION__ . $id] = "
+		$this->jQueryCode[__FUNCTION__ . $id] = "
 			$(document).ready(function(){
 				$('#" . $id . "').autocomplete(" . $data . ");
+			});
+		";
+	}
+	
+	
+	# Function to add jQuery-based autocomplete; see http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/ which is a bugfixed fork of the loopj version
+	function autocompleteTokenisedJQuery ($id, $jsonUrl, $optionsJsString = '', $singleLine = true)
+	{
+		# Add the main function
+		$this->jQueryLibraries[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/src/jquery.tokeninput.js"></script>';
+		
+		# Add the stylesheet
+		$uniqueFunctionId = __FUNCTION__ . ($singleLine ? '_singleline' : '_multiline');
+		$this->jQueryLibraries[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/styles/' . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
+		
+		# Compile the options; they are listed at http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/src/jquery.tokeninput.js ; note that the final item in a list must not have a comma at the end
+		$functionOptions = array ();
+		$functionOptions[] = "searchingText: 'Searching &hellip;'";
+		if ($singleLine) {
+			$functionOptions[] = 'classes: {
+						tokenList: "token-input-list-facebook",
+						token: "token-input-token-facebook",
+						tokenDelete: "token-input-delete-token-facebook",
+						selectedToken: "token-input-selected-token-facebook",
+						highlightedToken: "token-input-highlighted-token-facebook",
+						dropdown: "token-input-dropdown-facebook",
+						dropdownItem: "token-input-dropdown-item-facebook",
+						dropdownItem2: "token-input-dropdown-item2-facebook",
+						selectedDropdownItem: "token-input-selected-dropdown-item-facebook",
+						inputToken: "token-input-input-token-facebook"
+					}';
+		}
+		if (strlen ($optionsJsString)) {
+			$functionOptions[] = $optionsJsString;
+		}
+		
+		# Add a per-widget call
+		$this->jQueryCode[__FUNCTION__ . $id] = "
+			$(document).ready(function() {
+				$('#" . $id . "').tokenInput('" . $jsonUrl . "', {
+					" . implode (",\n\t\t\t\t\t", $functionOptions) . "
+				});
 			});
 		";
 	}
@@ -2765,7 +2809,7 @@ class form
 	function maxLengthJQuery ($id, $characters)
 	{
 		# Add the main function
-		$this->jQuery[__FUNCTION__] = "
+		$this->jQueryCode[__FUNCTION__] = "
 			function limitChars(textid, limit, infodiv)
 			{
 				var text = $('#'+textid).val(); 
@@ -2785,7 +2829,7 @@ class form
 		";
 		
 		# Add a per-widget call
-		$this->jQuery[__FUNCTION__ . $id] = "
+		$this->jQueryCode[__FUNCTION__ . $id] = "
 			$(function(){
 				$('#" . $id . "').keyup(function()
 				{
@@ -4222,7 +4266,7 @@ class form
 		$messageText = ($this->settings['unsavedDataProtection'] === true ? 'Leaving this page will cause edits to be lost. Press the submit button on the page if you wish to save your data.' : $this->settings['unsavedDataProtection']);
 		
 		# Create the jQuery code
-		$this->jQuery[__FUNCTION__] = "
+		$this->jQueryCode[__FUNCTION__] = "
 			function removeCheck() { window.onbeforeunload = null; }
 			$(document).ready(function() {
 			    $('#" . $formId . " :input').one('change', function() {
@@ -4475,7 +4519,7 @@ class form
 	function jQuery ()
 	{
 		# End if no jQuery use
-		if (!$this->jQuery) {return false;}
+		if (!$this->jQueryLibraries && !$this->jQueryCode) {return false;}
 		
 		# Start the HTML
 		$html  = '';
@@ -4485,10 +4529,15 @@ class form
 			$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
 		}
 		
+		# Add plugin libraries
+		foreach ($this->jQueryLibraries as $key => $htmlCode) {
+			$html .= "\n" . $htmlCode;
+		}
+		
 		# Add each client function
 		$html .= "\n<script type=\"text/javascript\">";
-		foreach ($this->jQuery as $key => $code) {
-			$html .= "\n" . $code;
+		foreach ($this->jQueryCode as $key => $jsCode) {
+			$html .= "\n" . $jsCode;
 		}
 		$html .= "\n</script>\n\n";
 		
@@ -6339,10 +6388,44 @@ class formWidget
 	# Function to add autocomplete functionality
 	function autocomplete ()
 	{
-		if ($this->arguments['autocomplete']) {
+		if ($this->arguments[__FUNCTION__]) {
 			$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
-			$this->form->autocompleteJQuery ($id, $this->arguments['autocomplete']);
+			$this->form->autocompleteJQuery ($id, $this->arguments[__FUNCTION__]);
 		}
+	}
+	
+	
+	# Function to add autocomplete functionality
+	function autocompleteTokenised ($singleLine = true)
+	{
+		# End if this functionality is not activated
+		if (!$this->arguments[__FUNCTION__]) {return;}
+		
+		# If a value has been submitted, process it
+		$options = array ();
+		if (strlen ($this->value)) {
+			
+			# Strip the trailing comma that the tokenised jQuery library being used creates
+			if (substr ($this->value, -1) == ',') {
+				$this->value = substr ($this->value, 0, -1);
+			}
+			
+			# Pre-populate this list if data has been submitted
+			$data = explode (',', $this->value);
+			$values = array ();
+			$i = 0;
+			foreach ($data as $value) {
+				$values[$i]['id'] = $value;
+				$values[$i]['name'] = $value;	// Ideally this would have the label, but this data is not available to ultimateForm
+				$i++;
+			}
+			$options[] = 'prePopulate: ' . json_encode ($values);
+		}
+		
+		# Create the widget
+		$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
+		$options = implode (',', $options);
+		$this->form->autocompleteTokenisedJQuery ($id, $this->arguments[__FUNCTION__], $options, $singleLine);
 	}
 	
 	

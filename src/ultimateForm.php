@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.2
+ * @version 1.17.3
  */
 class form
 {
@@ -90,8 +90,9 @@ class form
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
 	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
-	var $jQueryLibraries = array ();						// Array of jQuery client library loading HTML tags, if any, which are treated as plain HTML
-	var $jQueryCode = array ();						// Array of jQuery client code, if any, which will get wrapped in a script tag
+	var $jQueryLibraries = array ();			// Array of jQuery client library loading HTML tags, if any, which are treated as plain HTML
+	var $jQueryCode = array ();					// Array of jQuery client code, if any, which will get wrapped in a script tag
+	var $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
 	
 	# Output configuration
 	var $configureResultEmailRecipient;							// The recipient of an e-mail
@@ -1984,6 +1985,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'autoCenturyConversion'	=> 69,		# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'prefill'				=> false,	# Whether to include pre-fill link: '[Now]'
 		);
 		
 		# Define the supported levels
@@ -2194,10 +2196,44 @@ class form
 				$firstSubwidget = false;
 			}
 			
+			# Add prefill link if required
+			if ($arguments['level'] != 'time') {
+				if ($arguments['prefill']) {
+					$js  = "\n\tfunction zeroPad(num,count)";
+					$js .= "\n\t{";
+					$js .= "\n\t\tvar numZeropad = num + '';";
+					$js .= "\n\t\twhile(numZeropad.length < count) {";
+					$js .= "\n\t\t\tnumZeropad = '0' + numZeropad;";
+					$js .= "\n\t\t}";
+					$js .= "\n\t\treturn numZeropad;";
+					$js .= "\n\t}";
+					$js .= "\n\tfunction prefillDate(field)";
+					$js .= "\n\t{";
+					$js .= "\n\t\tvar currentTime = new Date();";
+					$dateTypes = array (
+						'time' => "zeroPad((currentTime.getHours() + 1), 2) + ':' + zeroPad((currentTime.getMinutes() + 1), 2) + ':' + zeroPad((currentTime.getSeconds() + 1), 2)",
+						'day' => 'currentTime.getDate()',
+						'month' => 'zeroPad((currentTime.getMonth() + 1), 2)',
+						'year' => 'currentTime.getFullYear()',
+					);
+					foreach ($dateTypes as $dateType => $javascriptFunction) {
+						$js .= "\n\t\tvar fieldId = 'form_' + field + '_{$dateType}';";
+						$js .= "\n\t\tvar oTarget = document.getElementById(fieldId);";
+						$js .= "\n\t\tif (oTarget) {";
+						$js .= "\n\t\t\toTarget.value = {$javascriptFunction};";
+						$js .= "\n\t\t}";
+					}
+					$js .= "\n\t}";
+					$this->javascriptCode[__FUNCTION__] = $js;
+					$widgetHtml .= "\n\t\t\t" . '&nbsp;&nbsp;<a href="#" onclick="prefillDate(\'' . $this->cleanId ($arguments['name']) . '\');return false;" class="prefill"><span class="small comment">[Now]</span></a>';
+				}
+			}
+			
 			# Surround with a fieldset if necessary
 			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
 				$widgetHtml  = "\n\t\t\t<fieldset>" . $widgetHtml . "\n\t\t\t</fieldset>";
 			}
+			
 		} else {
 			
 			# Non-editable version
@@ -4309,7 +4345,7 @@ class form
 		}
 		
 		# Load the jQuery library and client code if a widget/option has enabled its use and the setting for the source URL is specified
-		$html .= $this->jQuery ();
+		$html .= $this->loadJavascriptCode ();
 		
 		# Start the constructed form HTML
 		$html .= "\n" . '<form' . ($this->settings['id'] ? " id=\"{$this->settings['id']}\"" : '') . ' method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
@@ -4515,18 +4551,20 @@ class form
 	}
 	
 	
-	# Function to add jQuery code
-	function jQuery ()
+	# Function to add javascript/jQuery code
+	function loadJavascriptCode ()
 	{
 		# End if no jQuery use
-		if (!$this->jQueryLibraries && !$this->jQueryCode) {return false;}
+		if (!$this->jQueryLibraries && !$this->jQueryCode && !$this->javascriptCode) {return false;}
 		
 		# Start the HTML
 		$html  = '';
 		
 		# Add the library if required
-		if ($this->settings['jQuery']) {
-			$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
+		if ($this->jQueryLibraries || $this->jQueryCode) {
+			if ($this->settings['jQuery']) {
+				$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
+			}
 		}
 		
 		# Add plugin libraries
@@ -4535,11 +4573,16 @@ class form
 		}
 		
 		# Add each client function
-		$html .= "\n<script type=\"text/javascript\">";
-		foreach ($this->jQueryCode as $key => $jsCode) {
-			$html .= "\n" . $jsCode;
+		if ($this->jQueryCode || $this->javascriptCode) {
+			$html .= "\n<script type=\"text/javascript\">";
+			foreach ($this->jQueryCode as $key => $jsCode) {
+				$html .= "\n" . $jsCode;
+			}
+			foreach ($this->javascriptCode as $key => $jsCode) {
+				$html .= "\n" . $jsCode;
+			}
+			$html .= "\n</script>\n\n";
 		}
-		$html .= "\n</script>\n\n";
 		
 		# Return the HTML
 		return $html;

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.3
+ * @version 1.17.4
  */
 class form
 {
@@ -2316,6 +2316,7 @@ class form
 			'mime'					=> false,	# Whether to enable the MIME Type check
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
+			'appendExtension'		=> false,	# An additional extension which gets added to the filename upon upload; the starting dot is not assumed automatically
 			'lowercaseExtension'	=> false,	# Force the file extension to be lowercased
 			'discard'				=> false,	# Whether to process the input but then discard it in the results; note that the file will still be uploaded
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
@@ -5659,6 +5660,11 @@ class form
 				# Overwrite the filename if being forced; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
 					$attributes['name'] = $arguments['forcedFileName'] . $fileExtension;
+				}
+				
+				# If appendExtension is set, add that on to the filename
+				if (strlen ($arguments['appendExtension'])) {
+					$attributes['name'] .= $arguments['appendExtension'];
 				}
 				
 				# Create a shortcut for the filename (just the name, not with the path)

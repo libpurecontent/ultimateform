@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.4
+ * @version 1.17.5
  */
 class form
 {
@@ -2778,10 +2778,10 @@ class form
 	{
 		# Add the main function
 		$this->jQueryLibraries[__FUNCTION__] = '
-			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.bgiframe.min.js"></script> 
-			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.ajaxQueue.js"></script> 
-			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.js"></script> 
-			<link rel="stylesheet" type="text/css" href="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.css" /> 
+			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.bgiframe.min.js"></script>
+			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.ajaxQueue.js"></script>
+			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.js"></script>
+			<link rel="stylesheet" type="text/css" href="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.css" />
 		';
 		
 		# Encode the data, if it is an array of values rather than a URL
@@ -6066,7 +6066,7 @@ class form
 				}
 				
 				# Website fields - for fieldnames containing 'url/website/http'
-				if (preg_match ('/(url|website|http)/i', $fieldName)) {
+				if (preg_match ('/(website|http)/i', $fieldName) || $fieldName == 'url') {
 					$forceType = 'url';
 					$standardAttributes['regexp'] = '^(http|https)://';
 					$standardAttributes['description'] = 'Must begin http://';	// ' or https://' not added to this description just to keep it simple

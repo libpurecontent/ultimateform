@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.5
+ * @version 1.17.6
  */
 class form
 {
@@ -192,6 +192,7 @@ class form
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
 		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
 		'jQuery'							=> 'http://code.jquery.com/jquery-latest.js',	# If using DHTML features, where to load jQuery from (or false if already loaded elsewhere on the page)
+		'scripts'							=> false,							# Where to load GitHub files from; false = use default, string = library files in this URL/path location
 	);
 	
 	
@@ -2804,11 +2805,11 @@ class form
 	function autocompleteTokenisedJQuery ($id, $jsonUrl, $optionsJsString = '', $singleLine = true)
 	{
 		# Add the main function
-		$this->jQueryLibraries[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/src/jquery.tokeninput.js"></script>';
+		$this->jQueryLibraries[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/src/') . 'jquery.tokeninput.js"></script>';
 		
 		# Add the stylesheet
 		$uniqueFunctionId = __FUNCTION__ . ($singleLine ? '_singleline' : '_multiline');
-		$this->jQueryLibraries[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/styles/' . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
+		$this->jQueryLibraries[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/styles/') . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
 		
 		# Compile the options; they are listed at http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/src/jquery.tokeninput.js ; note that the final item in a list must not have a comma at the end
 		$functionOptions = array ();

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.6
+ * @version 1.17.7
  */
 class form
 {
@@ -191,7 +191,7 @@ class form
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
 		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
-		'jQuery'							=> 'http://code.jquery.com/jquery-latest.js',	# If using DHTML features, where to load jQuery from (or false if already loaded elsewhere on the page)
+		'jQuery'							=> 'http://code.jquery.com/jquery-latest.min.js',	# If using DHTML features, where to load jQuery from (or false if already loaded elsewhere on the page)
 		'scripts'							=> false,							# Where to load GitHub files from; false = use default, string = library files in this URL/path location
 	);
 	
@@ -2328,6 +2328,7 @@ class form
 			#!# Change to default to true in a later release once existing applications migrated over
 			'flatten'				=> false,	# Whether to flatten the rawcomponents (i.e. default in 'processing' mode) result if only a single subfield is specified
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'progressbar'			=> false,	# Whether to enable a progress bar (assumed to be in /uploader, or in specified subdirectory)
 		);
 		
 		# Create a new form widget
@@ -2379,6 +2380,21 @@ class form
 		if ($arguments['unzip'] && !extension_loaded ('zip')) {
 			$this->formSetupErrors['uploadUnzipUnsupported'] = 'Unzipping of zip files upon upload was requested but the unzipping module is not available on this server.';
 			$arguments['unzip'] = false;
+		}
+		
+		# Disallow progressbar with more than one subfield
+		if ($arguments['progressbar']) {
+			if ($arguments['subfields'] > 1) {
+				$this->formSetupErrors['uploadProgressbarSubfields'] = 'Only one subfield is allowed in an upload widget with a progressbar.';
+			}
+			if ($arguments['progressbar'] === true) {
+				$arguments['progressbar'] = '/uploader/';
+			}
+			$uploaderProgram = $_SERVER['DOCUMENT_ROOT'] . $arguments['progressbar'] . '/SolmetraUploader.php';
+			if (!file_exists ($uploaderProgram)) {
+				$this->formSetupErrors['uploadProgressbarSubfields'] = 'The upload widget is set to have a progressbar, but the third-party program for this is not installed.';
+				$arguments['progressbar'] = false;
+			}
 		}
 		
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary, and lowercase (and then unique) the extensions lists, ensuring each starts with .
@@ -2467,11 +2483,56 @@ class form
 			$elementProblems['subfieldsMismatch'] = 'You appear to have submitted more files than there are fields available.';
 		}
 		
-		# Start the HTML
+		# Loop through the number of fields required to create the widget
 		$widgetHtml = '';
 		if ($arguments['subfields'] > 1) {$widgetHtml .= "\n\t\t\t";}
+		for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
+			
+			# Where default file(s) are/is expected, show - for the current subfield - the filename for each file (or that there is no file)
+			if ($arguments['default']) {
+				$widgetHtml .= '<p class="currentfile' . ($subfield > 0 ? ' currentfilenext' : '') . '">' . (isSet ($arguments['default'][$subfield]) ? 'Current file: <span class="filename">' . htmlspecialchars (basename ($arguments['default'][$subfield]['name'])) . '</span>' : '<span class="comment">(No current file)</span>') . "</p>\n\t\t\t";
+			}
+			
+			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is bogus (non-standard and seemingly not supported by any browsers), so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would expose to the user the size of the PHP ini setting
+			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
+			if ($arguments['editable']) {
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($mimeTypes ? ' accept="' . implode (', ', $mimeTypes) . '"' : '') . ' />';
+				$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
+			} else {
+				if ($arguments['default'] && isSet ($arguments['default'][$subfield])) {
+					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . ' type="hidden" value="' . htmlspecialchars (basename ($arguments['default'][$subfield]['name'])) . '" />' . "\n\t\t\t";
+				}
+			}
+		}
 		
-		# Loop through the number of fields required to create the widget and perform checks
+		# Add progress bar support if required; this has only been tested so far with a single widget having this flag and with single upload
+		if ($arguments['progressbar']) {
+			
+			# Load the uploader
+			require_once ($uploaderProgram);
+			$solmetraUploader = new SolmetraUploader (
+				$arguments['progressbar'] . '/',				// a base path to Flash Uploader's directory (relative to the page)
+				$arguments['progressbar'] . '/upload.php',	// path to a file that handles file uploads (relative to uploader.swf) [optional]
+				$_SERVER['DOCUMENT_ROOT'] . $arguments['progressbar'] . '/config.php'	// path to a server-side config file (relative to the page) [optional]
+			);
+			
+			# Populate (emulate) $_FILES; NB We don't use $solmetraUploader->gatherUploadedFiles ();	as that populates the _FILES array differently to the (silly) array arrangement that PHP has
+			$elementValue = false;
+			$_FILES = array ();
+			$file = $solmetraUploader->getUploadedFiles ();
+			if ($file) {
+				$elementValue = array ($file[$arguments['name']]);
+				foreach ($file[$arguments['name']] as $key => $value) {	// Loop through the attributes (name,type,size,tmp_name,error) for the file
+					$_FILES[$arguments['name']][$key][] = $value;
+				}
+			}
+			
+			# Create the HTML
+			$widgetHtml  = '<script type="text/javascript" src="' . $arguments['progressbar'] . '/SolmetraUploader.js"></script>';
+			$widgetHtml .= $solmetraUploader->getInstance ($arguments['name']);
+		}
+		
+		# Loop through the number of fields required to perform checks
 		$apparentlyUploadedFiles = array ();
 		if ($arguments['default']) {$apparentlyUploadedFiles = $arguments['default'];}	// add in the numerically-indexed defaults (which are then overwritten if more uploaded)
 		for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
@@ -2493,22 +2554,6 @@ class form
 					if (!application::filenameIsValid ($elementValue[$subfield]['name'], $arguments['disallowedExtensions'], $arguments['allowedExtensions'])) {
 						$filenameInvalidSubfields[] = $elementValue[$subfield]['name'];
 					}
-				}
-			}
-			
-			# Where default file(s) are/is expected, show - for the current subfield - the filename for each file (or that there is no file)
-			if ($arguments['default']) {
-				$widgetHtml .= '<p class="currentfile' . ($subfield > 0 ? ' currentfilenext' : '') . '">' . (isSet ($arguments['default'][$subfield]) ? 'Current file: <span class="filename">' . htmlspecialchars (basename ($arguments['default'][$subfield]['name'])) . '</span>' : '<span class="comment">(No current file)</span>') . "</p>\n\t\t\t";
-			}
-			
-			# Define the widget's core HTML; note that MAX_FILE_SIZE as mentioned in the PHP manual is bogus (non-standard and seemingly not supported by any browsers), so is not supported here - doing so would also require MAX_FILE_SIZE as a disallowed form name, and would expose to the user the size of the PHP ini setting
-			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
-			if ($arguments['editable']) {
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($mimeTypes ? ' accept="' . implode (', ', $mimeTypes) . '"' : '') . ' />';
-				$widgetHtml .= (($subfield != ($arguments['subfields'] - 1)) ? "<br />\n\t\t\t" : (($arguments['subfields'] == 1) ? '' : "\n\t\t"));
-			} else {
-				if ($arguments['default'] && isSet ($arguments['default'][$subfield])) {
-					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . ' type="hidden" value="' . htmlspecialchars (basename ($arguments['default'][$subfield]['name'])) . '" />' . "\n\t\t\t";
 				}
 			}
 		}
@@ -2608,6 +2653,7 @@ class form
 			#!# Not finished
 #			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'unzip'	=> $arguments['unzip'],
+			'progressbar' => $arguments['progressbar'],
 			'mime' => $arguments['mime'],
 			'subfields' => $arguments['subfields'],
 			'default'	=> $arguments['default'],
@@ -2774,10 +2820,10 @@ class form
 	}
 	
 	
-	# Function to add jQuery-based autocomplete; see http://docs.jquery.com/Plugins/Autocomplete
+	# Function to add jQuery-based autocomplete; see: http://docs.jquery.com/Plugins/Autocomplete
 	function autocompleteJQuery ($id, $data)
 	{
-		# Add the main function
+		# Add the libraries
 		$this->jQueryLibraries[__FUNCTION__] = '
 			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.bgiframe.min.js"></script>
 			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.ajaxQueue.js"></script>
@@ -5694,7 +5740,14 @@ class form
 				
 				# Attempt to upload the file to the (now finalised) destination
 				$destination = $arguments['directory'] . $filename;
-				if (!move_uploaded_file ($attributes['tmp_name'], $destination)) {
+				if ($arguments['progressbar']) {
+					$uploadedFileMoved = true;	// The progressbar will have already moved the file into place
+					#!# Error handling needed
+					rename ($attributes['tmp_name'], $destination);
+				} else {
+					$uploadedFileMoved = move_uploaded_file ($attributes['tmp_name'], $destination);
+				}
+				if (!$uploadedFileMoved) {
 					
 					# Create an array of any failed file uploads
 					#!# Not sure what happens if this fails, given that the attributes may not exist

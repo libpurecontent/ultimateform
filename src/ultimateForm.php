@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.7
+ * @version 1.17.8
  */
 class form
 {
@@ -85,6 +85,7 @@ class form
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
 	var $formDisplayed = false;					// Flag for whether the form has been displayed
+	var $formDisabled = false;					// Whether the form has been disabled
 	var $setupOk = false;						// Flag for whether the form has been set up OK
 	var $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
@@ -136,7 +137,7 @@ class form
 		'displayColons'						=> true,							# Whether to show colons after the initial description
 		'whiteSpaceTrimSurrounding'			=> true,							# Whether to trim surrounding white space in any forms which are submitted
 		'whiteSpaceCheatAllowed'			=> false,							# Whether to allow people to cheat submitting whitespace only in required fields
-		'reappear'							=> false,							# Whether to keep the form visible after successful submission (useful for search forms, etc., that should reappear)
+		'reappear'							=> false,							# Whether to keep the form visible after successful submission (useful for search forms, etc., that should reappear), either true/false/'disabled' (disables the elements and the submit button but reshows the form as a whole)
 		'formCompleteText'					=> 'Many thanks for your input.',	# The form completion text (or false if not to display it at all)
 		'submitButtonPosition'				=> 'end',							# Whether the submit button appears at the end or the start/end/both of the form
 		'submitButtonText'					=> 'Submit!',						# The form submit button text
@@ -3913,9 +3914,19 @@ class form
 				$this->elementProblems = array ();	// Clear the element problems list in case this is being shown in templating mode
 			}
 			
-			# Display the form and any problems then end
+			# Is the form successful?
+			$formIsUnsuccessful = (!$this->formPosted || $elementProblems || $formRefreshed);
+			
+			# Should the form be disabled?
+			if ($this->settings['reappear'] === 'disabled') {
+				$this->formDisabled = (!$formIsUnsuccessful);
+			}
+			
+			# Construct the HTML
 			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
-			if (!$this->formPosted || $elementProblems || $formRefreshed) {
+			
+			# Display the form and any problems then end
+			if ($formIsUnsuccessful) {
 				#!# This should not be done if the form is successful
 				if ($this->settings['div']) {$this->html .= "\n</div>";}
 				if ($showHtmlDirectly) {echo $this->html;}
@@ -4537,36 +4548,38 @@ class form
 		
 		# Add the form button, either at the start or end as required
 		#!# submit_x and submit_y should be treated as a reserved word when using submitButtonAccesskey (i.e. generating type="image")
-		$submitButtonText = $this->settings['submitButtonText'] . (!empty ($this->settings['submitButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
-		$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="button" />';
-		if ($this->settings['refreshButton']) {
-			$refreshButtonText = $this->settings['refreshButtonText'] . (!empty ($this->settings['refreshButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['refreshButtonAccesskey'] . ']' : '');
-			#!# Need to deny __refresh as a reserved form name
-			$refreshButtonHtml = '<input name="__refresh" type="' . (!$this->settings['refreshButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['refreshButtonImage']}\" name=\"submit\" alt=\"{$refreshButtonText}") . '" value="' . $refreshButtonText . '"' . (!empty ($this->settings['refreshButtonAccesskey']) ? " accesskey=\"{$this->settings['refreshButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['refreshButtonTabindex']) ? " tabindex=\"{$this->settings['refreshButtonTabindex']}\"" : '') . ' class="button" />';
-		}
-		if ($this->settings['display'] == 'template') {
-			$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['SUBMIT'], $formButtonHtml, $formHtml);
+		if (!$this->formDisabled) {
+			$submitButtonText = $this->settings['submitButtonText'] . (!empty ($this->settings['submitButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
+			$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="button" />';
 			if ($this->settings['refreshButton']) {
-				$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['REFRESH'], $refreshButtonHtml, $formHtml);
+				$refreshButtonText = $this->settings['refreshButtonText'] . (!empty ($this->settings['refreshButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['refreshButtonAccesskey'] . ']' : '');
+				#!# Need to deny __refresh as a reserved form name
+				$refreshButtonHtml = '<input name="__refresh" type="' . (!$this->settings['refreshButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['refreshButtonImage']}\" name=\"submit\" alt=\"{$refreshButtonText}") . '" value="' . $refreshButtonText . '"' . (!empty ($this->settings['refreshButtonAccesskey']) ? " accesskey=\"{$this->settings['refreshButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['refreshButtonTabindex']) ? " tabindex=\"{$this->settings['refreshButtonTabindex']}\"" : '') . ' class="button" />';
 			}
-		} else {
-			$formButtonHtml = "\n\n" . '<p class="submit">' . $formButtonHtml . '</p>';
-			if ($this->settings['refreshButton']) {
-				$refreshButtonHtml = "\n\n" . '<p class="refresh">' . $refreshButtonHtml . '</p>';
-			}
-			switch ($this->settings['submitButtonPosition']) {
-				case 'start':
-					$formHtml = $formButtonHtml . $formHtml;
-					break;
-				case 'both':
-					$formHtml = $formButtonHtml . $formHtml . $formButtonHtml;
-					break;
-				case 'end':	// Fall-through
-				default:
-					$formHtml = $formHtml . $formButtonHtml;
-			}
-			if ($this->settings['refreshButton']) {
-				$formHtml = ((!$this->settings['refreshButtonAtEnd']) ? ($refreshButtonHtml . $formHtml) : ($formHtml . $refreshButtonHtml));
+			if ($this->settings['display'] == 'template') {
+				$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['SUBMIT'], $formButtonHtml, $formHtml);
+				if ($this->settings['refreshButton']) {
+					$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['REFRESH'], $refreshButtonHtml, $formHtml);
+				}
+			} else {
+				$formButtonHtml = "\n\n" . '<p class="submit">' . $formButtonHtml . '</p>';
+				if ($this->settings['refreshButton']) {
+					$refreshButtonHtml = "\n\n" . '<p class="refresh">' . $refreshButtonHtml . '</p>';
+				}
+				switch ($this->settings['submitButtonPosition']) {
+					case 'start':
+						$formHtml = $formButtonHtml . $formHtml;
+						break;
+					case 'both':
+						$formHtml = $formButtonHtml . $formHtml . $formButtonHtml;
+						break;
+					case 'end':	// Fall-through
+					default:
+						$formHtml = $formHtml . $formButtonHtml;
+				}
+				if ($this->settings['refreshButton']) {
+					$formHtml = ((!$this->settings['refreshButtonAtEnd']) ? ($refreshButtonHtml . $formHtml) : ($formHtml . $refreshButtonHtml));
+				}
 			}
 		}
 		
@@ -4576,12 +4589,14 @@ class form
 		}
 		
 		# Add in a reset button if wanted
-		if ($this->settings['resetButton']) {
-			$resetButtonHtml = '<input value="' . $this->settings['resetButtonText'] . (!empty ($this->settings['resetButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['resetButtonAccesskey'] . ']" accesskey="' . $this->settings['resetButtonAccesskey'] : '') . '" type="reset" class="resetbutton"' . (is_numeric ($this->settings['resetButtonTabindex']) ? " tabindex=\"{$this->settings['resetButtonTabindex']}\"" : '') . ' />';
-			if ($this->settings['display'] == 'template') {
-				$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['RESET'], $resetButtonHtml, $formHtml);
-			} else {
-				$formHtml .= "\n" . '<p class="reset">' . $resetButtonHtml . '</p>';
+		if (!$this->formDisabled) {
+			if ($this->settings['resetButton']) {
+				$resetButtonHtml = '<input value="' . $this->settings['resetButtonText'] . (!empty ($this->settings['resetButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['resetButtonAccesskey'] . ']" accesskey="' . $this->settings['resetButtonAccesskey'] : '') . '" type="reset" class="resetbutton"' . (is_numeric ($this->settings['resetButtonTabindex']) ? " tabindex=\"{$this->settings['resetButtonTabindex']}\"" : '') . ' />';
+				if ($this->settings['display'] == 'template') {
+					$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['RESET'], $resetButtonHtml, $formHtml);
+				} else {
+					$formHtml .= "\n" . '<p class="reset">' . $resetButtonHtml . '</p>';
+				}
 			}
 		}
 		
@@ -4593,6 +4608,12 @@ class form
 		
 		# Add the required field indicator display message if required
 		if (($this->settings['display'] != 'template') && ($this->settings['requiredFieldIndicator'] === 'bottom') || ($this->settings['requiredFieldIndicator'] === true)) {$html .= $requiredFieldIndicatorHtml;}
+		
+		# If the form is disabled, disable the elements
+		#!# This method is hacky but is the only way without extensive refactoring to enable elements to re-render their HTML retrospectively
+		if ($this->formDisabled) {
+			$html = preg_replace ('/<(input|select|textarea) /', '<\1 disabled="disabled" ', $html);
+		}
 		
 		# Return the HTML
 		return $html;

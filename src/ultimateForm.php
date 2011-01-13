@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.8
+ * @version 1.17.9
  */
 class form
 {
@@ -5962,7 +5962,7 @@ class form
 			'includeOnly' => array (),
 			'exclude' => array (),
 			'ordering' => array (),
-			'enumRadiobuttons' => false,	// Whether to use radiobuttons for ENUM
+			'enumRadiobuttons' => false,	// Whether to use radiobuttons for ENUM (true, or set number of value choices up to which they will be used, e.g. 2 means: radiobuttons if <=2 fields but select if >2)
 			'lookupFunction' => false,
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
@@ -6307,7 +6307,8 @@ class form
 					foreach ($values as $index => $value) {
 						$values[$index] = str_replace ("''", "'", $value);
 					}
-					$widgetType = ($enumRadiobuttons ? 'radiobuttons' : 'select');
+					$useRadiobuttons = (is_int ($enumRadiobuttons) ? (count ($values) <= $enumRadiobuttons) : $enumRadiobuttons);
+					$widgetType = ($useRadiobuttons ? 'radiobuttons' : 'select');
 					$this->$widgetType ($standardAttributes + array (
 						'values' => $values,
 						'output' => array ('processing' => 'compiled'),

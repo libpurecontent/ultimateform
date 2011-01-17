@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.9
+ * @version 1.17.10
  */
 class form
 {
@@ -192,7 +192,7 @@ class form
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
 		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
-		'jQuery'							=> 'http://code.jquery.com/jquery-latest.min.js',	# If using DHTML features, where to load jQuery from (or false if already loaded elsewhere on the page)
+		'jQuery'							=> true,							# If using DHTML features, where to load jQuery from (true = default, or false if already loaded elsewhere on the page)
 		'scripts'							=> false,							# Where to load GitHub files from; false = use default, string = library files in this URL/path location
 	);
 	
@@ -4632,6 +4632,9 @@ class form
 		# Add the library if required
 		if ($this->jQueryLibraries || $this->jQueryCode) {
 			if ($this->settings['jQuery']) {
+				if ($this->settings['jQuery'] === true) {	// If not a URL, use the default, respecting HTTP/HTTPS to avoid mixed content warnings
+					$this->settings['jQuery'] = $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js';
+				}
 				$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
 			}
 		}

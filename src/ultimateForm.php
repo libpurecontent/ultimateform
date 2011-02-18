@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.10
+ * @version 1.17.11
  */
 class form
 {
@@ -289,6 +289,7 @@ class form
 			'several'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with space/commas)
 			'autocomplete'			=> false,	# URL of data provider
 			'autocompleteTokenised'	=> false,	# URL of data provider
+			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
@@ -440,7 +441,7 @@ class form
 		if ($arguments['editable']) {
 			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? " step=\"{$arguments['step']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
 		} else {
-			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : htmlspecialchars ($this->form[$arguments['name']]));
+			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : ($arguments['entities'] ? htmlspecialchars ($this->form[$arguments['name']]) : $this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
 			$hiddenInput = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
 			$widgetHtml .= $hiddenInput;

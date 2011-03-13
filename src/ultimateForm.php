@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.11
+ * @version 1.17.12
  */
 class form
 {
@@ -2822,6 +2822,20 @@ class form
 	}
 	
 	
+	# Function to inject a jQuery library loading
+	function addJQueryLibrary ($id, $code)
+	{
+		$this->jQueryLibraries[$id] = $code;
+	}
+	
+	
+	# Function to inject a jQuery code block
+	function addJQueryCode ($id, $code)
+	{
+		$this->jQueryCode[$id] = $code;
+	}
+	
+	
 	# Function to add jQuery-based autocomplete; see: http://docs.jquery.com/Plugins/Autocomplete
 	function autocompleteJQuery ($id, $data)
 	{
@@ -4636,7 +4650,9 @@ class form
 				if ($this->settings['jQuery'] === true) {	// If not a URL, use the default, respecting HTTP/HTTPS to avoid mixed content warnings
 					$this->settings['jQuery'] = $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js';
 				}
-				$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
+				if ($this->settings['jQuery']) {
+					$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
+				}
 			}
 		}
 		

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.12
+ * @version 1.17.13
  */
 class form
 {
@@ -288,6 +288,7 @@ class form
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'several'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with space/commas)
 			'autocomplete'			=> false,	# URL of data provider
+			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
 			'autocompleteTokenised'	=> false,	# URL of data provider
 			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
@@ -637,6 +638,7 @@ class form
 			'maxlength'				=> false,	# Maximum number of characters allowed
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'autocomplete'			=> false,	# URL of data provider
+			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
 			'autocompleteTokenised'	=> false,	# URL of data provider
 		);
 		
@@ -2836,15 +2838,13 @@ class form
 	}
 	
 	
-	# Function to add jQuery-based autocomplete; see: http://docs.jquery.com/Plugins/Autocomplete
-	function autocompleteJQuery ($id, $data)
+	# Function to add jQuery-based autocomplete; see: http://jqueryui.com/demos/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: http://www.learningjquery.com/2010/06/autocomplete-migration-guide
+	function autocompleteJQuery ($id, $data, $options = array ())
 	{
 		# Add the libraries
 		$this->jQueryLibraries[__FUNCTION__] = '
-			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.bgiframe.min.js"></script>
-			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/lib/jquery.ajaxQueue.js"></script>
-			<script type="text/javascript" src="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.js"></script>
-			<link rel="stylesheet" type="text/css" href="http://view.jquery.com/trunk/plugins/autocomplete/jquery.autocomplete.css" />
+			<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
+			<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"></script>
 		';
 		
 		# Encode the data, if it is an array of values rather than a URL
@@ -2854,12 +2854,31 @@ class form
 			$data = "'{$data}'";
 		}
 		
-		# Add a per-widget call
-		$this->jQueryCode[__FUNCTION__ . $id] = "
-			$(document).ready(function(){
-				$('#" . $id . "').autocomplete(" . $data . ");
-			});
-		";
+		# Determine the options, if any
+		$optionsList  = '';
+		if ($options) {
+			foreach ($options as $key => $value) {
+				switch (true) {
+					case is_bool ($value):
+						$valueFormatted = ($value ? 'true' : 'false');
+						break;
+					case is_string ($value):
+						$valueFormatted = "'" . (string) $value . "'";
+						break;
+					default:
+						$valueFormatted = $value;
+				}
+				$optionsList .= ', ' . $key . ': ' . $valueFormatted;
+			}
+		}
+		
+		# Register a new entry to be added to the document-ready container
+		$this->autocompleteJQueryEntries[] = "$('#" . $id . "').autocomplete({source: {$data}{$optionsList}});";
+		
+		# Add/overwrite a per-widget call
+		$this->jQueryCode[__FUNCTION__]  = "\n\t$(document).ready(function(){";
+		$this->jQueryCode[__FUNCTION__] .= "\n\t\t" . implode ("\n\t\t", $this->autocompleteJQueryEntries);
+		$this->jQueryCode[__FUNCTION__] .= "\n\t});";
 	}
 	
 	
@@ -2906,6 +2925,7 @@ class form
 	
 	
 	# Function to add jQuery-based maxlength checking; see http://stackoverflow.com/questions/1588521/
+	#!# Replace with HTML5 widget attributes where available
 	function maxLengthJQuery ($id, $characters)
 	{
 		# Add the main function
@@ -5994,6 +6014,8 @@ class form
 			'prefixTitleSuffix'	=> false,	// What to suffix all field titles with
 			'intelligence'	=> false,		// Whether to enable intelligent field setup, e.g. password/file*/photograph* become relevant fields and key fields are handled as non-editable
 			'floatChopTrailingZeros' => true,	// Whether to replace trailing zeros at the end of a value where there is a decimal point
+			'autocomplete' => false,	// An autocomplete data endpoint URL; if %field is specified, it will be replaced with the fieldname
+			'autocompleteOptions' => false,	// Array of options that will be converted to a javascript array - see http://docs.jquery.com/UI/Autocomplete#options (this is the new plugin)
 		);
 		
 		# Merge the arguments
@@ -6103,6 +6125,8 @@ class form
 				'default' => $value,
 				'datatype' => $fieldAttributes['Type'],
 				'description' => ($commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : ''),
+				'autocomplete' => ($autocomplete ? str_replace ('%field', $fieldName, $autocomplete) : false),
+				'autocompleteOptions' => ($autocompleteOptions ? $autocompleteOptions : false),
 			);
 			
 			# If a link template is supplied, place that in, but if it includes a %table/%database template, put it in only if those exist
@@ -6535,7 +6559,7 @@ class formWidget
 	{
 		if ($this->arguments[__FUNCTION__]) {
 			$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
-			$this->form->autocompleteJQuery ($id, $this->arguments[__FUNCTION__]);
+			$this->form->autocompleteJQuery ($id, $this->arguments[__FUNCTION__], $this->arguments['autocompleteOptions']);
 		}
 	}
 	

@@ -56,8 +56,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-10, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.13
+ * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
+ * @version 1.17.14
  */
 class form
 {
@@ -286,7 +286,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'confirmation'			=> false,	# Whether to generate a confirmation field
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
-			'several'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with space/commas)
+			'multiple'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with comma-space)
 			'autocomplete'			=> false,	# URL of data provider
 			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
 			'autocompleteTokenised'	=> false,	# URL of data provider
@@ -304,7 +304,7 @@ class form
 		if ($functionName == 'email') {
 			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation e-mail field
 		} else {
-			$argumentDefaults['several'] = false;	# Ensure this option is disabled for non-email types
+			$argumentDefaults['multiple'] = false;	# Ensure this option is disabled for non-email types
 		}
 		
 		# Add in URL-specific defaults
@@ -440,7 +440,7 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? " step=\"{$arguments['step']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
+			$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? " step=\"{$arguments['step']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['multiple'] ? ' multiple="multiple"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
 		} else {
 			$widgetHtml  = ($functionName == 'password' ? str_repeat ('*', strlen ($arguments['default'])) : ($arguments['entities'] ? htmlspecialchars ($this->form[$arguments['name']]) : $this->form[$arguments['name']]));
 			#!# Change to registering hidden internally
@@ -6736,7 +6736,7 @@ class formWidget
 			
 			# Do splitting if required, by comma/semi-colon/space with any spaces surrounding
 			$addresses = array ($this->value);	// By default, make it a list of one
-			if ($this->arguments['several']) {
+			if ($this->arguments['multiple']) {
 				$addresses = application::emailListStringToArray ($this->value);
 			}
 			

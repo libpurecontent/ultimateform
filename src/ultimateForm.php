@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.14
+ * @version 1.17.15
  */
 class form
 {
@@ -4899,8 +4899,18 @@ class form
 	
 	
 	# Function to register external problems as registered by the calling application
-	function registerProblem ($key, $message)
+	function registerProblem ($key, $message, $highlightFieldsWarning = false /* false, or string, or array */)
 	{
+		# Convert the optional parameter for highlighting named field(s) into an array (whether empty or otherwise)
+		if ($highlightFieldsWarning) {
+			$fields = application::ensureArray ($highlightFieldsWarning);
+			foreach ($fields as $field) {
+				if (isSet ($this->elements[$field])) {	// Should really throw a form setup error, but this function is only run dynamically in runtime, so the programmer might not notice
+					$this->elements[$field]['requiredButEmpty'] = true;
+				}
+			}
+		}
+		
 		# Register the problem
 		$this->externalProblems[$key] = $message;
 	}

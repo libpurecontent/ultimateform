@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.15
+ * @version 1.17.16
  */
 class form
 {
@@ -647,6 +647,9 @@ class form
 		
 		$arguments = $widget->getArguments ();
 		
+		# Start a list of restrictions
+		$restrictions = array ();
+		
 		# If the widget is not editable, fix the form value to the default
 		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
 		
@@ -661,12 +664,16 @@ class form
 		$widget->cleanToNumeric ();
 		
 		# Enable minlength checking
-		#!# A $restriction needs to be shown
 		$widget->checkMinLength ();
+		if (is_numeric ($arguments['minlength'])) {
+			$restrictions[] = 'At least ' . number_format ($arguments['minlength']) . ' characters';
+		}
 		
 		# Enable maxlength checking
-		#!# A $restriction needs to be shown
 		$widget->checkMaxLength ();
+		if (is_numeric ($arguments['maxlength'])) {
+			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters';
+		}
 		
 		# Add jQuery-based checking of maxlength
 		if ($arguments['maxlength']) {
@@ -758,10 +765,10 @@ class form
 		#!# Regexp not being listed
 		switch ($arguments['mode']) {
 			case 'lines':
-				$restriction = 'Must have one numeric item per line';
+				$restrictions[] = 'Must have one numeric item per line';
 				break;
 			case 'coordinates':
-				$restriction = 'Must have two numeric items (x,y) per line';
+				$restrictions[] = 'Must have two numeric items (x,y) per line';
 				break;
 		}
 		
@@ -811,7 +818,7 @@ class form
 			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
+			'restriction' => ($restrictions && $arguments['editable'] ? implode ('; ', $restrictions) : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $requiredButEmpty,

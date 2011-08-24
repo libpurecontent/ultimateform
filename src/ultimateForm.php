@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.16
+ * @version 1.17.17
  */
 class form
 {
@@ -177,6 +177,7 @@ class form
 		'truncate'							=> false,							# Whether to truncate the visible part of a widget (global setting)
 		'listUnzippedFilesMaximum'			=> 5,								# When auto-unzipping an uploaded zip file, the maximum number of files contained that should be listed (beyond this, just 'x files' will be shown) in any visible result output
 		'fixMailHeaders'					=> false,							# Whether to add additional mail headers, for use with a server that fails to add Message-Id/Date/Return-Path; set as (bool) true or (str) application name
+		'size'								=> 30,								# Global setting for input widget - size
 		'cols'								=> 30,								# Global setting for textarea cols - number of columns
 		'rows'								=> 5,								# Global setting for textarea cols - number of rows
 		'mailAdminErrors'					=> false,							# Whether to mail the admin with any errors in the form setup
@@ -269,7 +270,7 @@ class form
 			'output'				=> array (),# Presentation format
 			'required'				=> false,	# Whether required or not
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false) [ignored for e-mail type]
-			'size'					=> 30,		# Visible size (optional; defaults to 30)
+			'size'					=> $this->settings['size'],		# Visible size (optional; defaults to 30)
 			'minlength'				=> '',		# Minimum length (optional; defaults to no limit)
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
 			'placeholder'			=> '',		# HTML5 placeholder text
@@ -777,7 +778,11 @@ class form
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
-			$widgetHtml = '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml  = '';
+			if ($arguments['maxlength']) {
+				$widgetHtml .= '<div' . $this->nameIdHtml ($arguments['name'], false, false, false, $idOnly = true, '__info') . ' class="charactersremaininginfo"></div>';
+			}
+			$widgetHtml .= '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['maxlength'] ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
 			$widgetHtml  = str_replace ("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', nl2br (htmlspecialchars ($this->form[$arguments['name']])));
 			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
@@ -2229,7 +2234,7 @@ class form
 						'year' => 'currentTime.getFullYear()',
 					);
 					foreach ($dateTypes as $dateType => $javascriptFunction) {
-						$js .= "\n\t\tvar fieldId = 'form_' + field + '_{$dateType}';";
+						$js .= "\n\t\tvar fieldId = '" . $this->settings['name'] . "_' + field + '_{$dateType}';";
 						$js .= "\n\t\tvar oTarget = document.getElementById(fieldId);";
 						$js .= "\n\t\tif (oTarget) {";
 						$js .= "\n\t\t\toTarget.value = {$javascriptFunction};";
@@ -2581,7 +2586,7 @@ class form
 		
 		# If fields which have an invalid extension have been found, throw a user error
 		if (isSet ($filenameInvalidSubfields)) {
-			$elementProblems['fileExtensionMismatch'] = (count ($filenameInvalidSubfields) > 1 ? 'The files <em>' : 'The file <em>') . implode ('</em>, <em>', $filenameInvalidSubfields) . (count ($filenameInvalidSubfields) > 1 ? '</em> do not' : '</em> does not') . ' comply with the specified file extension rules for this section.';
+			$elementProblems['fileExtensionMismatch'] = (count ($filenameInvalidSubfields) > 1 ? 'The files <em>' : 'The file <em>') . implode ('</em>, <em>', $filenameInvalidSubfields) . (count ($filenameInvalidSubfields) > 1 ? '</em> are the wrong type of files' : '</em> is the wrong type of file') . '.';
 		}
 		
 		# If fields which have an invalid MIME Type have been found, throw a user error
@@ -2789,7 +2794,7 @@ class form
 	
 	
 	# Function to generate ID and name HTML
-	function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false, $idOnly = false)
+	function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false, $idOnly = false, $idAppend = false)
 	{
 		# Create the name and ID and compile the HTML
 		# http://htmlhelp.com/reference/html40/attrs.html says that "Also note that while NAME may contain entities, the ID attribute value may not."
@@ -2801,7 +2806,7 @@ class form
 			$widgetName .= "_{$subitem}";
 			if (!strlen ($subitem)) {$widgetName .= '____NULL';}	// #!# Dirty fix - should really have a guarantee of uniqueness
 		}
-		$id   = ' id="' . $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$widgetName}]" : $widgetName) . '"';
+		$id   = ' id="' . $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$widgetName}]" : $widgetName) . ($idAppend ? "{$idAppend}" : '') . '"';
 		$html = ($idOnly ? '' : $name) . $id;
 		
 		# Return the HTML
@@ -2941,16 +2946,14 @@ class form
 			{
 				var text = $('#'+textid).val(); 
 				var textlength = text.length;
-				if(textlength > limit)
-				{
-					$('#' + infodiv).html('You cannot write more then '+limit+' characters!');
+				var remaining = limit - textlength;
+				if(textlength > limit) {
+					$('#' + infodiv).html('You cannot write more then ' + limit + ' characters!');
 					$('#'+textid).val(text.substr(0,limit));
 					return false;
-				}
-				else
-				{
-				$('#' + infodiv).html('You have '+ (limit - textlength) +' characters left.');
-				return true;
+				} else {
+					$('#' + infodiv).html('You have ' + remaining + (remaining == 1 ? ' character' : ' characters') + ' left.');
+					return true;
 				}
 			}
 		";
@@ -3183,17 +3186,30 @@ class form
 		# Set the reply-to field if applicable
 		$this->configureResultEmailReplyTo = $this->_setReplyTo ($replyToField);
 		
-		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
-		$this->configureResultEmailedSubjectTitle['email'] = $subjectTitle;
-		if (preg_match ('/\{([^\} ]+)\}/', $subjectTitle, $matches)) {
-			$element = $matches[1];
-			if (isSet ($this->elements[$element]) && ($this->elements[$element]['type'] == 'input')) {
-				$this->configureResultEmailedSubjectTitle['email'] = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $subjectTitle);
-			}
-		}
+		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname
+		$this->configureResultEmailedSubjectTitle['email'] = $this->_setTitle ($subjectTitle);
 		
 		#!# This cleaning routine is not a great fix but at least helps avoid ugly e-mail subject lines for now
 		//$this->configureResultEmailedSubjectTitle['email'] = html_entity_decode (application::htmlentitiesNumericUnicode ($this->configureResultEmailedSubjectTitle['email']), ENT_COMPAT, 'UTF-8');
+	}
+	
+	
+	# Helper function to set the title
+	function _setTitle ($title)
+	{
+		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
+		if (preg_match_all ('/\{([^\}]+)\}/', $title, $matches)) {
+			#!# Add more when tested
+			$supportedWidgetTypes = array ('input', 'email', 'url', 'tel', 'search', 'number', 'range', 'color', 'select', );
+			foreach ($matches[1] as $element) {
+				if (isSet ($this->elements[$element]) && (in_array ($this->elements[$element]['type'], $supportedWidgetTypes))) {
+					$title = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $title);
+				}
+			}
+		}
+		
+		# Return the title
+		return $title;
 	}
 	
 	
@@ -3354,14 +3370,8 @@ class form
 		# Assign the administrator e-mail address
 		$this->configureResultConfirmationEmailAdministrator = ($administrator != '' ? $administrator : $_SERVER['SERVER_ADMIN']);
 		
-		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
-		$this->configureResultEmailedSubjectTitle['confirmationEmail'] = $subjectTitle;
-		if (preg_match ('/\{([^\} ]+)\}/', $subjectTitle, $matches)) {
-			$element = $matches[1];
-			if (isSet ($this->elements[$element]) && ($this->elements[$element]['type'] == 'input')) {
-				$this->configureResultEmailedSubjectTitle['confirmationEmail'] = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $subjectTitle);
-			}
-		}
+		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname
+		$this->configureResultEmailedSubjectTitle['confirmationEmail'] = $this->_setTitle ($subjectTitle);
 	}
 	
 	
@@ -5605,7 +5615,7 @@ class form
 			$message .= 'Content-type: text/plain; charset="UTF-8"' . $eol;
 			$message .= "Content-Transfer-Encoding: 8bit" . $eol;
 			$message .= $eol;
-			$message .= wordwrap ($introductoryText . "\n\n" . ($totalAttachments == 1 ? 'There is also an attachment.' : "There are also {$totalAttachments} attachments.") . ($totalAttachmentsDifference ? ' ' . ($totalAttachmentsDifference == 1 ? 'One other submitted file was too large to e-mail, so it has' : "{$totalAttachmentsDifference} other submitted files were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' : '') . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "{$eol}{$eol}{$eol}" . $eol;
+			$message .= wordwrap ($introductoryText . "\n\n" . ($totalAttachments == 1 ? 'There is also an attachment.' : "There are also {$totalAttachments} attachments. Please take care when opening them.") . ($totalAttachmentsDifference ? ' ' . ($totalAttachmentsDifference == 1 ? 'One other submitted file was too large to e-mail, so it has' : "{$totalAttachmentsDifference} other submitted files were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' : '') . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "{$eol}{$eol}{$eol}" . $eol;
 			$message .= '--' . $mimeBoundary;
 			
 			# Add each attachment, starting with a mini-header for each

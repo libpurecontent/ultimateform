@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.17
+ * @version 1.17.18
  */
 class form
 {
@@ -2853,10 +2853,10 @@ class form
 	# Function to add jQuery-based autocomplete; see: http://jqueryui.com/demos/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: http://www.learningjquery.com/2010/06/autocomplete-migration-guide
 	function autocompleteJQuery ($id, $data, $options = array ())
 	{
-		# Add the libraries
+		# Add the libraries, ensuring that the loading respects the protocol type (HTTP/HTTPS) of the current page, to avoid mixed content warnings
 		$this->jQueryLibraries[__FUNCTION__] = '
-			<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
-			<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"></script>
+			<link href="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
+			<script src="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"></script>
 		';
 		
 		# Encode the data, if it is an array of values rather than a URL
@@ -2894,17 +2894,17 @@ class form
 	}
 	
 	
-	# Function to add jQuery-based autocomplete; see http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/ which is a bugfixed fork of the loopj version
+	# Function to add jQuery-based autocomplete; see https://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/ which is a bugfixed fork of the loopj version
 	function autocompleteTokenisedJQuery ($id, $jsonUrl, $optionsJsString = '', $singleLine = true)
 	{
 		# Add the main function
-		$this->jQueryLibraries[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/src/') . 'jquery.tokeninput.js"></script>';
+		$this->jQueryLibraries[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/') . 'jquery.tokeninput.js"></script>';
 		
 		# Add the stylesheet
 		$uniqueFunctionId = __FUNCTION__ . ($singleLine ? '_singleline' : '_multiline');
-		$this->jQueryLibraries[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/styles/') . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
+		$this->jQueryLibraries[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/styles/') . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
 		
-		# Compile the options; they are listed at http://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/raw/master/src/jquery.tokeninput.js ; note that the final item in a list must not have a comma at the end
+		# Compile the options; they are listed at https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/jquery.tokeninput.js ; note that the final item in a list must not have a comma at the end
 		$functionOptions = array ();
 		$functionOptions[] = "searchingText: 'Searching &hellip;'";
 		if ($singleLine) {

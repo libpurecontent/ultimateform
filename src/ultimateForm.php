@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.18
+ * @version 1.17.19
  */
 class form
 {
@@ -6191,7 +6191,7 @@ class form
 				}
 				
 				# HTML5 search/color fields become native fields
-				if (preg_match ('/search/i', $fieldName)) {
+				if (preg_match ('/\bsearch/i', $fieldName)) {
 					$forceType = 'search';
 				}
 				if (preg_match ('/(telephone|^tel$)/i', $fieldName)) {
@@ -6337,18 +6337,26 @@ class form
 					));
 					break;
 				
-				# FLOAT (numeric with decimal point) field
-				case (preg_match ('/float\(([0-9]+),([0-9]+)\)/i', $type, $matches)):
+				# FLOAT/DOUBLE (numeric with decimal point) field
+				case (preg_match ('/(float|double|double precision)\(([0-9]+),([0-9]+)\)/i', $type, $matches)):
+				case (preg_match ('/(float|double|double precision)$/i', $type, $matches)):
 					if ($floatChopTrailingZeros) {
 						if (substr_count ($standardAttributes['default'], '.')) {
 							$standardAttributes['default'] = preg_replace ('/0+$/', '', $standardAttributes['default']);
 							$standardAttributes['default'] = preg_replace ('/\.$/', '', $standardAttributes['default']);
 						}
 					}
-					$this->input ($standardAttributes + array (
-						'maxlength' => ((int) $matches[1] + 2),	// FLOAT(M,D) means "up to M digits in total, of which D digits may be after the decimal point", so maxlength is M + 1 (for the decimal point) + 1 (for a negative sign)
-						'regexp' => '^(-?)([0-9]{0,' . ($matches[1] - $matches[2]) . '})((\.)([0-9]{0,' . $matches[2] . '})$|$)',
-					));
+					if (isSet ($matches[2])) { // e.g. FLOAT(7,2)
+						$floatAttributes = array (
+							'maxlength' => ((int) $matches[2] + 2),	// FLOAT(M,D) means "up to M digits in total, of which D digits may be after the decimal point", so maxlength is M + 1 (for the decimal point) + 1 (for a negative sign)
+							'regexp' => '^(-?)([0-9]{0,' . ($matches[2] - $matches[3]) . '})((\.)([0-9]{0,' . $matches[3] . '})$|$)',
+						);
+					} else {	// e.g. FLOAT or DOUBLE without any size specification
+						$floatAttributes = array (
+							'regexp' => '^(-?)([0-9]+)((\.)([0-9]+)$|$)',
+						);
+					}
+					$this->input ($standardAttributes + $floatAttributes);
 					break;
 				
 				# CHAR/VARCHAR (character) field

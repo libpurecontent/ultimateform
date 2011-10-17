@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.19
+ * @version 1.17.20
  */
 class form
 {
@@ -1753,6 +1753,7 @@ class form
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			#!# Missing this value out causes errors lower
 			'values'				=> array (),# Simple array of selectable values
+			'disabled'				=> array (),# Whether individual checkboxes are disabled, formatted as array of value => 0|1 for each checkbox
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'append'				=> '',		# HTML appended to the widget
@@ -1779,6 +1780,9 @@ class form
 		
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
 		$arguments['default'] = application::ensureArray ($arguments['default']);
+		
+		# Ensure 'disabled' is an array, or disable it
+		if (!is_array ($arguments['disabled'])) {$arguments['disabled'] = array ();}
 		
 		# Obtain the value of the form submission (which may be empty)
 		$widget->setValue (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
@@ -1853,9 +1857,12 @@ class form
 //				# Construct the element ID, which must be unique	
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
+				# Determine whether to disable this checkbox
+				$disabled = ((isSet ($arguments['disabled'][$value]) && $arguments['disabled'][$value]) ? ' disabled="disabled"' : '');
+				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
 //				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
-				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . (($arguments['autofocus'] && $subwidgetIndex == 1)  ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . (($arguments['autofocus'] && $subwidgetIndex == 1)  ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . $disabled . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
 				
 				# Add a line/column breaks when required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1928,6 +1935,12 @@ class form
 				
 				# Determine if the value has been submitted
 				$isSubmitted = (isSet ($this->form[$arguments['name']][$value]) && $this->form[$arguments['name']][$value] == 'true');
+				
+				# If the checkbox is disabled, read the default, therefore ignoring whatever was submitted
+				$disabled = (isSet ($arguments['disabled'][$value]) && $arguments['disabled'][$value]);
+				if ($disabled) {
+					$isSubmitted = (in_array ($value, $arguments['default']));
+				}
 				
 				# rawcomponents is 'An array with every defined element being assigned as itemName => boolean true/false'
 				$data['rawcomponents'][$value] = $isSubmitted;

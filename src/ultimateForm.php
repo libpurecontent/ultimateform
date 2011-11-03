@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.20
+ * @version 1.17.21
  */
 class form
 {
@@ -1237,6 +1237,7 @@ class form
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'nullRequiredDefault'	=> true,	# Whether to add an empty value when the field is required and has a default
+			'onchangeSubmit'		=> false,	# Whether to submit the form onchange
 		);
 		
 		# Create a new form widget
@@ -1416,7 +1417,7 @@ class form
 				}
 				
 				# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-				$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . '>';
+				$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['onchangeSubmit'] ? ' onchange="this.form.submit();"' : '') . $widget->tabindexHtml () . '>';
 				if (!isSet ($arguments['_valuesMultidimensional'])) {
 					if ($arguments['required'] && $arguments['default'] && !$arguments['nullRequiredDefault']) {
 						$arguments['valuesWithNull'] = $arguments['values'];	// Do not add a null entry when a required field also has a default

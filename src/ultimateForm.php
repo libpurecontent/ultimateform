@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.21
+ * @version 1.17.22
  */
 class form
 {
@@ -673,7 +673,7 @@ class form
 		# Enable maxlength checking
 		$widget->checkMaxLength ();
 		if (is_numeric ($arguments['maxlength'])) {
-			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters';
+			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters, inc. spaces';
 		}
 		
 		# Add jQuery-based checking of maxlength
@@ -2348,7 +2348,7 @@ class form
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
 			'appendExtension'		=> false,	# An additional extension which gets added to the filename upon upload; the starting dot is not assumed automatically
-			'lowercaseExtension'	=> false,	# Force the file extension to be lowercased
+			'lowercaseExtension'	=> false,	# Make the eventual file extension lowercased
 			'discard'				=> false,	# Whether to process the input but then discard it in the results; note that the file will still be uploaded
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			#!# Consider a way of adding a checkbox to confirm on a per-widget basis; adds quite a few complications though
@@ -6416,12 +6416,11 @@ class form
 					if ($setSupportSupplied > $setSupportMax) {
 						$this->formSetupErrors['DatabindingSetExcessive'] = "{$setSupportSupplied} values were supplied for the {$fieldName} dataBinding 'SET' field but a maximum of only {$setSupportMax} are supported.";
 					} else {
-						#!# This one is inconsistent; however, pollenDatabase.php assumes that override values take precedence over $values coming from the eregi match here
-						$this->checkboxes (array_merge ($standardAttributes, array (
+						$this->checkboxes ($standardAttributes + array (
 							'values' => $values,
 							'output' => array ('processing' => 'special-setdatatype'),
 							'default' => ($value ? (is_array ($value) ? $value : explode (',', $value)) : array ()),	// Value from getData will just be item1,item2,item3
-						)));
+						));
 					}
 					break;
 				
@@ -6619,17 +6618,23 @@ class formWidget
 		# End if this functionality is not activated
 		if (!$this->arguments[__FUNCTION__]) {return;}
 		
+		# Use the default value if not posted
+		$value = ($this->form->formPosted ? $this->value : $this->arguments['default']);
+		
 		# If a value has been submitted, process it
 		$options = array ();
-		if (strlen ($this->value)) {
+		if (strlen ($value)) {
 			
-			# Strip the trailing comma that the tokenised jQuery library being used creates
-			if (substr ($this->value, -1) == ',') {
-				$this->value = substr ($this->value, 0, -1);
+			# Strip the trailing comma that the tokenised jQuery library being used creates when posting
+			if ($this->form->formPosted) {
+				if (substr ($value, -1) == ',') {
+					$value = substr ($value, 0, -1);
+					$this->value = $value;	// #!# Not sure if this is necessary
+				}
 			}
 			
 			# Pre-populate this list if data has been submitted
-			$data = explode (',', $this->value);
+			$data = explode (',', $value);
 			$values = array ();
 			$i = 0;
 			foreach ($data as $value) {

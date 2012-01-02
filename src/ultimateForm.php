@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.22
+ * @version 1.17.23
  */
 class form
 {
@@ -766,6 +766,7 @@ class form
 		#!# Regexp not being listed
 		switch ($arguments['mode']) {
 			case 'lines':
+				#!# Lines possibly currently allows through empty lines
 				$restrictions[] = 'Must have one numeric item per line';
 				break;
 			case 'coordinates':
@@ -2885,6 +2886,9 @@ class form
 		if ($options) {
 			foreach ($options as $key => $value) {
 				switch (true) {
+					case preg_match ('/^function ?\(/', $value):
+						$valueFormatted = $value;
+						break;
 					case is_bool ($value):
 						$valueFormatted = ($value ? 'true' : 'false');
 						break;

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.23
+ * @version 1.17.24
  */
 class form
 {
@@ -1175,7 +1175,7 @@ class form
 				'<a([^>]*) href="mailto:([^("|@)]+)@([^"]+)"([^>]*)>([^<]*)</a>' => '\5 [\2<span>&#64;</span>\3]',
 				'<span>@</span>' => '<span>&#64;</span>',
 				'<span><span>&#64;</span></span>' => '<span>&#64;</span>',
-				'([_a-z0-9-]+)(\.[_a-z0-9-]+)*@([a-z0-9-]+)(\.[a-z0-9-]+)*(\.[a-z]{2,6})' => '\1\2<span>&#64;</span>\3\4\5', // Non-linked, standard text, addresses
+				'([^\s]+)@([^\s]+)' => '\1<span>&#64;</span>\2', // Non-linked, standard text, addresses - basically any non-whitespace text with a @ in the middle
 			);
 		}
 		

@@ -56,8 +56,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-11, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.24
+ * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
+ * @version 1.17.25
  */
 class form
 {
@@ -6048,6 +6048,7 @@ class form
 			'exclude' => array (),
 			'ordering' => array (),
 			'enumRadiobuttons' => false,	// Whether to use radiobuttons for ENUM (true, or set number of value choices up to which they will be used, e.g. 2 means: radiobuttons if <=2 fields but select if >2)
+			'enumRadiobuttonsInitialNullText' => array (),	// Whether an initial empty radiobutton should have a label, specified as an array of fieldname=>value
 			'lookupFunction' => false,
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
@@ -6401,10 +6402,13 @@ class form
 				# ENUM (selection) field - explode the matches and insert as values
 				case (preg_match ('/enum\(\'(.*)\'\)/i', $type, $matches)):
 					$values = explode ("','", $matches[1]);
+					$useRadiobuttons = (is_int ($enumRadiobuttons) ? (count ($values) <= $enumRadiobuttons) : $enumRadiobuttons);
 					foreach ($values as $index => $value) {
 						$values[$index] = str_replace ("''", "'", $value);
+						if ($useRadiobuttons && $enumRadiobuttonsInitialNullText && is_array ($enumRadiobuttonsInitialNullText) && isSet ($enumRadiobuttonsInitialNullText[$fieldName])) {
+							$standardAttributes['nullText'] = $enumRadiobuttonsInitialNullText[$fieldName];
+						}
 					}
-					$useRadiobuttons = (is_int ($enumRadiobuttons) ? (count ($values) <= $enumRadiobuttons) : $enumRadiobuttons);
 					$widgetType = ($useRadiobuttons ? 'radiobuttons' : 'select');
 					$this->$widgetType ($standardAttributes + array (
 						'values' => $values,

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.25
+ * @version 1.17.26
  */
 class form
 {
@@ -195,6 +195,7 @@ class form
 		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
 		'jQuery'							=> true,							# If using DHTML features, where to load jQuery from (true = default, or false if already loaded elsewhere on the page)
 		'scripts'							=> false,							# Where to load GitHub files from; false = use default, string = library files in this URL/path location
+		'autofocus'							=> false,							# Place HTML5 autofocus on the first widget (true/false)
 	);
 	
 	
@@ -504,6 +505,7 @@ class form
 			'suitableAsEmailTarget' => ($functionName == 'email'),
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => ($functionName == 'password' ? 'compiled' : false),
@@ -831,6 +833,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
@@ -1059,6 +1062,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'TEXT') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
@@ -1534,6 +1538,7 @@ class form
 			'suitableAsEmailTarget' => $this->_suitableAsEmailTarget (array_keys ($arguments['values']), $arguments),
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'multiple' => $arguments['multiple'],
@@ -1735,6 +1740,7 @@ class form
 			'suitableAsEmailTarget' => $arguments['required'],
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
@@ -1983,6 +1989,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			#!# Not correct - needs multisplit into boolean
@@ -2315,6 +2322,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . strtoupper ($arguments['level'])) . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
@@ -2680,6 +2688,7 @@ class form
 			'output' => $arguments['output'],
 			'flatten' => $arguments['flatten'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => $data,	// Because the uploading can only be processed later, this is set to NULL
 			#!# Not finished
 #			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
@@ -2761,6 +2770,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			#!# Not finished
 			#!# 'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
@@ -6503,6 +6513,9 @@ class formWidget
 		# Assign the arguments
 		$this->arguments = application::assignArguments ($this->formSetupErrors, $suppliedArguments, $argumentDefaults, $functionName, $subargument);
 		
+		# Add autofocus to the first widget if required
+		$this->addAutofocusToFirstWidget ();
+		
 		# Ensure supplied values (values and default are correctly encoded)
 		$this->encodeApiSupplied ();
 		
@@ -6511,6 +6524,27 @@ class formWidget
 		
 		# Set whether the widget is an array type
 		$this->arrayType = $arrayType;
+	}
+	
+	
+	# Function to add autofocus to the first widget if required
+	function addAutofocusToFirstWidget ()
+	{
+		# End if not requiring autofocus functionality
+		if (!$this->settings['autofocus']) {return false;}
+		
+		# End if this current widget is not editable, as that will never have autofocus
+		if (!$this->arguments['editable']) {return false;}
+		
+		# End if there is an editable, non-heading widget already defined
+		foreach ($this->form->elements as $name => $attributes) {
+			if ($attributes['type'] == 'heading') {continue;}	// Skip headings
+			if (!$attributes['editable']) {continue;}			// Skip uneditable widgets
+			return false;	// End if the execution has got this far
+		}
+		
+		# If this is the first (non-header) widget, add the autofocus attribute to the widget specification
+		$this->arguments['autofocus'] = true;
 	}
 	
 	

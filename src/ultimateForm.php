@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.27
+ * @version 1.17.28
  */
 class form
 {
@@ -406,7 +406,7 @@ class form
 		# Describe restrictions on the widget
 		if ($arguments['enforceNumeric'] && ($functionName != 'email')) {$restriction = 'Must be numeric';}
 		if ($functionName == 'email') {$restriction = 'Must be valid';}
-		if (($arguments['regexp'] || $arguments['regexpi']) && ($functionName != 'email')) {$restriction = 'A specific pattern is required';}
+		if (($arguments['regexp'] || $arguments['regexpi']) && ($functionName != 'email') && ($functionName != 'url')) {$restriction = 'A specific pattern is required';}
 		
 		# Add a regexp check if using URL handling (retrieval or URL HEAD check)
 		# Re-assign back the value
@@ -537,7 +537,7 @@ class form
 	 */
 	function email ($suppliedArguments)
 	{
-		# Pass through to the standard input widget, but in password mode
+		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
@@ -548,7 +548,7 @@ class form
 	 */
 	function url ($suppliedArguments)
 	{
-		# Pass through to the standard input widget, but in password mode
+		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
@@ -559,7 +559,7 @@ class form
 	 */
 	function tel ($suppliedArguments)
 	{
-		# Pass through to the standard input widget, but in password mode
+		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
@@ -570,7 +570,7 @@ class form
 	 */
 	function search ($suppliedArguments)
 	{
-		# Pass through to the standard input widget, but in password mode
+		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
@@ -581,7 +581,7 @@ class form
 	 */
 	function number ($suppliedArguments)
 	{
-		# Pass through to the standard input widget, but in password mode
+		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
@@ -592,7 +592,7 @@ class form
 	 */
 	function range ($suppliedArguments)
 	{
-		# Pass through to the standard input widget, but in password mode
+		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
@@ -2772,7 +2772,7 @@ class form
 			'suitableAsEmailTarget' => false,
 			'output' => $arguments['output'],
 			'discard' => $arguments['discard'],
-			'editable' => $arguments['editable'],
+			'editable' => false,
 			'data' => (isSet ($data) ? $data : NULL),
 			#!# Not finished
 			#!# 'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
@@ -3349,13 +3349,13 @@ class form
 		
 		# If a field is set but it does not exist, throw an error and null the supplied argument
 		if (!isSet ($this->elements[$replyToField])) {
-			$this->formSetupErrors['setOutputEmailReplyToFieldInvalid'] = "The chosen e-mail reply-to address (<strong>$replyToField</strong>) is a non-existent field name.";
+			$this->formSetupErrors['setOutputEmailReplyToFieldInvalid'] = "The chosen e-mail reply-to address (<strong>{$replyToField}</strong>) is a non-existent field name.";
 			return NULL;
 		}
 		
 		# If it's not an e-mail or input type, disallow use as the field and null the supplied argument
 		if (($this->elements[$replyToField]['type'] != 'email') && ($this->elements[$replyToField]['type'] != 'input')) {
-			$this->formSetupErrors['setOutputEmailReplyToFieldInvalidType'] = "The chosen e-mail reply-to address (<strong>$replyToField</strong>) is not an e-mail/input type field name.";
+			$this->formSetupErrors['setOutputEmailReplyToFieldInvalidType'] = "The chosen e-mail reply-to address (<strong>{$replyToField}</strong>) is not an e-mail/input type field name.";
 			return NULL;
 		}
 		
@@ -6436,11 +6436,15 @@ class form
 					if ($setSupportSupplied > $setSupportMax) {
 						$this->formSetupErrors['DatabindingSetExcessive'] = "{$setSupportSupplied} values were supplied for the {$fieldName} dataBinding 'SET' field but a maximum of only {$setSupportMax} are supported.";
 					} else {
-						$this->checkboxes ($standardAttributes + array (
+						$checkboxesAttributes = $standardAttributes + array (
 							'values' => $values,
 							'output' => array ('processing' => 'special-setdatatype'),
-							'default' => ($value ? (is_array ($value) ? $value : explode (',', $value)) : array ()),	// Value from getData will just be item1,item2,item3
-						));
+							'default' => ($value ? $value : array ()),	// Value from getData will just be item1,item2,item3
+						);
+						if (strlen ($checkboxesAttributes['default'])) {	// Don't explode an empty string into array('');
+							$checkboxesAttributes['default'] = (is_array ($checkboxesAttributes['default']) ? $checkboxesAttributes['default'] : explode (',', $checkboxesAttributes['default']));
+						}
+						$this->checkboxes ($checkboxesAttributes);
 					}
 					break;
 				

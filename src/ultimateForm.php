@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.28
+ * @version 1.17.29
  */
 class form
 {
@@ -4535,7 +4535,7 @@ class form
 			# If the element is required, and indicators are in use add an indicator
 			$elementIsRequired = ($this->settings['requiredFieldIndicator'] && $elementAttributes['required']);
 			if ($elementIsRequired) {
-				$elementAttributes['title'] .= '&nbsp;*';
+				$elementAttributes['title'] .= ($elementAttributes['editable'] ? '&nbsp;*' : '<span class="requirednoneditable">&nbsp;*</span>');
 			}
 			
 			# If the form has been posted AND the element has any problems or is empty, add the warning CSS class

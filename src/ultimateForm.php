@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.17.29
+ * @version 1.18.0
  */
 class form
 {
@@ -1225,6 +1225,7 @@ class form
 			'name'					=> NULL,	# Name of the element
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'values'				=> array (),# Simple array of selectable values
+			'valuesNamesAutomatic'	=> false,	# Whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'get'					=> false,	# Whether a URL-supplied GET value should be used as the initial value (e.g. 'key' here would look in $_GET['key'] and supply that as the default)
@@ -1253,7 +1254,7 @@ class form
 		$arguments = $widget->getArguments ();
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
-		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name'], $arguments['valuesNamesAutomatic']);
 		
 		# If a multidimensional array, cache the multidimensional version, and flatten the main array values
 		if (application::isMultidimensionalArray ($arguments['values'])) {
@@ -1573,6 +1574,7 @@ class form
 			'name'					=> NULL,	# Name of the element
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'values'				=> array (),# Simple array of selectable values
+			'valuesNamesAutomatic'	=> false,	# Whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
 			'append'				=> '',		# HTML appended to the widget
@@ -1617,7 +1619,7 @@ class form
 		}
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
-		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name'], $arguments['valuesNamesAutomatic']);
 		
 		# Apply truncation if necessary
 		$arguments['values'] = $widget->truncate ($arguments['values']);
@@ -1661,6 +1663,7 @@ class form
 		
 		# Define the widget's core HTML
 		$widgetHtml = '';
+		$subelementsWidgetHtml = array ();
 		if ($arguments['editable']) {
 			$subwidgetIndex = 1;
 			
@@ -1682,7 +1685,8 @@ class form
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$widgetHtml .= "\n\t\t\t" . '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$subelementsWidgetHtml[$value] = '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t" . $subelementsWidgetHtml[$value];
 				$firstItem = false;
 				
 				# Add a line break if required
@@ -1733,6 +1737,7 @@ class form
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
 			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
+			'subelementsWidgetHtml' => $subelementsWidgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -1763,6 +1768,7 @@ class form
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			#!# Missing this value out causes errors lower
 			'values'				=> array (),# Simple array of selectable values
+			'valuesNamesAutomatic'	=> false,	# Whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'disabled'				=> array (),# Whether individual checkboxes are disabled, formatted as array of value => 0|1 for each checkbox
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
@@ -1800,7 +1806,7 @@ class form
 		$elementValue = $widget->getValue ();
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
-		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name']);
+		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name'], $arguments['valuesNamesAutomatic']);
 		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {
@@ -1837,6 +1843,7 @@ class form
 		
 		# Loop through each pre-defined element subname to construct the HTML
 		$widgetHtml = '';
+		$subelementsWidgetHtml = array ();
 		if ($arguments['editable']) {
 			/* #!# Write branching code around here which uses _valuesMultidimensional, when implementing fieldset grouping */
 			$subwidgetIndex = 1;
@@ -1872,7 +1879,8 @@ class form
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
 //				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' /><label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>';
-				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . (($arguments['autofocus'] && $subwidgetIndex == 1)  ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . $disabled . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$subelementsWidgetHtml[$value] = '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . (($arguments['autofocus'] && $subwidgetIndex == 1)  ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . $disabled . ' /><label for="' . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$widgetHtml .= "\n\t\t\t\t" . ($splitIntoColumns ? "\t\t" : '') . $subelementsWidgetHtml[$value];
 				
 				# Add a line/column breaks when required
 				if (($arguments['linebreaks'] === true) || (is_array ($arguments['linebreaks']) && in_array ($subwidgetIndex, $arguments['linebreaks']))) {$widgetHtml .= '<br />';}
@@ -1981,6 +1989,7 @@ class form
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
 			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
+			'subelementsWidgetHtml' => $subelementsWidgetHtml,
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
@@ -3030,10 +3039,21 @@ class form
 	
 	# Function to ensure that values are associative, even if multidimensional
 	#!# This function should be in the widget class but that won't work until formSetupErrors carry back to the main class
-	function ensureHierarchyAssociative ($originalValues, $forceAssociative, $elementName)
+	function ensureHierarchyAssociative ($originalValues, $forceAssociative, $elementName, $valuesNamesAutomatic)
 	{
 		# End if no values
 		if (!$originalValues) {return false;}
+		
+		# If requiring automatic names from a scalar array, e.g. array(option1,option2,option3,option4), create these
+		if ($valuesNamesAutomatic) {
+			if (!application::isAssociativeArray ($originalValues)) {
+				$newValues = array ();
+				foreach ($originalValues as $value) {
+					$newValues[$value] = application::unCamelCase ($value);
+				}
+				$originalValues = $newValues;
+			}
+		}
 		
 		# Convert the values, at any hierarchical level, to being associative
 		if (!$values = application::ensureValuesArrangedAssociatively ($originalValues, $forceAssociative)) {
@@ -3260,7 +3280,6 @@ class form
 		# If the field type is not suitable as an e-mail target, throw a setup error
 		if (!$this->elements[$recipient]['suitableAsEmailTarget']) {
 			$this->formSetupErrors['setOutputEmailElementInvalid'] = "The chosen field (<strong>$recipient</strong>) is not a valid field from which the recipient of the result-containing e-mail can be taken.";
-			application::dumpData ($this->elements[$recipient]);
 			return false;
 		}
 		
@@ -4305,11 +4324,10 @@ class form
 		}
 		
 		# Assemble the list of elements and their replacements
-		$elements = array_keys ($this->elements);
 		$this->displayTemplateElementReplacements = array ();
-		foreach ($elements as $element) {
+		foreach ($this->elements as $element => $attributes) {
 			$this->displayTemplateElementReplacements[$element]['widget'] = str_replace ($placemarker, $element, $this->settings['displayTemplatePatternWidget']);
-			$this->displayTemplateElementReplacements[$element]['label'] = str_replace ($placemarker, $element, $this->settings['displayTemplatePatternLabel']);
+			$this->displayTemplateElementReplacements[$element]['label']  = str_replace ($placemarker, $element, $this->settings['displayTemplatePatternLabel']);
 		}
 		
 		# Parse the template to ensure that all non-hidden elements exist in the template
@@ -4317,7 +4335,31 @@ class form
 		foreach ($this->displayTemplateElementReplacements as $element => $replacements) {
 			if ($this->elements[$element]['type'] == 'hidden') {continue;}
 			if (substr_count ($this->displayTemplateContents, $replacements['widget']) !== 1) {
-				$missingElements[] = $replacements['widget'];
+				
+				# If the element is not present in the replacements, determine if this is a type of element that contains a sub-elements widgets listing, e.g. radiobuttons, checkboxes
+				$isSubelementType = (isSet ($this->elements[$element]['subelementsWidgetHtml']));
+				
+				# If this is a subelement type, check for presence
+				if ($isSubelementType) {
+					$subelementSubstitutions = array ();
+					foreach ($this->elements[$element]['values'] as $subelementValue => $visible) {
+						$subelement = $element . '_' . $subelementValue;	// e.g. selectionlist_option1, selectionlist_someotheroption, etc.
+						$subelementSubstitutions[$subelementValue]['widget'] = str_replace ($placemarker, $subelement, $this->settings['displayTemplatePatternWidget']);
+						// $subelementSubstitutions[$subelementValue]['label']  = str_replace ($placemarker, $subelement, $this->settings['displayTemplatePatternLabel']);	// There is no concept of a label for sub-elements
+						if (substr_count ($this->displayTemplateContents, $subelementSubstitutions[$subelementValue]['widget']) !== 1) {
+							break;	// It is not present, so break out of the inner loop, and proceed to register the overall element as a missing element
+						}
+					}
+					
+					# If all sub-elements have substitutions, the element is complete, so register the substitutions by overwriting the substitution with an array
+					if (count ($subelementSubstitutions) == count ($this->elements[$element]['values'])) {
+						$this->displayTemplateElementReplacements[$element] = $subelementSubstitutions;
+						continue;	// Proceed ot the next element as we have confirmed that the element is no longer missing since its sub-elements are all present
+					}
+				}
+				
+				# Otherwise, register this as a missing element
+				$missingElements[] = $replacements['widget'] . ($isSubelementType ? ' (or a list of sub-elements)' : '');
 			}
 		}
 		
@@ -4327,23 +4369,23 @@ class form
 		}
 		
 		# Define special placemarker names and whether they are required; these can appear more than once
-		$specials = array (
+		$specialPlacemarkers = array (
 			'PROBLEMS' => true,				// Placemarker for the element problems box
 			'SUBMIT' => true,				// Placemarker for the submit button
 			'RESET' => $this->settings['resetButton'],	// Placemarker for the reset button - if there is one
 			'REQUIRED' => false,			// Placemarker for the required fields indicator text
 		);
 		if ($this->settings['refreshButton']) {
-			$specials['REFRESH'] = false;	// Placemarker for a refresh button
+			$specialPlacemarkers['REFRESH'] = false;	// Placemarker for a refresh button
 		}
 		
-		# Loop through each special, allocating its replacement shortcut and checking it exists if necessary
+		# Loop through each special placemarker, allocating its replacement shortcut and checking it exists if necessary
 		$missingElements = array ();
-		foreach ($specials as $special => $required) {
-			$this->displayTemplateElementReplacementsSpecials[$special] = str_replace ($placemarker, $special, $this->settings['displayTemplatePatternSpecial']);
+		foreach ($specialPlacemarkers as $specialPlacemarker => $required) {
+			$this->displayTemplateElementReplacementsSpecials[$specialPlacemarker] = str_replace ($placemarker, $specialPlacemarker, $this->settings['displayTemplatePatternSpecial']);
 			if ($required) {
-				if (!substr_count ($this->displayTemplateContents, $this->displayTemplateElementReplacementsSpecials[$special])) {
-					$missingElements[] = $this->displayTemplateElementReplacementsSpecials[$special];
+				if (!substr_count ($this->displayTemplateContents, $this->displayTemplateElementReplacementsSpecials[$specialPlacemarker])) {
+					$missingElements[] = $this->displayTemplateElementReplacementsSpecials[$specialPlacemarker];
 				}
 			}
 		}
@@ -4596,7 +4638,14 @@ class form
 					
 				# Templating - perform each replacement on a per-element basis
 				case 'template':
-					$this->displayTemplateContents = str_replace ($this->displayTemplateElementReplacements[$name], array ($elementAttributes['html'], $elementAttributes['title']), $this->displayTemplateContents);
+					$standardScalarElementReplacement = (isSet ($this->displayTemplateElementReplacements[$name]['widget']));
+					if ($standardScalarElementReplacement) {
+						$this->displayTemplateContents = str_replace ($this->displayTemplateElementReplacements[$name] /* i.e. array(widget=>..,label=>...) */, array ($elementAttributes['html'], $elementAttributes['title']), $this->displayTemplateContents);
+					} else {
+						foreach ($this->displayTemplateElementReplacements[$name] as $subelement => $replacements) {
+							$this->displayTemplateContents = str_replace ($replacements['widget'], $elementAttributes['subelementsWidgetHtml'][$subelement], $this->displayTemplateContents);
+						}
+					}
 					$formHtml = $this->displayTemplateContents;
 					break;
 				
@@ -6072,6 +6121,7 @@ class form
 			'prefixTitleSuffix'	=> false,	// What to suffix all field titles with
 			'intelligence'	=> false,		// Whether to enable intelligent field setup, e.g. password/file*/photograph* become relevant fields and key fields are handled as non-editable
 			'floatChopTrailingZeros' => true,	// Whether to replace trailing zeros at the end of a value where there is a decimal point
+			'valuesNamesAutomatic'	=> false,	// For select/radiobuttons/checkboxes, whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'autocomplete' => false,	// An autocomplete data endpoint URL; if %field is specified, it will be replaced with the fieldname
 			'autocompleteOptions' => false,	// Array of options that will be converted to a javascript array - see http://docs.jquery.com/UI/Autocomplete#options (this is the new plugin)
 		);
@@ -6167,7 +6217,7 @@ class form
 			
 			# Convert title from lowerCamelCase to Standard text if necessary
 			if ($changeCase) {
-				$title = application::changeCase ($title);
+				$title = application::unCamelCase ($title);
 			}
 			
 			# If using table fields comment assign an existent comment as the title, overwriting any amendments to the title already made
@@ -6175,7 +6225,7 @@ class form
 				$title = $fieldAttributes['Comment'];
 			}
 			
-			# Define the standard attributes
+			# Define the standard attributes; fields that don't support a particular option shown here will ignore it
 			$standardAttributes = array (
 				'name' => $fieldName,	// Internal widget name
 				'title' => $title,	// Visible name
@@ -6185,6 +6235,7 @@ class form
 				'description' => ($commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : ''),
 				'autocomplete' => ($autocomplete ? str_replace ('%field', $fieldName, $autocomplete) : false),
 				'autocompleteOptions' => ($autocompleteOptions ? $autocompleteOptions : false),
+				'valuesNamesAutomatic' => $valuesNamesAutomatic,
 			);
 			
 			# If a link template is supplied, place that in, but if it includes a %table/%database template, put it in only if those exist

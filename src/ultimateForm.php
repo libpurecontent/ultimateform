@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.0
+ * @version 1.18.1
  */
 class form
 {
@@ -1767,7 +1767,7 @@ class form
 			'name'					=> NULL,	# Name of the element
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			#!# Missing this value out causes errors lower
-			'values'				=> array (),# Simple array of selectable values
+			'values'				=> array (),# Simple array of selectable values; if a string is supplied it will be converted to an array of one item
 			'valuesNamesAutomatic'	=> false,	# Whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'disabled'				=> array (),# Whether individual checkboxes are disabled, formatted as array of value => 0|1 for each checkbox
 			'title'					=> '',		# Introductory text
@@ -1775,10 +1775,10 @@ class form
 			'append'				=> '',		# HTML appended to the widget
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
-			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
-			'maximum'		=> 0,		# The maximum number which must be selected (defaults to 0, i.e. no maximum checking done)
+			'required'				=> 0,		# The minimum number which must be selected (defaults to 0)
+			'maximum'				=> 0,		# The maximum number which must be selected (defaults to 0, i.e. no maximum checking done)
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
-			'default'			=> array (),# Pre-selected item(s)
+			'default'			=> array (),	# Pre-selected item(s); if a string is supplied it will be converted to an array of one item
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'columns'				=> false,	# Split into columns
@@ -1794,7 +1794,8 @@ class form
 		
 		$arguments = $widget->getArguments ();
 		
-		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
+		# Ensure the supplied values and initial value(s) are each an array, even if only an empty one, converting if necessary
+		$arguments['values'] = application::ensureArray ($arguments['values']);
 		$arguments['default'] = application::ensureArray ($arguments['default']);
 		
 		# Ensure 'disabled' is an array, or disable it
@@ -2483,7 +2484,7 @@ class form
 		if ($arguments['subfields'] != round ($arguments['subfields'])) {$this->formSetupErrors['uploadSubfieldsIncorrect'] = "You specified a non-whole number (<strong>{$arguments['subfields']}</strong>) for the number of file upload widgets in the <strong>{$arguments['name']}</strong> upload element which the form should create.";}
 		if ($arguments['subfields'] < 1) {$this->formSetupErrors['uploadSubfieldsIncorrect'] = "The number of files to be uploaded must be at least one; you specified <strong>{$arguments['subfields']}</strong> for the <strong>{$arguments['name']}</strong> upload element.";}
 		
-		# Explicitly switch off flattening if there is not a singular subfield
+		# Explicitly disable flattening if there is not a singular subfield
 		if ($arguments['subfields'] != 1) {$arguments['flatten'] = false;}
 		
 		# Check that the minimum required is a whole number and that it is not greater than the number actually available
@@ -6110,6 +6111,7 @@ class form
 			'ordering' => array (),
 			'enumRadiobuttons' => false,	// Whether to use radiobuttons for ENUM (true, or set number of value choices up to which they will be used, e.g. 2 means: radiobuttons if <=2 fields but select if >2)
 			'enumRadiobuttonsInitialNullText' => array (),	// Whether an initial empty radiobutton should have a label, specified as an array of fieldname=>value
+			'int1ToCheckbox' => false,	// Whether an INT/TINYINT/etc(1) field will be converted to a checkbox
 			'lookupFunction' => false,
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
@@ -6335,6 +6337,12 @@ class form
 				if ((strtolower ($fieldAttributes['Type']) == 'timestamp') && ($fieldAttributes['Default'] == 'CURRENT_TIMESTAMP')) {
 					continue;	// Skip widget creation
 				}
+				
+				# Assume that createdAt/createdOn/updatedAt/updatedOn (names borrowed from Rails) are timestamps
+				$timestampFieldnames = array ('createdAt', 'createdOn', 'updatedAt', 'updatedOn');
+				if (in_array ($fieldName, $timestampFieldnames)) {
+					continue;	// Skip widget creation
+				}
 			}
 			
 			# Add per-widget overloading if attributes supplied by the calling application
@@ -6453,13 +6461,26 @@ class form
 				# INT (numeric) field
 				case (preg_match ('/(int|tinyint|smallint|mediumint|bigint)\(([0-9]+)\)/i', $type, $matches)):
 					$unsigned = substr_count (strtolower ($type), ' unsigned');
-					$this->input ($standardAttributes + array (
-						'enforceNumeric' => true,
-						'regexp' => ($unsigned ? '^([0-9]*)$' : '^([-0-9]*)$'),
-						#!# Make these recognise types without the numeric value after
-						'maxlength' => $matches[2],
-						'size' => $matches[2] + 1,
-					));
+					if ($int1ToCheckbox && $matches[2] == '1') {
+						if (!$value) {	// i.e. 0 or '0' (or NULL)
+							$value = NULL;
+							$standardAttributes['default'] = NULL;	// Normalise 0 to NULL
+						}
+						$label = (is_string ($int1ToCheckbox) ? $int1ToCheckbox : '');	// Empty unless the 'int1ToCheckbox' value is a string
+						$this->checkboxes ($standardAttributes + array (
+							'values' => array ('1' => $label),
+							'default' => ($value ? '1' : NULL),
+							'output' => array ('processing' => 'special-setdatatype'),
+						));
+					} else {
+						$this->input ($standardAttributes + array (
+							'enforceNumeric' => true,
+							'regexp' => ($unsigned ? '^([0-9]*)$' : '^([-0-9]*)$'),
+							#!# Make these recognise types without the numeric value after
+							'maxlength' => $matches[2],
+							'size' => $matches[2] + 1,
+						));
+					}
 					break;
 				
 				# ENUM (selection) field - explode the matches and insert as values

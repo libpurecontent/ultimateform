@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.1
+ * @version 1.18.2
  */
 class form
 {
@@ -1434,7 +1434,7 @@ class form
 					}
 					foreach ($arguments['valuesWithNull'] as $availableValue => $visible) {
 						$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true, $idOnly = true) . '>' . htmlspecialchars ($visible) . '</option>';
+						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true, $idOnly = true) . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
 					}
 				} else {
 					
@@ -1444,12 +1444,12 @@ class form
 							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t<optgroup label=\"{$key}\">";
 							foreach ($mainValue as $availableValue => $visible) {
 								$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . htmlspecialchars ($visible) . '</option>';
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
 							}
 							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t</optgroup>";
 						} else {
 							$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $key);
-							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . htmlspecialchars ($mainValue) . '</option>';
+							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($mainValue)) . '</option>';
 						}
 					}
 				}
@@ -6113,6 +6113,7 @@ class form
 			'enumRadiobuttonsInitialNullText' => array (),	// Whether an initial empty radiobutton should have a label, specified as an array of fieldname=>value
 			'int1ToCheckbox' => false,	// Whether an INT/TINYINT/etc(1) field will be converted to a checkbox
 			'lookupFunction' => false,
+			'simpleJoin' => false,	// Overrides lookupFunction, uses targetId as a join to <database>.target
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
 			'truncate' => 40,
@@ -6148,6 +6149,12 @@ class form
 			'database'	=> $database,
 			'table'		=> $table,
 		);
+		
+		# If simple join mode is enabled, proxy in the values for lookupFunction
+		if ($simpleJoin) {
+			$lookupFunction = array ('database', 'lookup');
+			$tables = $this->databaseConnection->getTables ($database);	// Table lookup needed for the simple pluraliser which will favour pluralised table names (e.g. field 'caseId' will look for a table 'cases' then 'case')
+		}
 		
 		# Ensure any lookup function has been defined
 		if ($lookupFunction && !is_callable ($lookupFunction)) {
@@ -6207,7 +6214,7 @@ class form
 			$targetDatabase = false;
 			$targetTable = false;
 			if ($lookupFunction) {
-				$parameters = array ($this->databaseConnection, $title, $fieldAttributes['Type']);
+				$parameters = array ($this->databaseConnection, $title, $fieldAttributes['Type'], $simpleJoin = ($simpleJoin ? array ($database, $table, $tables) : false));
 				if ($lookupFunctionParameters) {$parameters = array_merge ($parameters, application::ensureArray ($lookupFunctionParameters));}
 				$userFunctionResult = call_user_func_array ($lookupFunction, $parameters);
 				if (count ($userFunctionResult) != 4) {	// Should be returning an array of four values as per the list() call below

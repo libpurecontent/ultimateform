@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.2
+ * @version 1.18.3
  */
 class form
 {
@@ -2037,6 +2037,7 @@ class form
 			'autoCenturyConversion'	=> 69,		# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'prefill'				=> false,	# Whether to include pre-fill link: '[Now]'
+			'picker'				=> false,	# Whether to enable a javascript datepicker for the 'date' level
 		);
 		
 		# Define the supported levels
@@ -2063,6 +2064,9 @@ class form
 			$arguments['level'] = 'datetime';
 		}
 		
+		# If the picker argument has been enabled but the level is not date, disable it
+		if ($arguments['picker'] && ($arguments['level'] != 'date')) {$arguments['picker'] = false;}
+		
 		# Convert the default if using the 'timestamp' keyword; cache a copy for later use; add a null date for the time version
 		$isTimestamp = ($arguments['default'] == 'timestamp');
 		if ($isTimestamp) {
@@ -2070,7 +2074,27 @@ class form
 		}
 		
 		# If the widget is not editable, fix the form value to the default
-		if (!$arguments['editable']) {$this->form[$arguments['name']] = timedate::getDateTimeArray ((($arguments['level'] == 'time') ? '0000-00-00 ' : '') . $arguments['default']);}
+		if (!$arguments['editable']) {
+			$this->form[$arguments['name']] = timedate::getDateTimeArray ((($arguments['level'] == 'time') ? '0000-00-00 ' : '') . $arguments['default']);
+		}
+		
+		# For picker mode, emulate a set of submitted per-part widgets by splitting the submitted ISO string into the constituent parts
+		if ($arguments['picker']) {
+			if ($arguments['editable']) {
+				if (isSet ($this->form[$arguments['name']])) {
+					
+					# Firstly, convert a jQuery picker -style date like 20/07/2012 to 2012-07-20
+					if (preg_match ('~^([0-9]{2})/([0-9]{2})/([0-9]{4})$~', $this->form[$arguments['name']], $matches)) {
+						$this->form[$arguments['name']] = "{$matches[3]}-{$matches[2]}-{$matches[1]}";
+					}
+					
+					# Now do the main conversion
+					if (preg_match ('~^([0-9]{4})-([0-9]{2})-([0-9]{2})$~', $this->form[$arguments['name']], $matches)) {
+						$this->form[$arguments['name']] = array ('year' => $matches[1], 'month' => $matches[2], 'day' => $matches[3]);
+					}
+				}
+			}
+		}
 		
 		# Obtain the value of the form submission (which may be empty)  (ensure that a full date and time array exists to prevent undefined offsets in case an incomplete set has been posted)
 		$value = (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
@@ -2215,74 +2239,109 @@ class form
 		if (($arguments['level'] == 'datetime') || ($arguments['level'] == 'time')) {$restriction = 'Time can be entered flexibly';}
 		
 		# Start to define the widget's core HTML
-		$firstSubwidget = true;
 		if ($arguments['editable']) {
-			$widgetHtml = '';
 			
-			# Start with the time if required
-			if (substr_count ($arguments['level'], 'time')) {	// datetime or time
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span>';
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'time', true) . ' type="text" size="10" value="' . $elementValue['time'] . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . ' />';
-				$firstSubwidget = false;
-			}
-			
-			# Add the date and month input boxes; if the day or year are 0 then nothing will be displayed
-			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'date' ? $widget->tabindexHtml () : '') . ' />&nbsp;';
-				$firstSubwidget = false;
-				$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
-				$widgetHtml .= "\n\t\t\t\t" . '<select' . $this->nameIdHtml ($arguments['name'], false, 'month', true) . '>';
-				$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
-				$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
-				foreach ($months as $monthNumber => $monthName) {
-					$widgetHtml .= "\n\t\t\t\t\t" . '<option value="' . sprintf ('%02s', $monthNumber) . '"' . (($elementValue['month'] == sprintf ('%02s', $monthNumber)) ? ' selected="selected"' : '') . '>' . $monthName . '</option>';
+			# For the picker version, create an HTML5 date widget, to which we will then attach fallback Javascript
+			if ($arguments['picker']) {
+				
+				# Compile an YYYY-MM-DD (ISO 8601 Extended) version of the element value
+				$elementValueIso = $elementValue['year'] . '-' . $elementValue['month'] . '-' . $elementValue['day'];
+				
+				# Create the basic widget; NB the submission of a type="date" widget will always be YYYY-MM-DD (ISO 8601 Extended) whatever the input GUI format is - see http://dev.w3.org/html5/spec-author-view/forms.html#input-author-notes
+				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($elementValueIso) . '"' . $widget->tabindexHtml () . ' />';
+				
+				# Add jQuery UI javascript for the date picker; see: http://jqueryui.com/demos/datepicker/
+				$this->enableJqueryUi ();
+				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
+				$this->jQueryCode[__FUNCTION__ . $widgetId] = "
+				var i = document.createElement('input');	// Create a bogus element for testing browser support of <input type=date>
+				i.setAttribute('type', 'date');
+				var html5Support = (i.type !== 'text');
+				if(!html5Support) {
+					dateDefaultDate = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// http://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
+					$(function() {
+						$('#{$widgetId}').datepicker({
+							minDate: -20,
+							changeMonth: true,
+							changeYear: true,
+							dateFormat: 'dd/mm/yy',
+							defaultDate: dateDefaultDate
+						});
+						$('#{$widgetId}').datepicker('setDate', dateDefaultDate);
+					});
+				}";
+				
+			# Non-picker version - three separate fields for date, month and year
+			} else {
+				
+				$firstSubwidget = true;
+				$widgetHtml = '';
+				
+				# Start with the time if required
+				if (substr_count ($arguments['level'], 'time')) {	// datetime or time
+					$widgetHtml .= "\n\t\t\t\t" . '<span class="' . (!isSet ($elementProblems['timePartInvalid']) ? 'comment' : 'warning') . '">t:&nbsp;</span>';
+					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'time', true) . ' type="text" size="10" value="' . $elementValue['time'] . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . ' />';
+					$firstSubwidget = false;
 				}
-				$widgetHtml .= "\n\t\t\t\t" . '</select>';
-			}
-			
-			# Add the year box
-			if ($arguments['level'] != 'time') {
-				$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" ' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'year' ? $widget->tabindexHtml () : '') . '/>' . "\n\t\t";
-				$firstSubwidget = false;
-			}
-			
-			# Add prefill link if required
-			if ($arguments['level'] != 'time') {
-				if ($arguments['prefill']) {
-					$js  = "\n\tfunction zeroPad(num,count)";
-					$js .= "\n\t{";
-					$js .= "\n\t\tvar numZeropad = num + '';";
-					$js .= "\n\t\twhile(numZeropad.length < count) {";
-					$js .= "\n\t\t\tnumZeropad = '0' + numZeropad;";
-					$js .= "\n\t\t}";
-					$js .= "\n\t\treturn numZeropad;";
-					$js .= "\n\t}";
-					$js .= "\n\tfunction prefillDate(field)";
-					$js .= "\n\t{";
-					$js .= "\n\t\tvar currentTime = new Date();";
-					$dateTypes = array (
-						'time' => "zeroPad((currentTime.getHours() + 1), 2) + ':' + zeroPad((currentTime.getMinutes() + 1), 2) + ':' + zeroPad((currentTime.getSeconds() + 1), 2)",
-						'day' => 'currentTime.getDate()',
-						'month' => 'zeroPad((currentTime.getMonth() + 1), 2)',
-						'year' => 'currentTime.getFullYear()',
-					);
-					foreach ($dateTypes as $dateType => $javascriptFunction) {
-						$js .= "\n\t\tvar fieldId = '" . $this->settings['name'] . "_' + field + '_{$dateType}';";
-						$js .= "\n\t\tvar oTarget = document.getElementById(fieldId);";
-						$js .= "\n\t\tif (oTarget) {";
-						$js .= "\n\t\t\toTarget.value = {$javascriptFunction};";
-						$js .= "\n\t\t}";
+				
+				# Add the date and month input boxes; if the day or year are 0 then nothing will be displayed
+				if (substr_count ($arguments['level'], 'date')) {	// datetime or date
+					$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'date' ? $widget->tabindexHtml () : '') . ' />&nbsp;';
+					$firstSubwidget = false;
+					$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
+					$widgetHtml .= "\n\t\t\t\t" . '<select' . $this->nameIdHtml ($arguments['name'], false, 'month', true) . '>';
+					$widgetHtml .= "\n\t\t\t\t\t" . '<option value="">Select</option>';
+					$months = array (1 => 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+					foreach ($months as $monthNumber => $monthName) {
+						$widgetHtml .= "\n\t\t\t\t\t" . '<option value="' . sprintf ('%02s', $monthNumber) . '"' . (($elementValue['month'] == sprintf ('%02s', $monthNumber)) ? ' selected="selected"' : '') . '>' . $monthName . '</option>';
 					}
-					$js .= "\n\t}";
-					$this->javascriptCode[__FUNCTION__] = $js;
-					$widgetHtml .= "\n\t\t\t" . '&nbsp;&nbsp;<a href="#" onclick="prefillDate(\'' . $this->cleanId ($arguments['name']) . '\');return false;" class="prefill"><span class="small comment">[Now]</span></a>';
+					$widgetHtml .= "\n\t\t\t\t" . '</select>';
 				}
-			}
-			
-			# Surround with a fieldset if necessary
-			if (substr_count ($arguments['level'], 'date')) {	// datetime or date
-				$widgetHtml  = "\n\t\t\t<fieldset>" . $widgetHtml . "\n\t\t\t</fieldset>";
+				
+				# Add the year box
+				if ($arguments['level'] != 'time') {
+					$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
+					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" ' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'year' ? $widget->tabindexHtml () : '') . '/>' . "\n\t\t";
+					$firstSubwidget = false;
+				}
+				
+				# Add prefill link if required
+				if ($arguments['level'] != 'time') {
+					if ($arguments['prefill']) {
+						$js  = "\n\tfunction zeroPad(num,count)";
+						$js .= "\n\t{";
+						$js .= "\n\t\tvar numZeropad = num + '';";
+						$js .= "\n\t\twhile(numZeropad.length < count) {";
+						$js .= "\n\t\t\tnumZeropad = '0' + numZeropad;";
+						$js .= "\n\t\t}";
+						$js .= "\n\t\treturn numZeropad;";
+						$js .= "\n\t}";
+						$js .= "\n\tfunction prefillDate(field)";
+						$js .= "\n\t{";
+						$js .= "\n\t\tvar currentTime = new Date();";
+						$dateTypes = array (
+							'time' => "zeroPad((currentTime.getHours() + 1), 2) + ':' + zeroPad((currentTime.getMinutes() + 1), 2) + ':' + zeroPad((currentTime.getSeconds() + 1), 2)",
+							'day' => 'currentTime.getDate()',
+							'month' => 'zeroPad((currentTime.getMonth() + 1), 2)',
+							'year' => 'currentTime.getFullYear()',
+						);
+						foreach ($dateTypes as $dateType => $javascriptFunction) {
+							$js .= "\n\t\tvar fieldId = '" . $this->settings['name'] . "_' + field + '_{$dateType}';";
+							$js .= "\n\t\tvar oTarget = document.getElementById(fieldId);";
+							$js .= "\n\t\tif (oTarget) {";
+							$js .= "\n\t\t\toTarget.value = {$javascriptFunction};";
+							$js .= "\n\t\t}";
+						}
+						$js .= "\n\t}";
+						$this->javascriptCode[__FUNCTION__] = $js;
+						$widgetHtml .= "\n\t\t\t" . '&nbsp;&nbsp;<a href="#" onclick="prefillDate(\'' . $this->cleanId ($arguments['name']) . '\');return false;" class="prefill"><span class="small comment">[Now]</span></a>';
+					}
+				}
+				
+				# Surround with a fieldset if necessary
+				if (substr_count ($arguments['level'], 'date')) {	// datetime or date
+					$widgetHtml  = "\n\t\t\t<fieldset>" . $widgetHtml . "\n\t\t\t</fieldset>";
+				}
 			}
 			
 		} else {
@@ -2887,14 +2946,22 @@ class form
 	}
 	
 	
-	# Function to add jQuery-based autocomplete; see: http://jqueryui.com/demos/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: http://www.learningjquery.com/2010/06/autocomplete-migration-guide
-	function autocompleteJQuery ($id, $data, $options = array ())
+	# Function to load jQuery UI
+	function enableJqueryUi ()
 	{
 		# Add the libraries, ensuring that the loading respects the protocol type (HTTP/HTTPS) of the current page, to avoid mixed content warnings
-		$this->jQueryLibraries[__FUNCTION__] = '
+		$this->jQueryLibraries['jQueryUI'] = '
 			<link href="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
 			<script src="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"></script>
 		';
+	}
+	
+	
+	# Function to add jQuery-based autocomplete; see: http://jqueryui.com/demos/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: http://www.learningjquery.com/2010/06/autocomplete-migration-guide
+	function autocompleteJQuery ($id, $data, $options = array ())
+	{
+		# Ensure that jQuery UI is loaded
+		$this->enableJqueryUi ();
 		
 		# Encode the data, if it is an array of values rather than a URL
 		if (is_array ($data)) {
@@ -6739,7 +6806,7 @@ class formWidget
 	}
 	
 	
-	# Function to add autocomplete functionality
+	# Function to add autocomplete functionality (tokenised version; NB sends q= and requires id,name keys)
 	function autocompleteTokenised ($singleLine = true)
 	{
 		# End if this functionality is not activated

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.3
+ * @version 1.18.4
  */
 class form
 {
@@ -967,6 +967,7 @@ class form
 			'directoryIndex' => 'index.html',		// Default directory index name
 			'imageAlignmentByClass'	=> true,		// Replace align="foo" with class="foo" for images
 			'nofixTag'	=> '<!-- nofix -->',	// Special marker which indicates that the HTML should not be cleaned (or false to disable)
+			'removeComments' => true,
 			'replacements' => array (),	// Regexp replacements to add before standard replacements are done
 		);
 		
@@ -1105,7 +1106,7 @@ class form
 				'drop-proprietary-attributes' => true,
 				'drop-font-tags' => true,
 				'drop-empty-paras' => true,
-				'hide-comments' => true,
+				'hide-comments' => $arguments['removeComments'],
 				'join-classes' => true,
 				'join-styles' => true,
 				'logical-emphasis' => true,

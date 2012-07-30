@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.4
+ * @version 1.18.5
  */
 class form
 {
@@ -190,6 +190,7 @@ class form
 		'passwordGeneratedLength'			=> 6,								# Length of a generated password
 		'antispam'							=> false,							# Global setting for anti-spam checking
 		'antispamRegexp'					=> '~(a href=|<a |<script|<url|\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
+		'picker'							=> false,							# Whether to use the date picker by default when creating date widgets
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
 		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
@@ -2038,7 +2039,7 @@ class form
 			'autoCenturyConversion'	=> 69,		# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'prefill'				=> false,	# Whether to include pre-fill link: '[Now]'
-			'picker'				=> false,	# Whether to enable a javascript datepicker for the 'date' level
+			'picker'				=> $this->settings['picker'],	# Whether to enable a javascript datepicker for the 'date' level
 		);
 		
 		# Define the supported levels

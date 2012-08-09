@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.5
+ * @version 1.18.6
  */
 class form
 {
@@ -289,6 +289,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'confirmation'			=> false,	# Whether to generate a confirmation field
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,	# Placing the widget after a specific other widget
 			'multiple'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with comma-space)
 			'autocomplete'			=> false,	# URL of data provider
 			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
@@ -512,6 +513,7 @@ class form
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => ($functionName == 'password' ? 'compiled' : false),
+			'after' => $arguments['after'],
 		);
 		
 		#!# Temporary hacking to add hidden widgets when using the _hidden type in dataBinding
@@ -643,6 +645,7 @@ class form
 			'minlength'				=> false,	# Minimum number of characters allowed
 			'maxlength'				=> false,	# Maximum number of characters allowed
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,	# Placing the widget after a specific other widget
 			'autocomplete'			=> false,	# URL of data provider
 			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
 			'autocompleteTokenised'	=> false,	# URL of data provider
@@ -839,6 +842,7 @@ class form
 			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'after' => $arguments['after'],
 		);
 	}
 	
@@ -970,6 +974,7 @@ class form
 			'nofixTag'	=> '<!-- nofix -->',	// Special marker which indicates that the HTML should not be cleaned (or false to disable)
 			'removeComments' => true,
 			'replacements' => array (),	// Regexp replacements to add before standard replacements are done
+			'after'					=> false,	# Placing the widget after a specific other widget
 		);
 		
 		# Create a new form widget
@@ -1069,6 +1074,7 @@ class form
 			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'TEXT') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'after' => $arguments['after'],
 		);
 	}
 	
@@ -1246,6 +1252,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,	# Placing the widget after a specific other widget
 			'nullRequiredDefault'	=> true,	# Whether to add an empty value when the field is required and has a default
 			'onchangeSubmit'		=> false,	# Whether to submit the form onchange
 		);
@@ -1549,6 +1556,7 @@ class form
 			'multiple' => $arguments['multiple'],
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => 'compiled',
+			'after' => $arguments['after'],
 		);
 	}
 	
@@ -1592,6 +1600,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,	# Placing the widget after a specific other widget
 			'entities'				=> true,	# Convert HTML in label to entity equivalents
 		);
 		
@@ -1754,6 +1763,7 @@ class form
 			'values' => $arguments['values'],
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => 'compiled',
+			'after' => $arguments['after'],
 		);
 	}
 	
@@ -1788,6 +1798,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,	# Placing the widget after a specific other widget
 			'entities'				=> true,	# Convert HTML in label to entity equivalents
 		);
 		
@@ -2010,6 +2021,7 @@ class form
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : $datatype),
 			'groupValidation' => 'compiled',
 			'total' => $checkedTally,
+			'after' => $arguments['after'],
 		);
 	}
 	
@@ -2038,8 +2050,12 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'autoCenturyConversion'	=> 69,		# The last two figures of the last year where '20' is automatically prepended, or false to disable (and thus require four-digit entry)
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,	# Placing the widget after a specific other widget
 			'prefill'				=> false,	# Whether to include pre-fill link: '[Now]'
 			'picker'				=> $this->settings['picker'],	# Whether to enable a javascript datepicker for the 'date' level
+			#!# Currently min/max are only implemented client-side
+			'min'					=> '1970-01-01',	# Minimum date in the picker
+			'max'					=> '2069-12-31',	# Maximum date in the picker
 		);
 		
 		# Define the supported levels
@@ -2250,7 +2266,11 @@ class form
 				$elementValueIso = $elementValue['year'] . '-' . $elementValue['month'] . '-' . $elementValue['day'];
 				
 				# Create the basic widget; NB the submission of a type="date" widget will always be YYYY-MM-DD (ISO 8601 Extended) whatever the input GUI format is - see http://dev.w3.org/html5/spec-author-view/forms.html#input-author-notes
-				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($elementValueIso) . '"' . $widget->tabindexHtml () . ' />';
+				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($elementValueIso) . '"' . $widget->tabindexHtml () . ($arguments['min'] ? " min=\"{$arguments['min']}\"" : '') . ($arguments['max'] ? " max=\"{$arguments['max']}\"" : '') . ' />';
+				
+				# Determine min and max dates for the fallback picker
+				$minDate = (($arguments['min'] && preg_match ('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $arguments['min'], $matches)) ? "new Date({$matches[1]}, " . ($matches[2] - 1) . ', ' . (int) $matches[3] . ')' : 'null');	// e.g. 2012-07-22 becomes new Date(2012, 6, 22)
+				$maxDate = (($arguments['min'] && preg_match ('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $arguments['max'], $matches)) ? "new Date({$matches[1]}, " . ($matches[2] - 1) . ', ' . (int) $matches[3] . ')' : 'null');
 				
 				# Add jQuery UI javascript for the date picker; see: http://jqueryui.com/demos/datepicker/
 				$this->enableJqueryUi ();
@@ -2263,11 +2283,12 @@ class form
 					dateDefaultDate = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// http://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
 					$(function() {
 						$('#{$widgetId}').datepicker({
-							minDate: -20,
 							changeMonth: true,
 							changeYear: true,
 							dateFormat: 'dd/mm/yy',
-							defaultDate: dateDefaultDate
+							defaultDate: dateDefaultDate,
+							minDate: {$minDate},
+							maxDate: {$maxDate}
 						});
 						$('#{$widgetId}').datepicker('setDate', dateDefaultDate);
 					});
@@ -2398,6 +2419,7 @@ class form
 			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . strtoupper ($arguments['level'])) . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'after' => $arguments['after'],
 		);
 	}
 	
@@ -2440,6 +2462,7 @@ class form
 			#!# Change to default to true in a later release once existing applications migrated over
 			'flatten'				=> false,	# Whether to flatten the rawcomponents (i.e. default in 'processing' mode) result if only a single subfield is specified
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,	# Placing the widget after a specific other widget
 			'progressbar'			=> false,	# Whether to enable a progress bar (assumed to be in /uploader, or in specified subdirectory)
 		);
 		
@@ -2770,6 +2793,7 @@ class form
 			'mime' => $arguments['mime'],
 			'subfields' => $arguments['subfields'],
 			'default'	=> $arguments['default'],
+			'after' => $arguments['after'],
 		);
 	}
 	
@@ -2845,6 +2869,7 @@ class form
 			'discard' => $arguments['discard'],
 			'editable' => false,
 			'data' => (isSet ($data) ? $data : NULL),
+			'after' => false,
 			#!# Not finished
 			#!# 'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
@@ -2887,6 +2912,7 @@ class form
 			'output' => array (),	// The output specification must always be array
 			'discard' => false,
 			'data' => (isSet ($data) ? $data : NULL),
+			'after' => false,
 		);
 	}
 	
@@ -3964,26 +3990,33 @@ class form
 	
 	
 	# Function to return the submitted but pre-finalised data, for use in adding additional checks; effectively this provides a kind of callback facility
-	public function getUnfinalisedData ()
+	public function getUnfinalisedData ($useDefinedOutputProcessingType = false)
 	{
 		# Return the form data, or an empty array (evaluating to false) if not posted
-		return ($this->formPosted ? $this->getData () : array ());
+		return ($this->formPosted ? $this->getData ($useDefinedOutputProcessingType) : array ());
 	}
 	
 	
 	# Function to extract the values from submitted data
-	private function getData ()
+	private function getData ($useDefinedOutputProcessingType = false)
 	{
 		# Get the presentation defaults
 		$presentationDefaults = $this->presentationDefaults ($returnFullAvailabilityArray = false, $includeDescriptions = false);
+		
+//application::dumpData ($presentationDefaults);
 		
 		# Loop through each field and obtain the value
 		$result = array ();
 		foreach ($this->elements as $name => $element) {
 			if (isSet ($element['data'])) {
 				$widgetType = $element['type'];
-				$defaultProcessingPresentationType = $presentationDefaults[$widgetType]['processing'];
-				$result[$name] = $element['data'][$defaultProcessingPresentationType];
+				$processingPresentationType = $presentationDefaults[$widgetType]['processing'];
+				if ($useDefinedOutputProcessingType) {
+					if (isSet ($element['output']) && isSet ($element['output']['processing'])) {
+						$processingPresentationType = $element['output']['processing'];
+					}
+				}
+				$result[$name] = $element['data'][$processingPresentationType];
 			}
 		}
 		
@@ -3997,6 +4030,9 @@ class form
 	 */
 	function process (&$html = NULL)	// Note that &$value = defaultValue is not supported in PHP4 - see http://devzone.zend.com/node/view/id/1714#Heading5 point 3; if running PHP4, (a) remove the & and (b) change var $minimumPhpVersion above to 4.3
 	{
+		# Rearrange the element order if required
+		$this->rearrangeElementOrder ();
+		
 		# Determine whether the HTML is shown directly
 		$showHtmlDirectly = ($html === NULL);
 		
@@ -4179,6 +4215,51 @@ class form
 	
 	
 	## Form processing support ##
+	
+	# Function to rearrange the element order if required
+	function rearrangeElementOrder ()
+	{
+		# Determine if the ordering needs to be changed
+		$afters = array ();
+		foreach ($this->elements as $name => $elementAttributes) {
+			if ($elementAttributes['after']) {
+				$goesAfter = $elementAttributes['after'];
+				if (!isSet ($this->elements[$goesAfter])) {
+					$this->formSetupErrors['formEmpty'] = 'There is no element' . htmlspecialchars ($goesAfter) . ' to place an element after.';
+					return false;
+				}
+				$afters[$name] = $goesAfter;
+			}
+			unset ($this->elements[$name]['after']);	// Since we don't need this again
+		}
+		
+		# End if no ordering
+		if (!$afters) {return;}
+		
+		# Do the reordering by copying the elements to a new temporary array
+		$elementsReordered = array ();
+		foreach ($this->elements as $name => $elementAttributes) {
+			
+			# Skip if the element has already been moved into the array
+			if (isSet ($elementsReordered[$name])) {continue;}
+			
+			# Reinstate the current element in the natural order
+			$elementsReordered[$name] = $elementAttributes;
+			
+			# Determine if anything comes after this element, and if so, apply each in order (there could be more than one, so an array_merge(array_spliceBefore,new,array_spliceAfter) method is not appropriate)
+			if (in_array ($name, $afters)) {	// Quick check to avoid pointless looping for each element
+				foreach ($afters as $newElement => $goesAfter) {
+					if ($goesAfter == $name) {
+						$elementsReordered[$newElement] = $this->elements[$newElement];
+					}
+				}
+			}
+		}
+		
+		# Use the new array
+		$this->elements = $elementsReordered;
+	}
+	
 	
 	# Function to determine whether this facility is open
 	function facilityIsOpen ()

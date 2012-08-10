@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.6
+ * @version 1.18.7
  */
 class form
 {
@@ -968,7 +968,7 @@ class form
 				// "ToolbarSets['pureContent']" => "[ ['Source'], ['Cut','Copy','Paste','PasteText','PasteWord','-','SpellCheck'], ['Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'], ['Bold','Italic','StrikeThrough','-','Subscript','Superscript'], ['OrderedList','UnorderedList','-','Outdent','Indent'], ['Link','Unlink','Anchor'], ['Image','Table','Rule','SpecialChar'/*,'ImageManager','UniversalKey'*/], /*['Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden']*/ [/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-'], ['Print','About'] ] ;",
 			),
 			'protectEmailAddresses' => true,	// Whether to obfuscate e-mail addresses
-			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links (as made within the editing system) or false
+			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links or false
 			'directoryIndex' => 'index.html',		// Default directory index name
 			'imageAlignmentByClass'	=> true,		// Replace align="foo" with class="foo" for images
 			'nofixTag'	=> '<!-- nofix -->',	// Special marker which indicates that the HTML should not be cleaned (or false to disable)
@@ -1470,6 +1470,7 @@ class form
 				#!# Need to deny __refresh_<cleaned-id> and __subwidgets_<cleaned-id> as a reserved form name
 				$refreshButton  = '<input type="hidden" value="' . $subwidgets . '" name="__subwidgets_' . $this->cleanId ($arguments['name']) . '" />';
 				$refreshButton .= '<input type="submit" value="&#10010;" title="Add another item" name="__refresh_' . $this->cleanId ($arguments['name']) . '" class="refresh" />';
+				$this->multipleSubmitReturnHandlerJQuery ();
 				$arguments['append'] = $refreshButton . $arguments['append'];
 			}
 			
@@ -3101,6 +3102,26 @@ class form
 					limitChars('" . $id . "', " . $characters . ", '" . $id . "__info');
 				})
 			});
+		";
+	}
+	
+	
+	# Function to enable a form with multiple submit buttons to submit the main button, not any others (such as a mid-form refresh)
+	function multipleSubmitReturnHandlerJQuery ()
+	{
+		# Add the main function; see: http://stackoverflow.com/a/5017423/180733
+		$this->multipleSubmitReturnHandlerClass = 'defaultsubmitbuttonx';
+		$this->jQueryCode[__FUNCTION__] = "
+			$(function() {
+				$('form" . ($this->settings['id'] ? "#{$this->settings['id']}" : '') . " input').keypress(function (e) {
+					if ((e.which && e.which == 13) || (e.keyCode && e.keyCode == 13)) {
+						$('input[type=submit].{$this->multipleSubmitReturnHandlerClass}').click();
+						return false;
+					} else {
+						return true;
+					}
+				});
+			})
 		";
 	}
 	
@@ -4832,7 +4853,7 @@ class form
 		#!# submit_x and submit_y should be treated as a reserved word when using submitButtonAccesskey (i.e. generating type="image")
 		if (!$this->formDisabled) {
 			$submitButtonText = $this->settings['submitButtonText'] . (!empty ($this->settings['submitButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
-			$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="button" />';
+			$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="button' . (isSet ($this->multipleSubmitReturnHandlerClass) ? " {$this->multipleSubmitReturnHandlerClass}" : '') . '" />';
 			if ($this->settings['refreshButton']) {
 				$refreshButtonText = $this->settings['refreshButtonText'] . (!empty ($this->settings['refreshButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['refreshButtonAccesskey'] . ']' : '');
 				#!# Need to deny __refresh as a reserved form name
@@ -6407,7 +6428,9 @@ class form
 				if ($useTemplate) {
 					#!# Need to deny __refresh as a reserved form name
 					$refreshButton = '<input type="submit" value="&#8635;" title="Refresh options" name="__refresh" class="refresh" />';
-					$standardAttributes['append'] = str_replace (array ('%database', '%table', '%refresh'), array ($targetDatabase, $targetTable, $refreshButton), $lookupFunctionAppendTemplate);
+					$refreshButtonTabindex999 = '<input type="submit" value="&#8635;" title="Refresh options" name="__refresh" class="refresh" tabindex="999" />';
+					$this->multipleSubmitReturnHandlerJQuery ();
+					$standardAttributes['append'] = str_replace (array ('%database', '%table', '%refreshtabindex999', '%refresh'), array ($targetDatabase, $targetTable, $refreshButtonTabindex999, $refreshButton), $lookupFunctionAppendTemplate);
 				}
 			}
 			
@@ -7180,7 +7203,6 @@ class formWidget
 #!# Allow multiple carry-throughs, perhaps using formCarried[$formNumber][...]: Add carry-through as an additional array section; then translate the additional array as a this-> input to hidden fields.
 #!# Enable javascript as an option
 		# On-submit disable switch bouncing
-		# Assign only the final submit button as the one accepting a 'return' when using multiple submits (refresh)
 #!# 	Use ideas in http://www.sitepoint.com/article/1273/3 for having js-validation with an icon
 		# http://www.tetlaw.id.au/view/javascript/really-easy-field-validation   may be a useful library
 #!# 	Style like in http://www.sitepoint.com/examples/simpletricks/form-demo.html [linked from http://www.sitepoint.com/article/1273/3]

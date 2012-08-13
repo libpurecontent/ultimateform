@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.7
+ * @version 1.18.8
  */
 class form
 {
@@ -1255,6 +1255,7 @@ class form
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'nullRequiredDefault'	=> true,	# Whether to add an empty value when the field is required and has a default
 			'onchangeSubmit'		=> false,	# Whether to submit the form onchange
+			'copyTo'				=> false,	# Whether to copy the value, onchange, to another form widget if that widget's value is currently empty
 		);
 		
 		# Create a new form widget
@@ -1503,6 +1504,9 @@ class form
 			$elementValue = array_keys ($presentableDefaults);
 		}
 		
+		# Support copyTo - sets the value of another field to the selected option's visible text if it is currently empty or changed again
+		$this->copyTo ($arguments);
+		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
 		
@@ -1562,7 +1566,7 @@ class form
 	}
 	
 	
-	# Helper function for select fields to determe whether a value is selected
+	# Helper function for select fields to determine whether a value is selected
 	function select_isSelected ($expandable, $elementValue, $subwidget, $availableValue)
 	{
 		if ($expandable) {
@@ -1571,6 +1575,34 @@ class form
 			$isSelected = (in_array ($availableValue, $elementValue));
 		}
 		return $isSelected;
+	}
+	
+	
+	# Helper function to support the copyTo argument
+	function copyTo ($arguments)
+	{
+		# End if not required
+		if (!$arguments['copyTo'] || (!is_string ($arguments['copyTo']))) {return;}
+		
+		# End if the widget does not exist
+		if (!isSet ($this->form[$arguments['copyTo']])) {return false;}
+		
+		# Determine the IDs of the current widget and the target
+		$idThis   = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]"   : $arguments['name']);
+		$idTarget = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['copyTo']}]" : $arguments['copyTo']);
+		
+		# Add the jQuery code
+		$this->jQueryCode[__FUNCTION__ . $arguments['name']] = "
+			$(document).ready(function(){
+				var autosetValue = '';
+				$('#{$idThis}').change(function() {
+					if($('#{$idTarget}').val() == '' || $('#{$idTarget}').val() == autosetValue) {
+						autosetValue = $('#{$idThis} option:selected').text();
+						$('#{$idTarget}').val(autosetValue);
+					}
+				});
+			});
+		";
 	}
 	
 	

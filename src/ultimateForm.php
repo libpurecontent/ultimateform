@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.8
+ * @version 1.18.9
  */
 class form
 {
@@ -5103,7 +5103,9 @@ class form
 			
 			# Construct a list of required but incomplete fields
 			if ($this->elements[$name]['requiredButEmpty']) {
-				$incompleteFields[] = ($this->elements[$name]['title'] != '' ? $this->elements[$name]['title'] : ucfirst ($name));
+				if (!isSet ($this->elements[$name]['requiredButEmptyNoMessage'])) {
+					$incompleteFields[] = ($this->elements[$name]['title'] != '' ? $this->elements[$name]['title'] : ucfirst ($name));
+				}
 			}
 			
 			#!# Do checks on hidden fields
@@ -5207,6 +5209,7 @@ class form
 			foreach ($fields as $field) {
 				if (isSet ($this->elements[$field])) {	// Should really throw a form setup error, but this function is only run dynamically in runtime, so the programmer might not notice
 					$this->elements[$field]['requiredButEmpty'] = true;
+					$this->elements[$field]['requiredButEmptyNoMessage'] = true;	// Stop the message that the field is empty, since we are registering a more specific message below
 				}
 			}
 		}
@@ -6600,6 +6603,7 @@ class form
 			}
 			
 			# Deal with looked-up value sets specially, defaulting to select unless the type is forced
+			$skipWidgetCreation = false;
 			if ($lookupValues && $fieldAttributes['Type'] != '_hidden') {
 				$lookupType = 'select';
 				if ($forceType && ($forceType == 'checkboxes' || $forceType == 'radiobuttons')) {
@@ -6612,13 +6616,17 @@ class form
 					'output' => array ('processing' => 'compiled'),
 					'truncate' => $truncate,
 				));
-				continue;	// Don't enter the switch which follows
+				$skipWidgetCreation = true;
 			}
 			
 			# Take the type and convert it into a form widget type
 			$type = $fieldAttributes['Type'];
 			switch (true) {
 				
+				# Skipping of this element
+				case ($skipWidgetCreation):
+					break;
+					
 				# Force to a specified type if required
 				case ($forceType):
 					if (($forceType == 'checkboxes' || $forceType == 'radiobuttons' || $forceType == 'select') && preg_match ('/(enum|set)\(\'(.*)\'\)/i', $type, $matches)) {
@@ -6766,6 +6774,17 @@ class form
 				# Otherwise throw an error
 				default:
 					$this->formSetupErrors['dataBindingUnsupportedFieldType'] = "An unknown field type ('{$type}') was found while trying to create a form from the data and fields; as such the form could not be created.";
+			}
+			
+			# If the field is unique, add a constraint
+			if (strtolower ($fieldAttributes['Key']) == 'uni') {
+				if ($unfinalisedData = $this->getUnfinalisedData ()) {
+					if ($unfinalisedData[$fieldName]) {
+						if ($existingData = $this->databaseConnection->select ($database, $table, array ($fieldName => $unfinalisedData[$fieldName]))) {
+							$this->registerProblem ($fieldName . 'notunique', "In the <strong>{$fieldName}</strong> element, that value already exists.", $fieldName);
+						}
+					}
+				}
 			}
 		}
 	}

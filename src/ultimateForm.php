@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.9
+ * @version 1.18.10
  */
 class form
 {
@@ -397,7 +397,7 @@ class form
 		$widget->uniquenessCheck ();
 		
 		# Add autocomplete functionality if required
-		$widget->autocomplete ();
+		$widget->autocomplete ($arguments);
 		$widget->autocompleteTokenised ();
 		
 		$elementValue = $widget->getValue ();
@@ -691,7 +691,7 @@ class form
 		}
 		
 		# Add autocomplete functionality if required
-		$widget->autocomplete ();
+		$widget->autocomplete ($arguments);
 		$widget->autocompleteTokenised ($singleLine = false);
 		
 		# Check whether the field satisfies any requirement for a field to be required
@@ -1008,6 +1008,9 @@ class form
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
 			
+			# Start the widget HTML
+			$widgetHtml = '';
+			
 			# Determine whether to use CKFinder
 			if ($arguments['CKFinder']) {
 				$arguments['editorConfig']['LinkBrowserURL'] = $arguments['editorConfig']['CKFinderLinkBrowserURL'];
@@ -1032,6 +1035,12 @@ class form
 				}
 			}
 			
+			# Warn IE9 users that they need to enable Compatibility Mode manually
+			#!# Fix by upgrading to CKEditor
+			if (preg_match ('/(?i)msie [9]/', $_SERVER['HTTP_USER_AGENT'])) {
+				$widgetHtml .= "\n<p class=\"warning\">The editor panel below is not fully compatible yet with Internet Explorer 9. Please click on the Compatibility View button <img src=\"http://res2.windows.microsoft.com/resbox/en/Windows%207/main/f080e77f-9b66-4ac8-9af0-803c4f8a859c_15.jpg\" alt=\"\" border=\"0\" /> in the address bar above, or use a different browser such as Firefox or Chrome.</p>";
+			}
+			
 			# Define the widget's core HTML by instantiating the richtext editor module and setting required options
 			require_once ('fckeditor.php');
 			$editor = new FCKeditor ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
@@ -1042,7 +1051,7 @@ class form
 			$editor->ToolbarSet	= $arguments['editorToolbarSet'];
 			$editor->Value		= $elementValue;
 			$editor->Config		= $arguments['editorConfig'];
-			$widgetHtml = $editor->CreateHtml ();
+			$widgetHtml .= $editor->CreateHtml ();
 		} else {
 			$widgetHtml = $this->form[$arguments['name']];
 			$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name']) . ' type="hidden" value="' . htmlspecialchars ($this->form[$arguments['name']]) . '" />';
@@ -1232,7 +1241,7 @@ class form
 		$argumentDefaults = array (
 			'name'					=> NULL,	# Name of the element
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
-			'values'				=> array (),# Simple array of selectable values
+			'values'				=> array (),# Array of selectable values
 			'valuesNamesAutomatic'	=> false,	# Whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'title'					=> '',		# Introductory text
 			'description'			=> '',		# Description text
@@ -1246,6 +1255,7 @@ class form
 			'size'			=> 5,		# Number of rows visible in multiple mode (optional; defaults to 1)
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> array (),# Pre-selected item(s)
+			'defaultPresplit'		=> false,	# Whether to pre-split a default that is a string, using the separator and separatorSurround values
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
@@ -1256,12 +1266,35 @@ class form
 			'nullRequiredDefault'	=> true,	# Whether to add an empty value when the field is required and has a default
 			'onchangeSubmit'		=> false,	# Whether to submit the form onchange
 			'copyTo'				=> false,	# Whether to copy the value, onchange, to another form widget if that widget's value is currently empty
+			'autocomplete'			=> false,	# URL of data provider
+			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
+			'separator'				=> ",\n",	# Separator used for the compiled and presented output types
+			'separatorSurround'		=> false,	# Whether, for the compiled and presented output types, if there are any output values, the separator should also be used to surround the values (e.g. |value1|value2|value3| rather than value1|value2|value3 for separator = '|')
 		);
 		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__, NULL, $arrayType = true);
 		
 		$arguments = $widget->getArguments ();
+		
+		# If pre-splitting is required, split
+		if ($arguments['defaultPresplit']) {
+			if (is_string ($arguments['default']) && strlen ($arguments['default'])) {
+				$splittableString = true;
+				if ($arguments['separatorSurround']) {
+					$splittableString = false;
+					$delimiter = '/';
+					$delimiter . '^' . preg_quote ($arguments['separator']) . '(.+)' . preg_quote ($arguments['separator']) . '$' . $delimiter;
+					if (preg_match ($delimiter . '^' . preg_quote ($arguments['separator'], $delimiter) . '(.+)' . preg_quote ($arguments['separator'], $delimiter) . '$' . $delimiter, $arguments['default'], $matches)) {
+						$splittableString = true;
+						$arguments['default'] = $matches[1];
+					}
+				}
+				if ($splittableString) {
+					$arguments['default'] = explode ($arguments['separator'], $matches[1]);
+				}
+			}
+		}
 		
 		# If the values are not an associative array, convert the array to value=>value format and replace the initial array
 		$arguments['values'] = $this->ensureHierarchyAssociative ($arguments['values'], $arguments['forceAssociative'], $arguments['name'], $arguments['valuesNamesAutomatic']);
@@ -1270,6 +1303,39 @@ class form
 		if (application::isMultidimensionalArray ($arguments['values'])) {
 			$arguments['_valuesMultidimensional'] = $arguments['values'];
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
+		}
+		
+		# For autocomplete, deal with various changes
+		$autocompleteAutovaluesMode = false;
+		if ($arguments['autocomplete']) {
+			
+			# Ensure the settings are sensible
+			if (($arguments['required'] > 1) && !$arguments['expandable']) {
+				$this->formSetupErrors['selectMultipleMismatch'] = "More than one value is set as being required to be selected, and autocomplete is on, but expandable mode is off. Expandable mode needs to be enabled.";
+			}
+			
+			# Set to the specified list if set to boolean true
+			if ($arguments['autocomplete'] === true) {
+				if (is_array ($arguments['values'])) {
+					$arguments['autocomplete'] = array_values ($arguments['values']);
+				} else {
+					$this->formSetupErrors['autocompleteValuesMismatch'] = "Autocomplete mode is enabled to expect an array of values but the values parameter is not an array";
+				}
+			}
+			
+			# If a string (i.e. a URL), make sure the values list is empty, and when confirmed, 
+			if (is_string ($arguments['autocomplete'])) {
+				if ($arguments['values'] === false) {
+					$autocompleteAutovaluesMode = true;
+					
+					# Create an array of arbitrary values to emulate a fixed supplied set
+					$createValues = 200;	// Arbitrarily high number of (arbitrary) values to create; this is a little poor but it is otherwise hard to work out how many to create; it basically needs always to be at least one more than the current number of widgets being displayed
+					$arguments['values'] = array_fill (0, $createValues, $arbitraryValue = true);	// Create an arbitrary value(s) list, to ensure that the widget(s) get(s) created
+					
+				} else {
+					$this->formSetupErrors['autocompleteValuesMismatch'] = "Autocomplete from an external data source is enabled. The values list must therefore be set to false, but this is not the case.";
+				}
+			}
 		}
 		
 		# If using a expandable widget-set, ensure that other arguments are sane
@@ -1285,7 +1351,6 @@ class form
 			}
 			
 			# Determine the number of widgets to display
-			$subwidgets = 1;
 			if ($arguments['required'] && is_numeric ($arguments['required'])) {
 				$subwidgets = $arguments['required'];
 			}
@@ -1293,14 +1358,22 @@ class form
 			if (isSet ($this->collection[$checkForSubwidgetsWidgetName])) {
 				if (ctype_digit ($this->collection[$checkForSubwidgetsWidgetName])) {
 					$subwidgets = $this->collection[$checkForSubwidgetsWidgetName];
-					$checkForRefreshWidgetName = '__refresh_' . $this->cleanId ($arguments['name']);
-					if (isSet ($this->collection[$checkForRefreshWidgetName])) {
+					$checkForRefreshAddWidgetName = '__refresh_add_' . $this->cleanId ($arguments['name']);
+					if (isSet ($this->collection[$checkForRefreshAddWidgetName])) {
 						$subwidgets++;
+						$arguments['autofocus'] = $subwidgets;
+					}
+					$checkForRefreshSubtractWidgetName = '__refresh_subtract_' . $this->cleanId ($arguments['name']);
+					if (isSet ($this->collection[$checkForRefreshSubtractWidgetName])) {
+						if (($subwidgets > $arguments['required']) && ($subwidgets > 1)) {
+							$subwidgets--;
+							$arguments['autofocus'] = $subwidgets;
+						}
 					}
 				}
 			}
 			$totalAvailableOptions = count ($arguments['values']);
-			if ($subwidgets > $totalAvailableOptions) {	// Ensure there are never any more than the available options
+			if (($subwidgets > $totalAvailableOptions) && ($subwidgets != 0)) {	// Ensure there are never any more than the available options
 				$subwidgets = $totalAvailableOptions;
 			}
 		}
@@ -1333,7 +1406,7 @@ class form
 			$allNonZeroSoFar = true;
 			for ($subwidget = 0; $subwidget < $subwidgets; $subwidget++) {
 				$subwidgetName = $arguments['name'] . ($arguments['expandable'] ? "_{$subwidget}" : '');
-				if (isSet ($this->form[$subwidgetName]) && isSet ($this->form[$subwidgetName][0])) {
+				if (isSet ($this->form[$subwidgetName]) && isSet ($this->form[$subwidgetName][0]) && is_string ($this->form[$subwidgetName][0])) {
 					$subwidgetValue = $this->form[$subwidgetName][0];
 					if ($value && $subwidgetValue && in_array ($subwidgetValue, $value)) {
 						$elementProblems['expandableValuesDuplicated'] = "In the <strong>{$arguments['name']}</strong> element, you selected the same value twice.";
@@ -1352,10 +1425,13 @@ class form
 		}
 		$widget->setValue ($value);
 		
+		# Add autocomplete functionality if required
+		$widget->autocomplete ($arguments, ($arguments['expandable'] ? $subwidgets : false));
+		
 		$elementValue = $widget->getValue ();
 		
 		# Check that the array of values is not empty
-		if (empty ($arguments['values'])) {
+		if (empty ($arguments['values']) && !$autocompleteAutovaluesMode) {
 			$this->formSetupErrors['selectNoValues'] = "No values have been set as selection items for the <strong>{$arguments['name']}</strong> element.";
 			return false;
 		}
@@ -1382,10 +1458,20 @@ class form
 		# Emulate the need for the field to be 'required', i.e. the minimum number of fields is greater than 0
 		$required = ($arguments['required'] > 0);
 		
-		# Loop through each element value to check that it is in the available values, and just discard without comment any that are not
-		foreach ($elementValue as $index => $value) {
-			if (!array_key_exists ($value, $arguments['values'])) {
-				unset ($elementValue[$index]);
+		# Loop through each element value to check that it is in the available values, and just discard any that are not, lodging a user error
+		if (!$autocompleteAutovaluesMode) {
+			foreach ($elementValue as $index => $value) {
+				$unavailableSubmitted = array ();
+				if ($value != '') {
+					if (!array_key_exists ($value, $arguments['values'])) {
+						$unavailableSubmitted[] = $elementValue[$index];
+						unset ($elementValue[$index]);
+					}
+				}
+				if ($unavailableSubmitted) {
+					$totalUnavailableSubmitted = count ($unavailableSubmitted);
+					$elementProblems['unavailableSubmitted'] = 'The ' . ($totalUnavailableSubmitted == 1 ? 'value' : 'values') . ' <em>' . htmlspecialchars (implode ('</em>, <em>', $unavailableSubmitted)) . '</em> you submitted ' . ($totalUnavailableSubmitted == 1 ? 'is' : 'are') . ' not in the list of available values.';
+				}
 			}
 		}
 		
@@ -1434,43 +1520,56 @@ class form
 					}
 				}
 				
-				# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-				$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['onchangeSubmit'] ? ' onchange="this.form.submit();"' : '') . $widget->tabindexHtml () . '>';
-				if (!isSet ($arguments['_valuesMultidimensional'])) {
-					if ($arguments['required'] && $arguments['default'] && !$arguments['nullRequiredDefault']) {
-						$arguments['valuesWithNull'] = $arguments['values'];	// Do not add a null entry when a required field also has a default
-					} else {
-						$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
-					}
-					foreach ($arguments['valuesWithNull'] as $availableValue => $visible) {
-						$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-						$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true, $idOnly = true) . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
-					}
+				# In autocomplete mode, create a standard input widget, but with an array submission type as the name
+				if ($arguments['autocomplete']) {
+					$hasAutofocus = ($arguments['autofocus'] === true || (is_numeric ($arguments['autofocus']) && ($subwidget + 1) == $arguments['autofocus']));	// True or the subwidget number matches
+					$subwidgetHtml[$subwidget] = "\n\t\t\t<input type=\"text\"" . (isSet ($elementValue[$subwidget]) ? ' value="' . htmlspecialchars ($elementValue[$subwidget]) . '"' : '') . $this->nameIdHtml ($subwidgetName, true) . ($hasAutofocus ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml () . '>';
+					if ($hasAutofocus) {$arguments['autofocus'] = false;}	// Ensure only one has autofocus
 				} else {
 					
-					# Multidimensional version, which adds optgroup labels
-					foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
-						if (is_array ($mainValue)) {
-							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t<optgroup label=\"{$key}\">";
-							foreach ($mainValue as $availableValue => $visible) {
-								$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
-							}
-							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t</optgroup>";
+					# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
+					$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['onchangeSubmit'] ? ' onchange="this.form.submit();"' : '') . $widget->tabindexHtml () . '>';
+					if (!isSet ($arguments['_valuesMultidimensional'])) {
+						if ($arguments['required'] && $arguments['default'] && !$arguments['nullRequiredDefault']) {
+							$arguments['valuesWithNull'] = $arguments['values'];	// Do not add a null entry when a required field also has a default
 						} else {
-							$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $key);
-							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($mainValue)) . '</option>';
+							$arguments['valuesWithNull'] = array ('' => $arguments['nullText']) + $arguments['values'];
+						}
+						foreach ($arguments['valuesWithNull'] as $availableValue => $visible) {
+							$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
+							$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . $this->nameIdHtml ($subwidgetName, false, $availableValue, true, $idOnly = true) . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
+						}
+					} else {
+						
+						# Multidimensional version, which adds optgroup labels
+						foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
+							if (is_array ($mainValue)) {
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t<optgroup label=\"{$key}\">";
+								foreach ($mainValue as $availableValue => $visible) {
+									$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
+									$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
+								}
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t</optgroup>";
+							} else {
+								$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $key);
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($mainValue)) . '</option>';
+							}
 						}
 					}
+					$subwidgetHtml[$subwidget] .= "\n\t\t\t</select>\n\t\t";
 				}
-				$subwidgetHtml[$subwidget] .= "\n\t\t\t</select>\n\t\t";
 			}
 			
 			# Add an expansion button at the end
 			if ($arguments['expandable']) {
-				#!# Need to deny __refresh_<cleaned-id> and __subwidgets_<cleaned-id> as a reserved form name
+				#!# Need to deny __refresh_add_<cleaned-id>, __refresh_subtract_<cleaned-id>, and __subwidgets_<cleaned-id> as reserved form names
 				$refreshButton  = '<input type="hidden" value="' . $subwidgets . '" name="__subwidgets_' . $this->cleanId ($arguments['name']) . '" />';
-				$refreshButton .= '<input type="submit" value="&#10010;" title="Add another item" name="__refresh_' . $this->cleanId ($arguments['name']) . '" class="refresh" />';
+				if (($subwidgets > $arguments['required']) && ($subwidgets > 1)) {
+					$refreshButton .= '<input type="submit" value="&#10006;" title="Subtract the last item" name="__refresh_subtract_' . $this->cleanId ($arguments['name']) . '" class="refresh" />';
+				}
+				if ($subwidgets < $totalAvailableOptions) {
+					$refreshButton .= '<input type="submit" value="&#10010;" title="Add another item" name="__refresh_add_' . $this->cleanId ($arguments['name']) . '" class="refresh" />';
+				}
 				$this->multipleSubmitReturnHandlerJQuery ();
 				$arguments['append'] = $refreshButton . $arguments['append'];
 			}
@@ -1513,6 +1612,13 @@ class form
 		# Get the posted data; there is no need to clear null or fake submissions because it will just get ignored, not being in the values list
 		if ($this->formPosted) {
 			
+			# In autocomplete auto-values mode, assume that whatever the user has posted is correct
+			if ($autocompleteAutovaluesMode) {
+				if ($this->form[$arguments['name']]) {
+					$arguments['values'] = array_combine ($this->form[$arguments['name']], $this->form[$arguments['name']]);
+				}
+			}
+			
 			# Loop through each defined element name
 			$chosenValues = array ();
 			$chosenVisible = array ();
@@ -1533,11 +1639,18 @@ class form
 			}
 			
 			# Assemble the compiled and presented versions
-			$data['compiled'] = implode (",\n", $chosenValues);
-			$data['presented'] = implode (",\n", $chosenVisible);
+			$data['compiled'] = implode ($arguments['separator'], $chosenValues);
+			$data['presented'] = implode ($arguments['separator'], $chosenVisible);
+			
+			# Add the surround if required
+			if ($arguments['separatorSurround']) {
+				if (strlen ($data['compiled']))  {$data['compiled']  = $arguments['separator'] . $data['compiled']  . $arguments['separator'];}
+				if (strlen ($data['presented'])) {$data['presented'] = $arguments['separator'] . $data['presented'] . $arguments['separator'];}
+			}
 		}
 		
 		# Compile the datatype
+		$datatype = array ();
 		foreach ($arguments['values'] as $key => $value) {
 			$datatype[] = str_replace ("'", "\'", $key);
 		}
@@ -2309,21 +2422,22 @@ class form
 				$this->enableJqueryUi ();
 				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
 				$this->jQueryCode[__FUNCTION__ . $widgetId] = "
+				// Date picker
 				var i = document.createElement('input');	// Create a bogus element for testing browser support of <input type=date>
 				i.setAttribute('type', 'date');
 				var html5Support = (i.type !== 'text');
 				if(!html5Support) {
-					dateDefaultDate = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// http://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
+					var dateDefaultDate_{$arguments['name']} = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// http://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
 					$(function() {
 						$('#{$widgetId}').datepicker({
 							changeMonth: true,
 							changeYear: true,
 							dateFormat: 'dd/mm/yy',
-							defaultDate: dateDefaultDate,
+							defaultDate: dateDefaultDate_{$arguments['name']},
 							minDate: {$minDate},
 							maxDate: {$maxDate}
 						});
-						$('#{$widgetId}').datepicker('setDate', dateDefaultDate);
+						$('#{$widgetId}').datepicker('setDate', dateDefaultDate_{$arguments['name']});
 					});
 				}";
 				
@@ -3019,7 +3133,7 @@ class form
 	
 	
 	# Function to add jQuery-based autocomplete; see: http://jqueryui.com/demos/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: http://www.learningjquery.com/2010/06/autocomplete-migration-guide
-	function autocompleteJQuery ($id, $data, $options = array ())
+	function autocompleteJQuery ($id, $data, $options = array (), $subwidgets = false)
 	{
 		# Ensure that jQuery UI is loaded
 		$this->enableJqueryUi ();
@@ -3052,8 +3166,14 @@ class form
 			}
 		}
 		
-		# Register a new entry to be added to the document-ready container
-		$this->autocompleteJQueryEntries[] = "$('#" . $id . "').autocomplete({source: {$data}{$optionsList}});";
+		# Register a new entry (or, for a set of subwidgets, entries) to be added to the document-ready container
+		if ($subwidgets) {
+			for ($i = 0; $i < $subwidgets; $i++) {
+				$this->autocompleteJQueryEntries[] = "$('#" . $id . '_' . $i . "').autocomplete({source: {$data}{$optionsList}});";
+			}
+		} else {
+			$this->autocompleteJQueryEntries[] = "$('#" . $id . "').autocomplete({source: {$data}{$optionsList}});";
+		}
 		
 		# Add/overwrite a per-widget call
 		$this->jQueryCode[__FUNCTION__]  = "\n\t$(document).ready(function(){";
@@ -4145,14 +4265,15 @@ class form
 			}
 		}
 		
-		# Determine if any kind of refresh button has been selected (either a __refresh or __refresh_<cleaned-id> expandable type)
+		# Determine if any kind of refresh button has been selected (either a __refresh or __refresh_add_<cleaned-id> / __refresh_subtract_<cleaned-id> expandable type)
 		$formRefreshed = false;
 		if (isSet ($this->collection['__refresh'])) {
 			$formRefreshed = true;
 		} else {
 			foreach ($this->elements as $name => $elementAttributes) {
-				$checkForRefreshWidgetName = '__refresh_' . $this->cleanId ($name);	// e.g. if a select widget called 'foo' has the 'expandable' attribute set, then check for __refresh_foo
-				if (isSet ($this->collection[$checkForRefreshWidgetName])) {
+				$checkForRefreshAddWidgetName = '__refresh_add_' . $this->cleanId ($name);	// e.g. if a select widget called 'foo' has the 'expandable' attribute set, then check for __refresh_add_foo
+				$checkForRefreshSubtractWidgetName = '__refresh_subtract_' . $this->cleanId ($name);	// e.g. if a select widget called 'foo' has the 'expandable' attribute set, then check for __refresh_subtract_foo
+				if (isSet ($this->collection[$checkForRefreshAddWidgetName]) || isSet ($this->collection[$checkForRefreshSubtractWidgetName])) {
 					$formRefreshed = true;
 					break;
 				}
@@ -6333,6 +6454,7 @@ class form
 			'valuesNamesAutomatic'	=> false,	// For select/radiobuttons/checkboxes, whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'autocomplete' => false,	// An autocomplete data endpoint URL; if %field is specified, it will be replaced with the fieldname
 			'autocompleteOptions' => false,	// Array of options that will be converted to a javascript array - see http://docs.jquery.com/UI/Autocomplete#options (this is the new plugin)
+			'editingUniquenessUniChecking' => true,	// Whether uniqueness checking for editing of a record when a UNI field is found in the database (should be set to false when doing a record clone)
 		);
 		
 		# Merge the arguments
@@ -6780,7 +6902,12 @@ class form
 			if (strtolower ($fieldAttributes['Key']) == 'uni') {
 				if ($unfinalisedData = $this->getUnfinalisedData ()) {
 					if ($unfinalisedData[$fieldName]) {
-						if ($existingData = $this->databaseConnection->select ($database, $table, array ($fieldName => $unfinalisedData[$fieldName]))) {
+						$whereNotCurrent = false;
+						if ($editingUniquenessUniChecking && $data && isSet ($data[$fieldName]) && strlen ($data[$fieldName])) {		// If there is existing data (i.e. the user is doing an UPDATE, not an INSERT), exclude this from the lookup
+							$whereNotCurrent .= " AND `{$fieldName}` != " . $this->databaseConnection->quote ($data[$fieldName]);
+						}
+						$query = "SELECT * FROM `{$database}`.`{$table}` WHERE `{$fieldName}` = " . $this->databaseConnection->quote ($unfinalisedData[$fieldName]) . $whereNotCurrent . ' LIMIT 1;';
+						if ($existingData = $this->databaseConnection->getData ($query)) {
 							$this->registerProblem ($fieldName . 'notunique', "In the <strong>{$fieldName}</strong> element, that value already exists.", $fieldName);
 						}
 					}
@@ -6954,11 +7081,11 @@ class formWidget
 	
 	
 	# Function to add autocomplete functionality
-	function autocomplete ()
+	function autocomplete ($arguments, $subwidgets = false)
 	{
-		if ($this->arguments[__FUNCTION__]) {
-			$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
-			$this->form->autocompleteJQuery ($id, $this->arguments[__FUNCTION__], $this->arguments['autocompleteOptions']);
+		if ($arguments[__FUNCTION__]) {
+			$id = $this->form->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
+			$this->form->autocompleteJQuery ($id, $arguments[__FUNCTION__], $arguments['autocompleteOptions'], $subwidgets);
 		}
 	}
 	

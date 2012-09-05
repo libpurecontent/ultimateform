@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.18.10
+ * @version 1.19.0
  */
 class form
 {
@@ -1527,8 +1527,9 @@ class form
 					if ($hasAutofocus) {$arguments['autofocus'] = false;}	// Ensure only one has autofocus
 				} else {
 					
-					# Create the widget; this has to split between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
-					$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, true) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['onchangeSubmit'] ? ' onchange="this.form.submit();"' : '') . $widget->tabindexHtml () . '>';
+					# Create the widget; this has to differentiate between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
+					$useArrayFormat = ($arguments['multiple']);	// i.e. form[widgetname][] rather than form[widgetname]
+					$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, $useArrayFormat) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['onchangeSubmit'] ? ' onchange="this.form.submit();"' : '') . $widget->tabindexHtml () . '>';
 					if (!isSet ($arguments['_valuesMultidimensional'])) {
 						if ($arguments['required'] && $arguments['default'] && !$arguments['nullRequiredDefault']) {
 							$arguments['valuesWithNull'] = $arguments['values'];	// Do not add a null entry when a required field also has a default
@@ -1544,12 +1545,12 @@ class form
 						# Multidimensional version, which adds optgroup labels
 						foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
 							if (is_array ($mainValue)) {
-								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t<optgroup label=\"{$key}\">";
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t<optgroup label=\"{$key}\">";
 								foreach ($mainValue as $availableValue => $visible) {
 									$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
-									$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
+									$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t" . '<option value="' . htmlspecialchars ($availableValue) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($visible)) . '</option>';
 								}
-								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t\t</optgroup>";
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t</optgroup>";
 							} else {
 								$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $key);
 								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<option value="' . htmlspecialchars ($key) . '"' . ($isSelected ? ' selected="selected"' : '') . '>' . str_replace ('  ', '&nbsp;&nbsp;', htmlspecialchars ($mainValue)) . '</option>';
@@ -4175,8 +4176,6 @@ class form
 	{
 		# Get the presentation defaults
 		$presentationDefaults = $this->presentationDefaults ($returnFullAvailabilityArray = false, $includeDescriptions = false);
-		
-//application::dumpData ($presentationDefaults);
 		
 		# Loop through each field and obtain the value
 		$result = array ();

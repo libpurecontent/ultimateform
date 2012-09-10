@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.0
+ * @version 1.19.1
  */
 class form
 {
@@ -1251,7 +1251,7 @@ class form
 			'output'				=> array (),# Presentation format
 			'multiple'				=> false,	# Whether to create a multiple-mode select box
 			'expandable'			=> false,	# Whether a multiple-select box should be converted to a set of single boxes whose number can be incremented by pressing a + button
-			'required'		=> 0,		# The minimum number which must be selected (defaults to 0)
+			'required'		=> 0,		# The minimum number which must be selected (defaults to 0), or true (which will be turned into 1)
 			'size'			=> 5,		# Number of rows visible in multiple mode (optional; defaults to 1)
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> array (),# Pre-selected item(s)
@@ -1305,6 +1305,9 @@ class form
 			$arguments['values'] = application::flattenMultidimensionalArray ($arguments['values']);
 		}
 		
+		# Ensure the 'required' argument is numeric if supplied
+		if ($arguments['required'] === true) {$arguments['required'] = 1;}
+		
 		# For autocomplete, deal with various changes
 		$autocompleteAutovaluesMode = false;
 		if ($arguments['autocomplete']) {
@@ -1351,7 +1354,7 @@ class form
 			}
 			
 			# Determine the number of widgets to display
-			if ($arguments['required'] && is_numeric ($arguments['required'])) {
+			if ($arguments['required']) {
 				$subwidgets = $arguments['required'];
 			}
 			$checkForSubwidgetsWidgetName = '__subwidgets_' . $this->cleanId ($arguments['name']);
@@ -1387,12 +1390,14 @@ class form
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary
 		$arguments['default'] = application::ensureArray ($arguments['default']);
 		
-		# Increase the number of default widgets to the number of defaults if any are set
-		if ($arguments['expandable']) {
-			if ($arguments['default']) {
-				$totalDefaults = count ($arguments['default']);
-				if ($totalDefaults > $subwidgets) {
-					$subwidgets = $totalDefaults;
+		# Increase the number of default widgets to the number of defaults if any are set and the form has not been posted
+		if (!$this->formPosted) {
+			if ($arguments['expandable']) {
+				if ($arguments['default']) {
+					$totalDefaults = count ($arguments['default']);
+					if ($totalDefaults > $subwidgets) {
+						$subwidgets = $totalDefaults;
+					}
 				}
 			}
 		}
@@ -2200,6 +2205,7 @@ class form
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'prefill'				=> false,	# Whether to include pre-fill link: '[Now]'
 			'picker'				=> $this->settings['picker'],	# Whether to enable a javascript datepicker for the 'date' level
+			'pickerAutosubmit'		=> false,	# Whether to submit the form if a picker value is selected
 			#!# Currently min/max are only implemented client-side
 			'min'					=> '1970-01-01',	# Minimum date in the picker
 			'max'					=> '2069-12-31',	# Maximum date in the picker
@@ -2403,7 +2409,7 @@ class form
 		# Describe restrictions on the widget
 		if (($arguments['level'] == 'datetime') || ($arguments['level'] == 'time')) {$restriction = 'Time can be entered flexibly';}
 		
-		# Start to define the widget's core HTML
+		# Define the widget's core HTML
 		if ($arguments['editable']) {
 			
 			# For the picker version, create an HTML5 date widget, to which we will then attach fallback Javascript
@@ -2427,6 +2433,9 @@ class form
 				var i = document.createElement('input');	// Create a bogus element for testing browser support of <input type=date>
 				i.setAttribute('type', 'date');
 				var html5Support = (i.type !== 'text');
+				if (navigator.userAgent.match(/Chrom(e|ium)\//i) && parseInt(navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./i)[2]) < 21) {	// Prior to Chrome 20, the date picker just had an up/down rocker
+					html5Support = false;
+				}
 				if(!html5Support) {
 					var dateDefaultDate_{$arguments['name']} = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// http://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
 					$(function() {
@@ -2441,6 +2450,25 @@ class form
 						$('#{$widgetId}').datepicker('setDate', dateDefaultDate_{$arguments['name']});
 					});
 				}";
+				
+				# Enable autosubmit if required; see: http://stackoverflow.com/questions/11532433 for the HTML5 picker, and http://stackoverflow.com/questions/6471959 for the jQuery picker
+				if ($arguments['pickerAutosubmit']) {
+					$this->jQueryCode[__FUNCTION__ . $widgetId] .= "\n
+				// Date picker autosubmit (HTML/jQuery picker)
+				$(function() {
+					if(html5Support) {
+						var el = document.getElementById('{$widgetId}');
+						el.addEventListener('input', function(e) {	// i.e. oninput
+							$('form[name={$this->settings['name']}]').submit();
+						}, false);
+					} else {
+						$('#{$widgetId}').change(function() {
+							$('form[name={$this->settings['name']}]').submit();
+						});
+					}
+				});
+				";
+				}
 				
 			# Non-picker version - three separate fields for date, month and year
 			} else {

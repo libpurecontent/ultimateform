@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.1
+ * @version 1.19.2
  */
 class form
 {
@@ -1336,7 +1336,7 @@ class form
 					$arguments['values'] = array_fill (0, $createValues, $arbitraryValue = true);	// Create an arbitrary value(s) list, to ensure that the widget(s) get(s) created
 					
 				} else {
-					$this->formSetupErrors['autocompleteValuesMismatch'] = "Autocomplete from an external data source is enabled. The values list must therefore be set to false, but this is not the case.";
+					$this->formSetupErrors['autocompleteValuesMismatch'] = "Autocomplete from an external data source is enabled for {$arguments['name']}. The values list must therefore be set to false, but this is not the case.";
 				}
 			}
 		}
@@ -6466,6 +6466,7 @@ class form
 			'enumRadiobuttons' => false,	// Whether to use radiobuttons for ENUM (true, or set number of value choices up to which they will be used, e.g. 2 means: radiobuttons if <=2 fields but select if >2)
 			'enumRadiobuttonsInitialNullText' => array (),	// Whether an initial empty radiobutton should have a label, specified as an array of fieldname=>value
 			'int1ToCheckbox' => false,	// Whether an INT/TINYINT/etc(1) field will be converted to a checkbox
+			'textAsVarchar' => false,	// Force a TEXT type to be a VARCHAR(255) instead
 			'lookupFunction' => false,
 			'simpleJoin' => false,	// Overrides lookupFunction, uses targetId as a join to <database>.target
 			'lookupFunctionParameters' => array (),
@@ -6767,6 +6768,9 @@ class form
 				));
 				$skipWidgetCreation = true;
 			}
+			
+			# If the textAsVarchar option is on, convert the type to VARCHAR(255)
+			if ($textAsVarchar && (strtolower ($fieldAttributes['Type']) == 'text')) {$fieldAttributes['Type'] = 'VARCHAR(255)';}
 			
 			# Take the type and convert it into a form widget type
 			$type = $fieldAttributes['Type'];

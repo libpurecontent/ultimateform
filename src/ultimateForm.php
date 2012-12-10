@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.2
+ * @version 1.19.3
  */
 class form
 {
@@ -2434,6 +2434,9 @@ class form
 				i.setAttribute('type', 'date');
 				var html5Support = (i.type !== 'text');
 				if (navigator.userAgent.match(/Chrom(e|ium)\//i) && parseInt(navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./i)[2]) < 21) {	// Prior to Chrome 20, the date picker just had an up/down rocker
+					html5Support = false;
+				}
+				if (navigator.userAgent.match(/Safari\//i) && parseInt(navigator.userAgent.match(/Version\/([0-9]+)\./i)[1]) < 6) {	// Safari 5 date picker just had an up/down rocker
 					html5Support = false;
 				}
 				if(!html5Support) {

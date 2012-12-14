@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.3
+ * @version 1.19.4
  */
 class form
 {
@@ -967,6 +967,7 @@ class form
 				//'FormatIndentator'			=> '	', // Tabs - still doesn't work in FCKeditor
 				// "ToolbarSets['pureContent']" => "[ ['Source'], ['Cut','Copy','Paste','PasteText','PasteWord','-','SpellCheck'], ['Undo','Redo','-','Find','Replace','-','SelectAll','RemoveFormat'], ['Bold','Italic','StrikeThrough','-','Subscript','Superscript'], ['OrderedList','UnorderedList','-','Outdent','Indent'], ['Link','Unlink','Anchor'], ['Image','Table','Rule','SpecialChar'/*,'ImageManager','UniversalKey'*/], /*['Form','Checkbox','Radio','Input','Textarea','Select','Button','ImageButton','Hidden']*/ [/*'FontStyleAdv','-','FontStyle','-',*/'FontFormat','-','-'], ['Print','About'] ] ;",
 			),
+			'allowCurlyQuotes' => false,
 			'protectEmailAddresses' => true,	// Whether to obfuscate e-mail addresses
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links or false
 			'directoryIndex' => 'index.html',		// Default directory index name
@@ -1003,7 +1004,7 @@ class form
 		$elementValue = $widget->getValue ();
 		
 		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid), or clean it if posted
-		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments, $arguments['nofixTag']));
+		$elementValue = (!$this->formPosted ? $arguments['default'] : $this->richtextClean ($this->form[$arguments['name']], $arguments, $arguments['nofixTag'], 'utf8', $arguments['allowCurlyQuotes']));
 		
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
@@ -1089,7 +1090,7 @@ class form
 	
 	
 	# Function to clean the content
-	function richtextClean ($content, &$arguments, $nofixTag = '<!-- nofix -->', $charset = 'utf8')
+	function richtextClean ($content, &$arguments, $nofixTag = '<!-- nofix -->', $charset = 'utf8', $allowCurlyQuotes = false)
 	{
 		# Determine whether the <!-- nofix --> tag is present at the start and therefore whether the content should be cleaned
 		$nofixPresent = ($nofixTag && (substr ($content, 0, strlen ($nofixTag)) == $nofixTag));	// ereg/preg_match are not used as otherwise escaping may be needed
@@ -1106,6 +1107,18 @@ class form
 			'<p style="clear: left;">' => '__PSTYLECLEARLEFT',
 			'<p style="clear: right;">' => '__PSTYLECLEARRIGHT',
 		);
+		if ($allowCurlyQuotes) {
+			$cache += array (
+				'&#8216;' => '__U+2018',
+				'&lsquo;' => '__entityU+2018',
+				'&#8217;' => '__U+2019',
+				'&rsquo;' => '__entityU+2019',
+				'&#8220;' => '__U+201C',
+				'&ldquo;' => '__entityU+201C',
+				'&#8221;' => '__U+201D',
+				'&rdquo;' => '__entityU+201D',
+			);
+		}
 		if ($cleanHtml) {
 			$content = str_replace (array_keys ($cache), array_values ($cache), $content);
 		}
@@ -5610,6 +5623,7 @@ class form
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
 				),
 				'file'				=> array ('compiled', 'rawcomponents', 'presented'),
+				#!# Probably e-mail should be 'presented' to avoid the need for "'output' => array ('email' => 'presented')"  to be added to such fields
 				'email'				=> array ('compiled', 'rawcomponents', 'presented'),
 				'confirmationEmail'	=> array ('presented', 'compiled'),
 				'screen'			=> array ('presented', 'compiled'),

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.4
+ * @version 1.19.5
  */
 class form
 {
@@ -636,6 +636,7 @@ class form
 			'regexp'				=> '',		# Case-sensitive regular expression(s) against which all lines of the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression(s) against which all lines of the submission must validate
 			'disallow'				=> false,	# Regular expression against which all lines of the submission must not validate
+			'mustContain'			=> false,	# String or array of strings that the submission must contain
 			'antispam'				=> $this->settings['antispam'],		# Whether to switch on anti-spam checking
 			'current'				=> false,	# List of current values which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
@@ -764,6 +765,20 @@ class form
 			# If any problem lines are found, construct the error message for this
 			if (isSet ($disallowProblemLines)) {
 				$elementProblems['failsDisallow'] = (isSet ($disallowErrorMessage) ? $disallowErrorMessage : (count ($disallowProblemLines) > 1 ? 'Rows ' : 'Row ') . implode (', ', $disallowProblemLines) . (count ($disallowProblemLines) > 1 ? ' match' : ' matches') . ' a specified disallowed pattern for this section.');
+			}
+		}
+		
+		# Do checks to ensure a string / list of strings are present if required
+		if ($elementValue && $arguments['mustContain']) {
+			$arguments['mustContain'] = application::ensureArray ($arguments['mustContain']);
+			$notFound = array ();
+			foreach ($arguments['mustContain'] as $mustContain) {
+				if (!substr_count ($elementValue, $mustContain)) {
+					$notFound[] = htmlspecialchars ($mustContain);
+				}
+			}
+			if ($notFound) {
+				$elementProblems['mustContain'] = 'The ' . (count ($notFound) == 1 ? 'string' : 'strings') . ' <em>' . implode ("</em>, <em>", $notFound) . '</em> must be contained in the text but ' . (count ($mustContain) == 1 ? 'was' : 'were') . ' not found.';
 			}
 		}
 		

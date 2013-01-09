@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.5
+ * @version 1.19.6
  */
 class form
 {
@@ -1471,6 +1471,9 @@ class form
 		
 		# Apply truncation if necessary
 		$arguments['values'] = $widget->truncate ($arguments['values']);
+		if (isSet ($arguments['_valuesMultidimensional'])) {
+			$arguments['_valuesMultidimensional'] = $widget->truncate ($arguments['_valuesMultidimensional']);
+		}
 		
 		# Check that the given minimum required is not more than the number of items actually available
 		$totalSubItems = count ($arguments['values']);
@@ -7268,14 +7271,25 @@ class formWidget
 	}
 	
 	
-	# Perform truncation on the visible part of an array
+	# Perform truncation on the visible part of an array, with support for multidimensionality
 	function truncate ($values)
 	{
-		# Loop through and truncating the value's numeric length if necessary
-		#!# Needs to take account of multi-dimensional selects
+		# End if no truncation
+		if (!$this->arguments['truncate']) {return $values;}
+		
+		# Ensure it is numeric
+		if (!is_numeric ($this->arguments['truncate'])) {return $values;}
+		
+		# Define a proper unicode ... character (equivalent of &hellip;)
+		$hellip = chr(0xe2).chr(0x80).chr(0xa6);
+		
+		# Apply truncation if required
 		foreach ($values as $key => $value) {
-			#!# Should use a proper &hellip; unicode symbol rather than three dots (...)
-			$values[$key] = ($this->arguments['truncate'] && (is_numeric ($this->arguments['truncate'])) ? substr ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ...' : '') : $value);
+			if (is_array ($value)) {	// Recurse if multi-dimensional
+				$values[$key] = $this->truncate ($value);
+			} else {
+				$values[$key] = substr ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ' . $hellip : '');
+			}
 		}
 		
 		# Return the modified array

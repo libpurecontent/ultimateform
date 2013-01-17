@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.6
+ * @version 1.19.7
  */
 class form
 {
@@ -2459,6 +2459,7 @@ class form
 				# Add jQuery UI javascript for the date picker; see: http://jqueryui.com/demos/datepicker/
 				$this->enableJqueryUi ();
 				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
+				# NB This has to be done in Javascript rather than PHP because the main part of this is client-side testing of actual browser support rather than just a browser number
 				$this->jQueryCode[__FUNCTION__ . $widgetId] = "
 				// Date picker
 				var i = document.createElement('input');	// Create a bogus element for testing browser support of <input type=date>
@@ -3188,9 +3189,10 @@ class form
 	function enableJqueryUi ()
 	{
 		# Add the libraries, ensuring that the loading respects the protocol type (HTTP/HTTPS) of the current page, to avoid mixed content warnings
+		# Need to keep this in sync with a compatible jQuery version
 		$this->jQueryLibraries['jQueryUI'] = '
-			<link href="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
-			<script src="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"></script>
+			<link href="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
+			<script src="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
 		';
 	}
 	
@@ -5150,7 +5152,7 @@ class form
 		if ($this->jQueryLibraries || $this->jQueryCode) {
 			if ($this->settings['jQuery']) {
 				if ($this->settings['jQuery'] === true) {	// If not a URL, use the default, respecting HTTP/HTTPS to avoid mixed content warnings
-					$this->settings['jQuery'] = $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js';
+					$this->settings['jQuery'] = $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js';
 				}
 				if ($this->settings['jQuery']) {
 					$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";

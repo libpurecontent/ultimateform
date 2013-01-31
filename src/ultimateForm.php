@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.7
+ * @version 1.19.8
  */
 class form
 {
@@ -4367,7 +4367,7 @@ class form
 			}
 			
 			# Construct the HTML
-			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems);
+			$this->html .= $this->constructFormHtml ($this->elements, $this->elementProblems, $formRefreshed);
 			
 			# Display the form and any problems then end
 			if ($formIsUnsuccessful) {
@@ -4891,7 +4891,7 @@ class form
 	 * Function actually to display the form
 	 * @access private
 	 */
-	function constructFormHtml ($elements, $problems)
+	function constructFormHtml ($elements, $problems, $formRefreshed)
 	{
 		# Define various HTML snippets
 		$requiredFieldIndicatorHtml = "\n" . '<p class="requiredmessage"><strong>*</strong> Items marked with an asterisk [*] are required fields and must be fully completed.</p>';
@@ -4958,7 +4958,6 @@ class form
 				continue;
 			}
 			
-			
 			# If colons are set to show, add them
 			if ($this->settings['displayColons']) {$elementAttributes['title'] .= ':';}
 			
@@ -4969,8 +4968,13 @@ class form
 			}
 			
 			# If the form has been posted AND the element has any problems or is empty, add the warning CSS class
-			if ($this->formPosted && (($elementAttributes['problems']) || ($elementAttributes['requiredButEmpty']) || (($elementAttributes['type'] == 'upload') && (isSet ($this->elementProblems['generic']) && isSet ($this->elementProblems['generic']['reselectUploads']))))) {
-				$elementAttributes['title'] = '<span class="warning">' . $elementAttributes['title'] . '</span>';
+			$indicateWarning = ($this->formPosted && !$formRefreshed && (($elementAttributes['problems']) || ($elementAttributes['requiredButEmpty']) || (($elementAttributes['type'] == 'upload') && (isSet ($this->elementProblems['generic']) && isSet ($this->elementProblems['generic']['reselectUploads'])))));
+			if ($indicateWarning) {
+				if ($this->settings['display'] == 'template') {
+					$elementAttributes['html'] = '<span class="unsuccessful">' . $elementAttributes['html'] . '</span>';	// Surround the whole HTML with a new element if it is not a "successful" element
+				} else {
+					$elementAttributes['title'] = '<span class="warning">' . $elementAttributes['title'] . '</span>';	// Surround the title with a warning
+				}
 			}
 			
 			# Select whether to show restriction guidelines
@@ -6520,6 +6524,8 @@ class form
 			'autocomplete' => false,	// An autocomplete data endpoint URL; if %field is specified, it will be replaced with the fieldname
 			'autocompleteOptions' => false,	// Array of options that will be converted to a javascript array - see http://docs.jquery.com/UI/Autocomplete#options (this is the new plugin)
 			'editingUniquenessUniChecking' => true,	// Whether uniqueness checking for editing of a record when a UNI field is found in the database (should be set to false when doing a record clone)
+			'notNullFields' => array (),	// Array of elements (or single element as string) that should be treated as NOT NULL, even if the database structure says they are nullable
+			'notNullExceptFields' => array (),	// Assume all elements are treated as NOT NULL (even if the database structure says they are nullable), except for these specified elements (or single element as string)
 		);
 		
 		# Merge the arguments
@@ -6560,6 +6566,14 @@ class form
 			$this->formSetupErrors['dataBindingIncludeExcludeClash'] = 'Values have been set for both includeOnly and exclude when data binding.';
 			return false;
 		}
+		
+		# Ensure the user has not set both notNullFields and notNullExceptFields lists, and ensure they are arrays
+		if ($notNullFields && $notNullExceptFields) {
+			$this->formSetupErrors['dataBindingAutoNullableClash'] = 'Values have been set for both notNullFields and notNullExceptFields when data binding.';
+			return false;
+		}
+		$notNullFields		= application::ensureArray ($notNullFields);
+		$notNullExceptFields	= application::ensureArray ($notNullExceptFields);
 		
 		# Get the database fields
 		if (!$fields = $this->databaseConnection->getFields ($database, $table)) {
@@ -6627,11 +6641,16 @@ class form
 				$title = $fieldAttributes['Comment'];
 			}
 			
+			# Determine whether the field is required
+			$required = ($fieldAttributes['Null'] != 'YES');
+			if ($notNullFields && (in_array ($fieldName, $notNullFields))) {$required = true;}
+			if ($notNullExceptFields && (!in_array ($fieldName, $notNullExceptFields))) {$required = true;}
+			
 			# Define the standard attributes; fields that don't support a particular option shown here will ignore it
 			$standardAttributes = array (
 				'name' => $fieldName,	// Internal widget name
 				'title' => $title,	// Visible name
-				'required' => ($fieldAttributes['Null'] != 'YES'),	// Whether a required field
+				'required' => $required,
 				'default' => $value,
 				'datatype' => $fieldAttributes['Type'],
 				'description' => ($commentsAsDescription && isSet ($fieldAttributes['Comment']) && $fieldAttributes['Comment'] ? $fieldAttributes['Comment'] : ''),

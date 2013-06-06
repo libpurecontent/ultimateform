@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.8
+ * @version 1.19.9
  */
 class form
 {
@@ -4919,7 +4919,7 @@ class form
 		$html .= $this->loadJavascriptCode ();
 		
 		# Start the constructed form HTML
-		$html .= "\n" . '<form' . ($this->settings['id'] ? " id=\"{$this->settings['id']}\"" : '') . ' method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . $this->settings['submitTo'] . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
+		$html .= "\n" . '<form' . ($this->settings['id'] ? " id=\"{$this->settings['id']}\"" : '') . ' method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . htmlspecialchars ($this->settings['submitTo']) . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
 		
 		# Start the HTML
 		$formHtml = '';

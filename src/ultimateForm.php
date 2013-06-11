@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.19.9
+ * @version 1.20.0
  */
 class form
 {
@@ -94,6 +94,7 @@ class form
 	var $jQueryLibraries = array ();			// Array of jQuery client library loading HTML tags, if any, which are treated as plain HTML
 	var $jQueryCode = array ();					// Array of jQuery client code, if any, which will get wrapped in a script tag
 	var $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
+	var $formSave = false;						// Whether the submission is a save rather than a proper submission
 	
 	# Output configuration
 	var $configureResultEmailRecipient;							// The recipient of an e-mail
@@ -154,6 +155,10 @@ class form
 		'resetButtonText'					=> 'Clear changes',					# The form reset button
 		'resetButtonAccesskey'				=> 'r',								# The form reset button accesskey
 		'resetButtonTabindex'				=> false,							# The form reset button tabindex (if any)
+		'saveButton'						=> false,							# Whether the save button (i.e. save an incomplete form) is visible (note that this must be switched on in the template mode to appear, even if the save placemarker is given)
+		'saveButtonText'					=> 'Save and continue later',		# The form save button
+		'saveButtonAccesskey'				=> 'c',								# The form save button accesskey
+		'saveButtonTabindex'				=> false,							# The form save button tabindex (if any)
 		'warningMessage'					=> false,							# The form incompletion message (a specialised default is used)
 		'requiredFieldIndicator'			=> true,							# Whether the required field indicator is to be displayed (top / bottom/true / false) (note that this must be switched on in the template mode to appear, even if the reset placemarker is given)
 		'requiredFieldClass'				=> 'required',						# The CSS class used to mark a widget as required
@@ -741,7 +746,7 @@ class form
 				}
 				
 				# If the line does not validate against a specified disallow, add the line to a list of lines containing a problem then move onto the next line
-				#!# Merge this with formWidget::regexpCheck ()
+				#!# Merge this with formWidget->regexpCheck ()
 				#!# Consider allowing multiple disallows, even though a regexp can deal with that anyway
 				if ($arguments['disallow']) {
 					$disallowRegexp = $arguments['disallow'];
@@ -1622,7 +1627,7 @@ class form
 			$presentableDefaults = array ();
 			foreach ($arguments['default'] as $argument) {
 				if (isSet ($arguments['values'][$argument])) {
-					$presentableDefaults[$argument] = $arguments['values'][$argument];
+					$presentableDefaults[$argument] = htmlspecialchars ($arguments['values'][$argument]);
 				}
 			}
 			
@@ -2097,7 +2102,7 @@ class form
 			#!# Need to double-check that $arguments['default'] isn't being changed above this point [$arguments['default'] is deliberately used here because of the $identifier system above]
 			$presentableDefaults = array ();
 			foreach ($arguments['default'] as $argument) {
-				$presentableDefaults[$argument] = $arguments['values'][$argument];
+				$presentableDefaults[$argument] = htmlspecialchars ($arguments['values'][$argument]);
 			}
 			
 			# Set the widget HTML
@@ -2468,8 +2473,10 @@ class form
 				if (navigator.userAgent.match(/Chrom(e|ium)\//i) && parseInt(navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./i)[2]) < 21) {	// Prior to Chrome 20, the date picker just had an up/down rocker
 					html5Support = false;
 				}
-				if (navigator.userAgent.match(/Safari\//i) && parseInt(navigator.userAgent.match(/Version\/([0-9]+)\./i)[1]) < 6) {	// Safari 5 date picker just had an up/down rocker
-					html5Support = false;
+				if (!navigator.userAgent.match(/Chrom(e|ium)\//i)) {
+					if (navigator.userAgent.match(/Safari\//i) && parseInt(navigator.userAgent.match(/Version\/([0-9]+)\./i)[1]) < 6) {	// Safari 5 date picker just had an up/down rocker
+						html5Support = false;
+					}
 				}
 				if(!html5Support) {
 					var dateDefaultDate_{$arguments['name']} = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// http://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
@@ -3327,7 +3334,7 @@ class form
 	function multipleSubmitReturnHandlerJQuery ()
 	{
 		# Add the main function; see: http://stackoverflow.com/a/5017423/180733
-		$this->multipleSubmitReturnHandlerClass = 'defaultsubmitbuttonx';
+		$this->multipleSubmitReturnHandlerClass = 'defaultsubmitbutton';
 		$this->jQueryCode[__FUNCTION__] = "
 			$(function() {
 				$('form" . ($this->settings['id'] ? "#{$this->settings['id']}" : '') . " input').keypress(function (e) {
@@ -3366,7 +3373,7 @@ class form
 		# Construct the warning message
 		if (isSet ($missingValues)) {
 			$totalMissingValues = count ($missingValues);
-			$this->formSetupErrors['defaultMissingFromValuesArray'] = "In the <strong>{$arguments['name']}</strong> element, the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . implode (', ', $missingValues) . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+			$this->formSetupErrors['defaultMissingFromValuesArray'] = "In the <strong>{$arguments['name']}</strong> element, the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . '<em>' . htmlspecialchars (implode (', ', $missingValues)) . '</em>' . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
 		}
 	}
 	
@@ -4343,8 +4350,12 @@ class form
 			}
 		}
 		
+		# Determine if the form is being saved (incomplete submission) rather than submitted; note that each element's data will only ever contain either valid or empty data, so the output can safely be transferred to a database
+		$this->formSave = ($this->settings['saveButton'] && isSet ($this->collection['__save']));
+		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		$elementProblems = $this->getElementProblems ();
+		if ($this->formSave) {$elementProblems = false;}	// A form save bypasses validation
 		if (!$this->formPosted || $elementProblems || $formRefreshed || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
 			
 			# Run the callback function if one is set
@@ -4419,6 +4430,16 @@ class form
 		# Get the data
 		$data = $this->outputData ('processing');
 		
+		# For a form save, if there are element problems, wipe out any value for those elements
+#!# Unfinished work - need to wipe out the values for all output types properly, and deal with hierarchical ones
+		if ($this->formSave) {
+			if (isSet ($this->elementProblems['elements'])) {
+				foreach ($this->elementProblems['elements'] as $field => $problems) {
+					$data[$field] = '';
+				}
+			}
+		}
+		
 		# If the data is grouped, rearrange it into groups first
 		if ($this->prefixedGroups) {
 			foreach ($this->prefixedGroups as $group => $fields) {
@@ -4448,6 +4469,13 @@ class form
 		
 		# Return the data (whether virgin or grouped)
 		return $data;
+	}
+	
+	
+	# Getter function to return if this is a save
+	public function isSave ()
+	{
+		return $this->formSave;
 	}
 	
 	
@@ -4758,10 +4786,11 @@ class form
 		
 		# Define special placemarker names and whether they are required; these can appear more than once
 		$specialPlacemarkers = array (
-			'PROBLEMS' => true,				// Placemarker for the element problems box
-			'SUBMIT' => true,				// Placemarker for the submit button
-			'RESET' => $this->settings['resetButton'],	// Placemarker for the reset button - if there is one
-			'REQUIRED' => false,			// Placemarker for the required fields indicator text
+			'PROBLEMS'	=> true,				// Placemarker for the element problems box
+			'SUBMIT'	=> true,				// Placemarker for the submit button
+			'RESET'		=> $this->settings['resetButton'],	// Placemarker for the reset button - if there is one
+			'SAVE'		=> $this->settings['saveButton'],	// Placemarker for the save button - if there is one
+			'REQUIRED'	=> false,			// Placemarker for the required fields indicator text
 		);
 		if ($this->settings['refreshButton']) {
 			$specialPlacemarkers['REFRESH'] = false;	// Placemarker for a refresh button
@@ -5123,6 +5152,18 @@ class form
 			}
 		}
 		
+		# Add in a save button if wanted
+		if (!$this->formDisabled) {
+			if ($this->settings['saveButton']) {
+				$saveButtonHtml = '<input name="__save" value="' . $this->settings['saveButtonText'] . (!empty ($this->settings['saveButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['saveButtonAccesskey'] . ']" accesskey="' . $this->settings['saveButtonAccesskey'] : '') . '" type="submit"' . (is_numeric ($this->settings['saveButtonTabindex']) ? " tabindex=\"{$this->settings['saveButtonTabindex']}\"" : '') . ' />';
+				if ($this->settings['display'] == 'template') {
+					$formHtml = str_replace ($this->displayTemplateElementReplacementsSpecials['SAVE'], $saveButtonHtml, $formHtml);
+				} else {
+					$formHtml .= "\n" . '<p class="save">' . $saveButtonHtml . '</p>';
+				}
+			}
+		}
+		
 		# Add in the form HTML
 		$html .= $formHtml;
 		
@@ -5309,7 +5350,7 @@ class form
 		#!# Failures in group validation will not appear in the same order as the widgets themselves
 		$this->elementProblems['group'] = $this->_groupValidationChecks ();
 		
-		# Add in externally-supplied problems (where the calling application has inserted data checked against ->getUnfinalisedData), which by default is an empty array
+		# Add in externally-supplied problems (where the calling application has inserted data checked against ->getUnfinalisedData(), which by default is an empty array)
 		$this->elementProblems['external'] = $this->externalProblems;
 		
 		# If there are no fields incomplete, remove the requirement to force upload(s) reselection
@@ -7465,7 +7506,7 @@ class formWidget
 #!# Deal with encoding problems - see http://skew.org/xml/misc/xml_vs_http/#troubleshooting
 #!# $resultLines[] should have the [techName] optional
 # Antispam Captcha option
-# Support for select::regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
+# Support for select:regexp needed - for cases where a particular option needs to become disabled when submitting a dataBinded form
 # Consider grouping/fieldset and design issues at http://www.sitepoint.com/print/fancy-form-design-css/
 # Deal with widget name conversion of dot to underscore: http://uk2.php.net/manual/en/language.types.array.php#52124
 # Check more thoroughly against XSS at http://ha.ckers.org/xss.html

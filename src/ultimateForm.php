@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.0
+ * @version 1.20.1
  */
 class form
 {
@@ -298,7 +298,7 @@ class form
 			'multiple'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with comma-space)
 			'autocomplete'			=> false,	# URL of data provider
 			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
-			'autocompleteTokenised'	=> false,	# URL of data provider
+			'tags'					=> false,	# Tags mode
 			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'displayedValue'		=> false,	# When using editable=false, optional text that should be displayed instead of the value; can be made into HTML using entities=false
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
@@ -403,7 +403,9 @@ class form
 		
 		# Add autocomplete functionality if required
 		$widget->autocomplete ($arguments);
-		$widget->autocompleteTokenised ();
+		
+		# Add tags functionality if required
+		$widget->tags ();
 		
 		$elementValue = $widget->getValue ();
 		
@@ -6554,7 +6556,7 @@ class form
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
 			'truncate' => 40,
-			'size' => 40,
+			'size' => 40,	#!# This default should use the top-level size setting
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
 			'commentsAsDescription' => false,	// Whether to use column comments for the description field rather than for the title field
 			'prefix'	=> false,	// What to prefix all field names with (plus _ implied)
@@ -7215,6 +7217,74 @@ class formWidget
 			$id = $this->form->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
 			$this->form->autocompleteJQuery ($id, $arguments[__FUNCTION__], $arguments['autocompleteOptions'], $subwidgets);
 		}
+	}
+	
+	
+	# Function to add tags functionality; uses Tag-it: https://github.com/aehlke/tag-it/ and http://aehlke.github.io/tag-it/examples.html
+	function tags ()
+	{
+		# End if this functionality is not activated
+		if (!$this->arguments[__FUNCTION__]) {return;}
+		$parameter = $this->arguments[__FUNCTION__];
+		
+		# Enable jQuery UI
+		$this->form->enableJqueryUi ();
+		
+		# Add the main function
+		$this->form->jQueryLibraries[__FUNCTION__]  = "\n\t\t\t" . '<script type="text/javascript" src="' . $this->settings['scripts'] . 'tag-it/js/tag-it.js"></script>';	// https://rawgithub.com/aehlke/tag-it/master/js/tag-it.js
+		
+		# Add the stylesheets
+		$this->form->jQueryLibraries[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'http://ajax.googleapis.com/ajax/libs') . '/jqueryui/1/themes/flick/jquery-ui.css" type="text/css" />';
+		$this->form->jQueryLibraries[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/jquery.tagit.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/jquery.tagit.css
+		$this->form->jQueryLibraries[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/tagit.ui-zendesk.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/tagit.ui-zendesk.css
+		
+		# Options
+		$functionOptions = array ();
+		$functionOptions[] = 'removeConfirmation: true';
+		
+		# If required, add autocomplete functionality; either a string representing an AJAX endpoint, or an array of values
+		if (is_string ($parameter)) {
+			/* 
+				# The data source needs to emit either:
+				- A simple array, json_encode'd:
+					json_encode (array (
+						'foo',
+						'bar',
+						// ...
+					));
+				- Or an associative value/label array, json_encode'd:
+					json_encode (array (
+						array ('value' => 'foovalue', 'label' => 'foolabel'),
+						array ('value' => 'barvalue', 'label' => 'barlabel'),
+						// ...
+					));
+			*/
+			$functionOptions['autocomplete'] = "tagSource: function(search, showChoices) {
+						$.ajax({
+							url: '{$parameter}',
+							data: search,
+							success: function(data) {
+								data = JSON.parse(data);
+								showChoices(data);
+							}
+						});
+					}";
+		} else if (is_array ($parameter)) {
+			$functionOptions['autocomplete'] = 'availableTags: ' . json_encode (array_values ($parameter));
+		}
+		if (isSet ($functionOptions['autocomplete'])) {
+			$functionOptions[] = 'autocomplete: {delay: 0, minLength: 2}';
+		}
+		
+		# Add a per-widget call
+		$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
+		$this->form->jQueryCode[__FUNCTION__ . $id] = "
+			$(document).ready(function() {
+				$('#" . $id . "').tagit({
+					" . implode (",\n\t\t\t\t\t", $functionOptions) . "
+				});
+			});
+		";
 	}
 	
 	

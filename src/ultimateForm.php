@@ -56,8 +56,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.2
+ * @copyright Copyright  2003-13, Martin Lucas-Smith, University of Cambridge
+ * @version 1.20.3
  */
 class form
 {
@@ -3593,10 +3593,19 @@ class form
 		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
 		if (preg_match_all ('/\{([^\}]+)\}/', $title, $matches)) {
 			#!# Add more when tested
-			$supportedWidgetTypes = array ('input', 'email', 'url', 'tel', 'search', 'number', 'range', 'color', 'select', );
+			$supportedWidgetTypes = array ('input', 'email', 'url', 'tel', 'search', 'number', 'range', 'color', 'select', 'radiobuttons');
 			foreach ($matches[1] as $element) {
+				
+				# Extract any output format specifier
+				$placeholder = $element;	// Cache this, as $element may get overwritten
+				$outputFormat = 'presented';
+				if (substr_count ($element, '|')) {
+					list ($element, $outputFormat) = explode ('|', $element, 2);
+				}
+				
+				# Replace this element placeholder in the string
 				if (isSet ($this->elements[$element]) && (in_array ($this->elements[$element]['type'], $supportedWidgetTypes))) {
-					$title = str_replace ('{' . $element . '}', $this->elements[$element]['data']['presented'], $title);
+					$title = str_replace ('{' . $placeholder . '}', $this->elements[$element]['data'][$outputFormat], $title);
 				}
 			}
 		}
@@ -6757,7 +6766,7 @@ class form
 					$forceType = 'color';
 				}
 				
-				# Richtext fields - text fields with html/richtext in fieldname
+				# Richtext fields - text fields with html/richtext in fieldname; NB if changing the regexp, also change this in the addSettingsTableConfig method in frontControllerApplication.php
 				if (preg_match ('/(html|richtext)/i', $fieldName) && (strtolower ($fieldAttributes['Type']) == 'text')) {
 					$forceType = 'richtext';
 					
@@ -7428,6 +7437,7 @@ class formWidget
 			if (is_array ($value)) {	// Recurse if multi-dimensional
 				$values[$key] = $this->truncate ($value);
 			} else {
+				#!# This is not multi-byte safe
 				$values[$key] = substr ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ' . $hellip : '');
 			}
 		}

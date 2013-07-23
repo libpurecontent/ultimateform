@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-12, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.1
+ * @version 1.20.2
  */
 class form
 {
@@ -5508,6 +5508,14 @@ class form
 			) {
 				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace (array ('%fields', '%parameter'), array ($this->_fieldListString ($rule['fields']), $rule['parameter']), $this->validationTypes[$rule['type']]);
 			}
+			
+			# Highlight empty fields
+			#!# Currently only implemented for 'all' - this must have all highlighted (others are more selective)
+			if ($rule['type'] == 'all') {
+				foreach (array_keys ($emptyValues) as $emptyField) {
+					$this->elements[$emptyField]['requiredButEmpty'] = true;
+				}
+			}
 		}
 		
 		# Return the problems
@@ -7571,7 +7579,7 @@ class formWidget
 # Enable specification of a validation function (i.e. callback for checking a value against a database)
 # Element setup errors should result in not bothering to create the widget; this avoids more offset checking like that at the end of the radiobuttons type in non-editable mode
 # Multi-select combo box like at http://cross-browser.com/x/examples/xselect.php
-# Consider highlighting in red areas caught by >validation
+# Consider highlighting in red areas caught by >validation - currently only the 'all' type is implemented
 # Optgroup setting to allow multiple appearances of the same item
 #!# Deal with encoding problems - see http://skew.org/xml/misc/xml_vs_http/#troubleshooting
 #!# $resultLines[] should have the [techName] optional
@@ -7581,6 +7589,7 @@ class formWidget
 # Deal with widget name conversion of dot to underscore: http://uk2.php.net/manual/en/language.types.array.php#52124
 # Check more thoroughly against XSS at http://ha.ckers.org/xss.html
 # Add slashes and manual \' replacement need to be re-considered
+# Add an 'other' option to radiobuttons/select which proxies a chained 'other' field; should detect cases when dataBinding provides an adjacent database field
 
 # Version 2 feature proposals
 #!# Self-creating form mode

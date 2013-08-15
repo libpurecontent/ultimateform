@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-13, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.3
+ * @version 1.20.4
  */
 class form
 {
@@ -7437,8 +7437,8 @@ class formWidget
 			if (is_array ($value)) {	// Recurse if multi-dimensional
 				$values[$key] = $this->truncate ($value);
 			} else {
-				#!# This is not multi-byte safe
-				$values[$key] = substr ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ' . $hellip : '');
+				$substrFunction = (function_exists ('mb_substr') ? 'mb_substr' : 'substr');	// Favour mb_string when available
+				$values[$key] = $substrFunction ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ' . $hellip : '');
 			}
 		}
 		

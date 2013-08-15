@@ -370,6 +370,7 @@ class form
 				$arguments['title'] .= ' (confirmation)';
 				$arguments['description'] = 'Please retype to confirm.';
 				$arguments['discard'] = true;
+				$arguments['autofocus'] = false;
 				$this->validation ('same', array ($originalName, $arguments['name']));
 			}
 		}

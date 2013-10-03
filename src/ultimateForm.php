@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-13, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.6
+ * @version 1.20.7
  */
 class form
 {
@@ -1308,6 +1308,7 @@ class form
 			'copyTo'				=> false,	# Whether to copy the value, onchange, to another form widget if that widget's value is currently empty
 			'autocomplete'			=> false,	# URL of data provider
 			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
+			'entities'				=> true,	# Convert HTML in label to entity equivalents
 		);
 		
 		# Create a new form widget
@@ -1632,7 +1633,7 @@ class form
 			$presentableDefaults = array ();
 			foreach ($arguments['default'] as $argument) {
 				if (isSet ($arguments['values'][$argument])) {
-					$presentableDefaults[$argument] = htmlspecialchars ($arguments['values'][$argument]);
+					$presentableDefaults[$argument] = ($arguments['entities'] ? htmlspecialchars ($arguments['values'][$argument]) : $arguments['values'][$argument]);
 				}
 			}
 			

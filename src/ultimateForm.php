@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-13, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.8
+ * @version 1.20.9
  */
 class form
 {
@@ -2527,6 +2527,22 @@ class form
 							maxDate: {$maxDate}
 						});
 						$('#{$widgetId}').datepicker('setDate', dateDefaultDate_{$arguments['name']});
+						$('#{$widgetId}').after('<br /><span class=\"small comment\">Enter as dd/mm/yyyy</span>');
+						
+						// IE fix to avoid picker being in wrong position on page; see: http://stackoverflow.com/a/16925979/180733
+						$('#{$widgetId}').on('click', function() {
+							if (navigator.userAgent.match(/msie/i)) {
+								var self;
+								self = $(this);
+								$('#ui-datepicker-div').hide();
+								setTimeout(function(){
+									$('#ui-datepicker-div').css({
+										top: self.offset().top + document.body.scrollTop + 30
+									});
+									$('#ui-datepicker-div').show();
+								}, 0);
+							}
+						});
 					});
 				}";
 				

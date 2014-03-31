@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-14, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.13
+ * @version 1.20.14
  */
 class form
 {
@@ -7111,6 +7111,7 @@ class form
 				# BLOB
 				case (strtolower ($type) == 'blob'):
 				case (strtolower ($type) == 'mediumtext'):
+				case (strtolower ($type) == 'longtext'):
 				case (strtolower ($type) == 'text'):
 					$this->textarea ($standardAttributes + array (
 						// 'cols' => 50,

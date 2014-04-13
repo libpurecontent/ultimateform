@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-14, Martin Lucas-Smith, University of Cambridge
- * @version 1.20.15
+ * @version 1.20.16
  */
 class form
 {
@@ -1820,7 +1820,7 @@ class form
 		
 		# Do a sanity-check to check that a non-editable field can succeed
 		#!# Apply to all cases?
-		if (!$arguments['editable'] && $arguments['required'] && !$arguments['default']) {
+		if (!$arguments['editable'] && $arguments['required'] && !strlen ($arguments['default'])) {
 			$this->formSetupErrors['defaultTooMany'] = "In the <strong>{$arguments['name']}</strong> element, you cannot set a non-editable field to be required but have no initial value.";
 		}
 		

@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-14, Martin Lucas-Smith, University of Cambridge
- * @version 1.21.0
+ * @version 1.21.1
  */
 class form
 {
@@ -1012,6 +1012,7 @@ class form
 							['Cut','Copy','Paste','PasteText','PasteWord','-',],
 							['Undo','Redo','-','Find','Replace','-','SelectAll'],
 							['Scayt'],
+							['Maximize'],
 							['About'],
 							'/',
 							['BulletedList','NumberedList','-','Outdent','Indent','Blockquote'],
@@ -3501,7 +3502,7 @@ class form
 		if ($options) {
 			foreach ($options as $key => $value) {
 				switch (true) {
-					case preg_match ('/^function ?\(/', $value):
+					case preg_match ('/^function ?\(/', trim ($value)):
 						$valueFormatted = $value;
 						break;
 					case is_bool ($value):
@@ -7020,6 +7021,7 @@ class form
 			$forceType = false;
 			
 			# Add intelligence rules if required
+			#!# Bug: $int1ToCheckbox should avoid modifications but currently an int like mailToAdmin INT(1) is wrongly getting converted
 			if ($intelligence) {
 				
 				# Fields with 'email' in become e-mail fields

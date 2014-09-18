@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-14, Martin Lucas-Smith, University of Cambridge
- * @version 1.21.2
+ * @version 1.21.3
  */
 class form
 {
@@ -188,6 +188,7 @@ class form
 		'richtextEditorBasePath'			=> '/_ckeditor/',					# Global default setting for of the editor files
 		'richtextEditorToolbarSet'			=> 'pureContent',					# Global default setting for richtext editor toolbar set
 		'richtextEditorAreaCSS'				=> '',								# Global default setting for richtext editor CSS
+		'richtextEditorConfig.docType'		=> '<!DOCTYPE html>',				# Global default setting for richtext editor config.docType
 		'richtextWidth'						=> '100%',							# Global default setting for richtext width; assumed to be px unless % specified
 		'richtextHeight'					=> 400,								# Global default setting for richtext height; assumed to be px unless % specified
 		'richtextEditorFileBrowser'			=> '/_ckfinder/',					# Global default setting for richtext file browser path (must have trailing slash), or false to disable
@@ -927,6 +928,7 @@ class form
 			'config.protectedSource'			=> "[ '/<\?[\s\S]*?\?>/g' ]",					// Protect PHP code
 			'config.disableNativeSpellChecker'	=> false,								// Disables the built-in spell checker if the browser provides one
 			'config.allowedContent'				=> true,										// http://docs.ckeditor.com/#!/api/CKEDITOR.config-cfg-allowedContent
+			'config.docType'					=> $this->settings['richtextEditorConfig.docType'],	// http://docs.ckeditor.com/#!/api/CKEDITOR.config-cfg-docType
 			'allowCurlyQuotes'		=> false,
 			'protectEmailAddresses'	=> true,	// Whether to obfuscate e-mail addresses
 			'externalLinksTarget'	=> '_blank',	// The window target name which will be instanted for external links or false
@@ -1024,9 +1026,8 @@ class form
 							['Image'],
 							'/',
 							['Format'],
-							['Bold','Italic','Strike'],
-							['Styles'],
-							['RemoveFormat']
+							['Bold','Italic','Strike','RemoveFormat'],
+							['Styles']
 						]
 					",
 					
@@ -1120,7 +1121,7 @@ class form
 						}
 						$editorConfig[$editorConfigKey] .= '[' . implode (', ', $argumentValue) . ']';
 					} else {
-						$editorConfig[$editorConfigKey] .= '"' . $argumentValue . '"';	// Appears as quoted string
+						$editorConfig[$editorConfigKey] .= '"' . str_replace ('"', '\\"', $argumentValue) . '"';	// Appears as quoted string
 					}
 				}
 			}
@@ -6611,6 +6612,20 @@ class form
 				
 				# Overwrite the filename if being forced; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
+					
+					# If the forced filename is prefixed with a %, look for a field of that name, and use its value (e.g. '%id' will use a forcedFileName that is the value of the submitted 'id' element)
+					#!# Currently this doesn't check whether %id is sensible, in terms of a missing/non-required/array-type field (and ideally with a suitable regexp)
+					if (preg_match ('/^%(.+)$/', $arguments['forcedFileName'], $matches)) {
+						$matchField = $matches[1];
+						if (isSet ($this->elements[$matchField])) {
+							if (is_string ($this->form[$matchField])) {		// #!# Support only at present for string types; there needs to be a standard way for elements to give a serialised string representation of their output
+								$forcedFilename = $this->form[$matchField];
+								$forcedFilename = str_replace (array ('/', '\\'), '_', $forcedFilename);	// Prevent any kind of directory traversal attacks
+								$arguments['forcedFileName'] = $forcedFilename;
+							}
+						}
+					}
+					
 					$attributes['name'] = $arguments['forcedFileName'] . $fileExtension;
 				}
 				
@@ -6851,7 +6866,7 @@ class form
 			'int1ToCheckbox' => false,	// Whether an INT/TINYINT/etc(1) field will be converted to a checkbox
 			'textAsVarchar' => false,	// Force a TEXT type to be a VARCHAR(255) instead
 			'lookupFunction' => false,
-			'simpleJoin' => false,	// Overrides lookupFunction, uses targetId as a join to <database>.target
+			'simpleJoin' => false,	// Overrides lookupFunction, uses targetId as a join to <database>.target; lookupFunctionParameters can still be used
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
 			'truncate' => 40,

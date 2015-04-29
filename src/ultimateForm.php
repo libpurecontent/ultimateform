@@ -56,8 +56,8 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-14, Martin Lucas-Smith, University of Cambridge
- * @version 1.21.4
+ * @copyright Copyright  2003-15, Martin Lucas-Smith, University of Cambridge
+ * @version 1.22.0
  */
 class form
 {
@@ -90,6 +90,7 @@ class form
 	var $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
+	var $antispamWait = 0;						// Time to wait in the event of spam attempt detection, in seconds
 	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
 	var $jQueryLibraries = array ();			// Array of jQuery client library loading HTML tags, if any, which are treated as plain HTML
 	var $jQueryCode = array ();					// Array of jQuery client code, if any, which will get wrapped in a script tag
@@ -202,6 +203,7 @@ class form
 		'passwordGeneratedLength'			=> 6,								# Length of a generated password
 		'antispam'							=> false,							# Global setting for anti-spam checking
 		'antispamRegexp'					=> '~(a href=|<a |<script|<url|\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
+		'antispamUrlsThreshold'				=> 5,								# Number of URLs in a textarea which will trigger an antispam check failure
 		'picker'							=> false,							# Whether to use the date picker by default when creating date widgets
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
@@ -310,6 +312,7 @@ class form
 			'tags'					=> false,	# Tags mode
 			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'displayedValue'		=> false,	# When using editable=false, optional text that should be displayed instead of the value; can be made into HTML using entities=false
+			'antispamWait'			=> false,	# Antispam wait in the event of any failure
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
@@ -572,6 +575,16 @@ class form
 			}
 		}
 		
+		# Check for element problems
+		$problems = $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false);
+		
+		# Add antispam wait if any failured occured
+		if ($arguments['antispamWait']) {
+			if ($problems) {
+				$this->antispamWait += $arguments['antispamWait'];
+			}
+		}
+		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => $functionName,
@@ -579,7 +592,7 @@ class form
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
 			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
-			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
+			'problems' => $problems,
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $widget->requiredButEmpty (),
 			'suitableAsEmailTarget' => ($functionName == 'email'),
@@ -4291,6 +4304,52 @@ class form
 	}
 	
 	
+	# Add in hidden anti-spam field if required; see: http://stackoverflow.com/questions/2387496/how-to-prevent-robots-from-automatically-filling-up-a-form
+	private function addAntiSpamHoneyPot ()
+	{
+		# End if not required
+		if (!$this->settings['antispam']) {return;}
+		
+		# Add the honeypot field; this is hidden with CSS but marked (for screen-readers) as not for changing; if a value is added, then it can be inferred that it is a non-human submission
+		$this->input (array (
+			'name'			=> '__token',
+			'title'			=> 'Our ref',
+			'editable'		=> true,	// Must be editable
+			'regexp'		=> '^$',	// Require empty
+			'discard'		=> true,	// Throw away in result
+			'append'		=> ' Please leave blank - anti-spam measure',
+			'antispamWait'	=> 5,
+		));
+		
+		# Add timestamp checking
+		$fieldname = '__timestamp';
+		$now = time ();
+		$this->hidden (array (
+			'name'			=> $fieldname,
+			'values'		=> array ('time' => $now),
+			'discard'		=> true,
+			'security'		=> false,
+		));
+		$secondsMinimum = 4;
+		if ($unfinalisedData = $this->getUnfinalisedData ()) {
+			if (isSet ($unfinalisedData[$fieldname]['time'])) {
+				$timestamp = $unfinalisedData[$fieldname]['time'];
+				$regexp = '^([0-9]{' . strlen ($now) . '})$';
+				if (preg_match ('/' . $regexp . '/', $timestamp, $matches)) {
+					$turnAroundTime = $now - $timestamp;
+					if ($turnAroundTime <= $secondsMinimum) {
+						$this->registerProblem ('tooquick', 'Please repost again in a few seconds.');
+						$this->antispamWait += 3;
+					}
+				}
+			}
+		}
+		
+		# Register CSS to hide the HTML
+		$this->html .= "\n" . '<style type="text/css">form tr.__token {display: none;}</style>';
+	}
+	
+	
 	# Function to validate built-in hidden security fields
 	function hiddenSecurityFieldSubmissionInvalid ()
 	{
@@ -4679,6 +4738,14 @@ class form
 	{
 		# Rearrange the element order if required
 		$this->rearrangeElementOrder ();
+		
+		# Add in hidden anti-spam field at the end, if required
+		$this->addAntiSpamHoneyPot ();
+		
+		# Perform wait if required
+		if ($this->antispamWait) {
+			sleep ($this->antispamWait);
+		}
 		
 		# Determine whether the HTML is shown directly
 		$showHtmlDirectly = ($html === NULL);
@@ -8218,10 +8285,21 @@ class formWidget
 	function antispamCheck ()
 	{
 		# Antispam checks
-		if ($this->arguments['antispam']) {
-			if (preg_match ($this->settings['antispamRegexp'], $this->value)) {
-				$this->elementProblems['failsAntispam'] = "The submitted information matched disallowed text for this section.";
-			}
+		if (!$this->arguments['antispam']) {return;}
+		
+		# Check for presence
+		if (preg_match ($this->settings['antispamRegexp'], $this->value)) {
+			$this->elementProblems['failsAntispamTextMatch'] = "The submitted information matched disallowed text for this section.";
+			$this->form->antispamWait += 3;
+			return;
+		}
+		
+		# Check for excessive numbers of links
+		$total = preg_match_all ('~(https?://)~', $this->value);
+		if ($total >= $this->settings['antispamUrlsThreshold']) {
+			$this->elementProblems['failsAntispamLinkCount'] = "The submitted information exceeded the number of links permitted for this section.";
+			$this->form->antispamWait += 3;
+			return;
 		}
 	}
 	

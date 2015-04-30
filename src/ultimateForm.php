@@ -57,7 +57,7 @@
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-15, Martin Lucas-Smith, University of Cambridge
- * @version 1.22.0
+ * @version See $version below
  */
 class form
 {
@@ -114,6 +114,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
+	var $version = '1.22.1';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -204,6 +205,8 @@ class form
 		'antispam'							=> false,							# Global setting for anti-spam checking
 		'antispamRegexp'					=> '~(a href=|<a |<script|<url|\[link|\[url|Content-Type:)~DsiU',	# Regexp for antispam, in preg_match format
 		'antispamUrlsThreshold'				=> 5,								# Number of URLs in a textarea which will trigger an antispam check failure
+		'akismetApiKey'						=> false,							# Akismet developer API key, available from https://akismet.com/development/api/
+		'applicationName'					=> false,							# Application name
 		'picker'							=> false,							# Whether to use the date picker by default when creating date widgets
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
@@ -4350,6 +4353,101 @@ class form
 	}
 	
 	
+	# Function to perform Akismet anti-spam checking
+	private function akismetChecking ()
+	{
+		# End if not required
+		if (!$this->settings['antispam']) {return NULL;}
+		
+		# End if no API key specified
+		if (!$this->settings['akismetApiKey']) {return NULL;}
+		
+		# Set the user agent, as requested at https://akismet.com/development/api/#detailed-docs
+		$userAgent = ($this->settings['applicationName'] ? $this->settings['applicationName'] . ' ' : '') . 'ultimateForm/' . $this->version;
+		
+		# Validate API key
+		$siteUrl = $_SERVER['_SITE_URL'] . '/';
+		$postData = array (
+			'key'	=> $this->settings['akismetApiKey'],
+			'blog'	=> $siteUrl,
+		);
+		$output = application::file_post_contents ('https://rest.akismet.com/1.1/verify-key', $postData, false, $error, $userAgent);
+		if ($output != 'valid') {
+			$this->formSetupErrors['akismetKeyInvalid'] = 'The antispam checking API key is not valid.';
+			return NULL;
+		}
+		
+		# End if form not posted
+		if (!$this->formPosted) {return NULL;}
+		
+		# Assemble submission for testing; see: https://akismet.com/development/api/#comment-check
+		$postData = array (
+			'blog'					=> $siteUrl,
+			'user_ip'				=> $_SERVER['REMOTE_ADDR'],
+			'user_agent'			=> $_SERVER['HTTP_USER_AGENT'],
+			'referrer'				=> $_SERVER['HTTP_REFERER'],
+			'permalink'				=> $_SERVER['_PAGE_URL'],
+			'comment_type'			=> 'contact-form',		// http://blog.akismet.com/2012/06/19/pro-tip-tell-us-your-comment_type/
+			'blog_lang'				=> 'en',
+			'blog_charset'			=> 'UTF-8',
+		);
+		
+		
+		# Determine comment content value, by concatenating all textarea values, ending if none
+		$postData['comment_content'] = '';
+		foreach ($this->elements as $field => $elementAttributes) {
+			if ($elementAttributes['type'] == 'textarea') {
+				$postData['comment_content'] .= $elementAttributes['data']['presented'];
+			}
+		}
+		if (!strlen ($postData['comment_content'])) {return NULL;}
+		
+		# Determine author e-mail value, by looking for a first e-mail field
+		foreach ($this->elements as $field => $elementAttributes) {
+			if ($elementAttributes['type'] == 'email') {
+				if (strlen ($elementAttributes['data']['presented'])) {
+					$postData['comment_author_email'] = $elementAttributes['data']['presented'];
+					break;
+				}
+			}
+		}
+		
+		# Determine author name value, by looking for a field called name
+		#!# Fieldname should be configurable
+		foreach ($this->elements as $field => $elementAttributes) {
+			if ($field == 'name') {
+				if (strlen ($elementAttributes['data']['presented'])) {
+					$postData['comment_author'] = $elementAttributes['data']['presented'];		// Send official value 'viagra-test-123' to force true result
+					break;
+				}
+			}
+		}
+		
+		# Determine URL value, by looking for a first URL field
+		foreach ($this->elements as $field => $elementAttributes) {
+			if ($elementAttributes['type'] == 'url') {
+				if (strlen ($elementAttributes['data']['presented'])) {
+					$postData['comment_author_url'] = $elementAttributes['data']['presented'];
+					break;
+				}
+			}
+		}
+		
+		# Submit for testing
+		$output = application::file_post_contents ("https://{$this->settings['akismetApiKey']}.rest.akismet.com/1.1/comment-check", $postData, false, $error, $userAgent);
+		$isSpam = ($output == 'true');
+		
+		# If spam, register problem
+		if ($isSpam) {
+			$this->registerProblem ('apparentlyspam', 'Your message was detected as possible spam. If this is not the case, please accept our apologies and contact us directly.');
+			$this->antispamWait += 3;
+		}
+		
+		# Return whether it is spam
+		return $isSpam;
+	}
+	
+	
 	# Function to validate built-in hidden security fields
 	function hiddenSecurityFieldSubmissionInvalid ()
 	{
@@ -4741,6 +4839,9 @@ class form
 		
 		# Add in hidden anti-spam field at the end, if required
 		$this->addAntiSpamHoneyPot ();
+		
+		# Do Askismet checking if required
+		$this->akismetChecking ();
 		
 		# Perform wait if required
 		if ($this->antispamWait) {

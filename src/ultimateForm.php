@@ -114,7 +114,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.22.1';
+	var $version = '1.22.2';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -452,7 +452,7 @@ class form
 		$widget->uniquenessCheck ();
 		
 		# Add autocomplete functionality if required
-		$widget->autocomplete ($arguments);
+		$widget->autocomplete ($arguments, ($arguments['expandable'] ? $subwidgets : false));
 		
 		# Add tags functionality if required
 		$widget->tags ();

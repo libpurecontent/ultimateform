@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.23.0';
+	var $version = '1.23.1';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -1148,6 +1148,18 @@ class form
 							['Bold','Italic'],
 							['BulletedList','NumberedList'],
 							['Link','Unlink'],
+							['About']
+						]
+					",
+					
+					# Basic, plus image
+					'BasicImage' => "
+						[
+							['Source'],
+							['Bold','Italic'],
+							['BulletedList','NumberedList'],
+							['Link','Unlink'],
+							['Image'],
 							['About']
 						]
 					",
@@ -5966,6 +5978,7 @@ class form
 			'all'		=> 'The values for all of the sections %fields must be completed if one of them is.',
 			'master'	=> 'The value for the field %fields must be completed if any of the other %parameter fields are completed.',
 			'total'		=> 'In the sections %fields, the total number of items selected must be exactly %parameter.',
+			'details'	=> 'In the sections %fields, no details were submitted.',
 		);
 		
 		# Loop through each registered rule to check for setup problems (but do not perform the validations themselves)
@@ -6070,7 +6083,7 @@ class form
 			}
 			
 			# Check the rule
-			#!# Ideally refactor to avoid the same list of cases specified as $this->validationTypes
+			#!# Ideally refactor to avoid duplicating the same list of cases specified as $this->validationTypes
 			$validationFailed = false;
 			if (
 				   ( ($rule['type'] == 'different') && ($nonEmptyValues) && (count ($nonEmptyValues) != count (array_unique ($nonEmptyValues))) )
@@ -6079,18 +6092,23 @@ class form
 				|| ( ($rule['type'] == 'all')       && $nonEmptyValues && $emptyValues )
 				|| ( ($rule['type'] == 'total')     && ($total != $rule['parameter']) )
 				|| ( ($rule['type'] == 'master')    && $nonEmptyValues && array_key_exists ($firstField, $emptyValues) )
+				|| ( ($rule['type'] == 'details')   && $nonEmptyValues && $this->elements[$rule['fields'][0]]['data']['presented'] == 'Yes' && !strlen ($this->elements[$rule['fields'][1]]['data']['presented']) )
 			) {
 				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace (array ('%fields', '%parameter'), array ($this->_fieldListString ($rule['fields']), $rule['parameter']), $this->validationTypes[$rule['type']]);
 				$validationFailed = true;
 			}
 			
 			# Highlight empty fields if validation failed
-			#!# Currently only implemented for 'all' - this must have all highlighted (others are more selective)
+			#!# Currently only implemented for 'all'/'details' - this must have all highlighted (others are more selective)
 			if ($validationFailed) {
 				if ($rule['type'] == 'all') {
 					foreach (array_keys ($emptyValues) as $emptyField) {
 						$this->elements[$emptyField]['requiredButEmpty'] = true;
 					}
+				}
+				if ($rule['type'] == 'details') {
+					$emptyField = $rule['fields'][1];
+					$this->elements[$emptyField]['requiredButEmpty'] = true;
 				}
 			}
 		}
@@ -7445,6 +7463,15 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				$timestampFieldnames = array ('createdAt', 'createdOn', 'updatedAt', 'updatedOn');
 				if (in_array ($fieldName, $timestampFieldnames)) {
 					continue;	// Skip widget creation
+				}
+				
+				# Select fields containing Yes/No, with a subsequent field with 'Details' appended to the name, should trigger a 'details' validation rule
+				if (is_array ($fieldAttributes['_values']) && in_array ('Yes', $fieldAttributes['_values']) && in_array ('No', $fieldAttributes['_values'])) {
+					$detailsField = $fieldName . 'Details';		// e.g. foo and fooDetails
+					#!# Ideally this would also check that the details field was the next field, rather than just existing
+					if (isSet ($fields[$detailsField])) {
+						$this->validation ('details', array ($fieldName, $detailsField));
+					}
 				}
 			}
 			

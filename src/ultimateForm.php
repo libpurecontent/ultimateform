@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.23.1';
+	var $version = '1.23.2';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -6588,7 +6588,7 @@ class form
 		}
 		
 		# Construct the introductory text, including the IP address for the e-mail type
-		$introductoryText = ($outputType == 'confirmationEmail' ? $this->settings['confirmationEmailIntroductoryText'] . ($this->settings['confirmationEmailIntroductoryText'] ? "\n\n\n" : '') : $this->settings['emailIntroductoryText'] . ($this->settings['emailIntroductoryText'] ? "\n\n\n" : '')) . ($outputType == 'email' ? 'Below is a submission from the form' :  'Below is a confirmation of (apparently) your submission from the form') . " at \n" . $_SERVER['_PAGE_URL'] . "\nmade at " . date ('g:ia, jS F Y') . ($this->settings['ip'] ? ', from the IP address ' . $_SERVER['REMOTE_ADDR'] : '') . ($this->settings['browser'] ? (empty ($_SERVER['HTTP_USER_AGENT']) ? '; no browser type information was supplied.' : ', using the browser "' . $_SERVER['HTTP_USER_AGENT']) . '"' : '') . '.';
+		$introductoryText = ($outputType == 'confirmationEmail' ? $this->settings['confirmationEmailIntroductoryText'] . ($this->settings['confirmationEmailIntroductoryText'] ? "\n\n\n" : '') : $this->settings['emailIntroductoryText'] . ($this->settings['emailIntroductoryText'] ? "\n\n\n" : '')) . ($outputType == 'email' ? 'Below is a submission from the form' :  'Below is a confirmation of' . ($this->settings['user'] ? '' : ' (apparently)') . ' your submission from the form') . " at \n" . $_SERVER['_PAGE_URL'] . "\nmade at " . date ('g:ia, jS F Y') . ($this->settings['ip'] ? ', from the IP address ' . $_SERVER['REMOTE_ADDR'] : '') . ($this->settings['browser'] ? (empty ($_SERVER['HTTP_USER_AGENT']) ? '; no browser type information was supplied.' : ', using the browser "' . $_SERVER['HTTP_USER_AGENT']) . '"' : '') . '.';
 		
 		# Add an abuse notice if required
 		if (($outputType == 'confirmationEmail') && ($this->configureResultConfirmationEmailAbuseNotice)) {$introductoryText .= "\n\n(If it was not you who submitted the form, please report it as abuse to " . $this->configureResultConfirmationEmailAdministrator . ' .)';}

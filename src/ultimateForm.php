@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.23.2';
+	var $version = '1.23.3';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -209,8 +209,10 @@ class form
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
 		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
 		'jQuery'							=> true,							# If using DHTML features, where to load jQuery from (true = default, or false if already loaded elsewhere on the page)
+		'jQueryUi'							=> true,							# If using DHTML features, where to load jQueryUi from (currently only true/false are supported)
 		'scripts'							=> false,							# Where to load GitHub files from; false = use default, string = library files in this URL/path location
 		'autofocus'							=> false,							# Place HTML5 autofocus on the first widget (true/false)
+		'reorderableRows'				=> false,							# Whether to enable drag-and-drop reorderability of rows
 		'errorsCssClass'					=> 'error'							# CSS class for div of errors box
 	);
 	
@@ -3618,10 +3620,12 @@ class form
 	{
 		# Add the libraries, ensuring that the loading respects the protocol type (HTTP/HTTPS) of the current page, to avoid mixed content warnings
 		# Need to keep this in sync with a compatible jQuery version
-		$this->jQueryLibraries['jQueryUI'] = '
-			<link href="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
-			<script src="' . $_SERVER['_SERVER_PROTOCOL_TYPE'] . '://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
-		';
+		if ($this->settings['jQueryUi']) {
+			$this->jQueryLibraries['jQueryUI'] = '
+				<script src="//code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
+				<link href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css" rel="stylesheet" type="text/css"/>
+			';
+		}
 	}
 	
 	
@@ -5503,6 +5507,50 @@ class form
 	}
 	
 	
+	# Function to define DHTML for drag-and-drop reorderable rows - see: http://www.avtex.com/blog/2015/01/27/drag-and-drop-sorting-of-table-rows-in-priority-order/
+	private function reorderableRows ($formId)
+	{
+		# Create the jQuery code
+		$this->jQueryCode[__FUNCTION__] = "
+			\$(document).ready(function() {
+
+				// Helper function to keep table row from collapsing when being sorted
+				var fixHelperModified = function(e, tr) {
+					var \$originals = tr.children();
+					var \$helper = tr.clone();
+					\$helper.children().each(function(index)
+					{
+						\$(this).width(\$originals.eq(index).width())
+					});
+					return \$helper;
+				};
+					
+				// Make table sortable
+				\$('#{$formId} table tbody').sortable({
+					helper: fixHelperModified,
+					stop: function(event,ui) {renumber_table('#{$formId}} table')}
+				});
+				
+				// Set pointer style
+				\$('#{$formId} table tr').css({'cursor':'move'});
+				\$('#{$formId} table tr:hover').css({'background-color':'#f7f7f7'});
+				
+				/*
+				// Delete button in table rows
+				\$('table').on('click','.btn-delete',function() {
+					tableID = '#' + \$(this).closest('table').attr('id');
+					r = confirm('Delete this item?');
+					if(r) {
+						\$(this).closest('tr').remove();
+						renumber_table(tableID);
+					}
+				});
+				*/
+			});
+		";
+	}
+	
+	
 	/**
 	 * Function actually to display the form
 	 * @access private
@@ -5525,10 +5573,19 @@ class form
 		
 		# Add unsaved data protection HTML if required, ensuring that an ID exists for the form tag
 		if ($this->settings['unsavedDataProtection']) {
+			#!# This needs to be handled more generically as this code is duplicated
 			if (!$this->settings['id']) {
 				$this->settings['id'] = 'ultimateForm';
 			}
 			$this->unsavedDataProtectionJs ($this->settings['id']);
+		}
+		
+		# Add drag-and-drop reorderability of rows if required
+		if ($this->settings['reorderableRows']) {
+			if (!$this->settings['id']) {
+				$this->settings['id'] = 'ultimateForm';
+			}
+			$html .= $this->reorderableRows ($this->settings['id']);
 		}
 		
 		# Load the jQuery library and client code if a widget/option has enabled its use and the setting for the source URL is specified

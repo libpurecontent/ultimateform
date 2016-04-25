@@ -53,7 +53,7 @@
  * @package ultimateForm
  * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-15, Martin Lucas-Smith, University of Cambridge
+ * @copyright Copyright  2003-16, Martin Lucas-Smith, University of Cambridge
  * @version See $version below
  */
 class form
@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.23.3';
+	var $version = '1.23.4';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -212,8 +212,10 @@ class form
 		'jQueryUi'							=> true,							# If using DHTML features, where to load jQueryUi from (currently only true/false are supported)
 		'scripts'							=> false,							# Where to load GitHub files from; false = use default, string = library files in this URL/path location
 		'autofocus'							=> false,							# Place HTML5 autofocus on the first widget (true/false)
-		'reorderableRows'				=> false,							# Whether to enable drag-and-drop reorderability of rows
-		'errorsCssClass'					=> 'error'							# CSS class for div of errors box
+		'reorderableRows'					=> false,							# Whether to enable drag-and-drop reorderability of rows
+		'errorsCssClass'					=> 'error',							# CSS class for div of errors box
+		'uploadThumbnailWidth'				=> 300,								# Default upload thumbnail box width
+		'uploadThumbnailHeight'				=> 300,								# Default upload thumbnail box height
 	);
 	
 	
@@ -3105,6 +3107,7 @@ class form
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'progressbar'			=> false,	# Whether to enable a progress bar (assumed to be in /uploader, or in specified subdirectory)
+			'thumbnail'				=> false,	# Enable HTML5 thumbnail preview; either true (to auto-create a container div), or jQuery-style selector, specifying an existing element
 		);
 		
 		# Create a new form widget
@@ -3306,6 +3309,110 @@ class form
 			# Create the HTML
 			$widgetHtml  = '<script type="text/javascript" src="' . $arguments['progressbar'] . '/SolmetraUploader.js"></script>';
 			$widgetHtml .= $solmetraUploader->getInstance ($arguments['name']);
+		}
+		
+		# If thumbnail viewing is enabled, parse the argument and create the HTML5 code
+		if ($arguments['thumbnail']) {
+			if ($arguments['subfields'] == 1) {		// Currently only supported when single subfield due to callback problem below
+				$subfield = 0;
+				
+				# If set to boolean true, auto-create the div; otherwise the named selector will be used
+				$createDivJs = 'false';
+				$thumbnailDivId = false;
+				if ($arguments['thumbnail'] === true) {
+					$thumbnailDivId = 'thumbnailpreview';
+					$arguments['thumbnail'] = '#' . $thumbnailDivId;
+					$createDivJs = 'true';
+				}
+				
+				# Get the widget ID
+				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$subfield}]" : "{$arguments['name']}_{$subfield}");
+				
+				# Enable jQuery
+				#!# Actually this is currently enabling jQuery as well as jQueryUI
+				$this->enableJqueryUi ();
+				
+				# Add the Javascript
+				#!# Need to find a way to pass $arguments['thumbnail'] into the callback in the Javascript, so that multiple subfields are possible
+				$this->jQueryCode[__FUNCTION__] = "\n" . "
+				$(document).ready(function() {
+					
+					if ({$createDivJs}) {
+						$('<div />', {id: '{$thumbnailDivId}', width: '{$this->settings['uploadThumbnailWidth']}px', height: '{$this->settings['uploadThumbnailHeight']}px'}).insertAfter( $('#{$elementId}') );
+						$('{$arguments['thumbnail']}').html( '<p class=\"comment\">(Thumbnail willl appear here.)</p>' );
+					}
+					
+					$('#{$elementId}').change(function() {
+						thumb(this.files);
+					});
+					
+					function thumb(files) {
+						
+						if (files == null || files == undefined) {
+							$('{$arguments['thumbnail']}').html( '<p><em>Unable to show a thumbnail, as this web browser is too old to support this.</em></p>' );
+							return false;
+						}
+						
+						for (var i = 0; i < files.length; i++) {
+							var file = files[i];
+							var imageType = /image.*/;
+							
+							if (!file.type.match(imageType)) {
+								continue;
+							}
+							
+							var reader = new FileReader();
+							
+							if (reader != null) {
+								reader.onload = GetThumbnail;
+								reader.readAsDataURL(file);
+							}
+						}
+					}
+					
+					function GetThumbnail(e) {
+						
+						var thumbnailCanvas = document.createElement('canvas');
+						var img = new Image();
+						img.src = e.target.result;
+						
+						img.onload = function () {
+							
+							var originalImageWidth = img.width;
+							var originalImageHeight = img.height;
+							
+							thumbnailCanvas.id = 'myTempCanvas';
+							thumbnailCanvas.width  = $('{$arguments['thumbnail']}').width();
+							thumbnailCanvas.height = $('{$arguments['thumbnail']}').height();
+							
+							// Scale the thumbnail to fit the box
+							if (originalImageWidth >= originalImageHeight) {
+								scaledWidth = Math.min(thumbnailCanvas.width, originalImageWidth);	// Ensure width is no greater than the available size
+								scaleFactor = (scaledWidth / originalImageWidth);
+								scaledHeight = Math.round(scaleFactor * originalImageHeight);	// Scale to same proportion, and round
+							} else {
+								scaledHeight = Math.min(thumbnailCanvas.height, originalImageHeight);
+								scaleFactor = (scaledHeight / originalImageHeight);
+								scaledWidth = Math.round(scaleFactor * originalImageWidth);
+							}
+							
+							if (thumbnailCanvas.getContext) {
+								var canvasContext = thumbnailCanvas.getContext('2d');
+								canvasContext.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+								var dataURL = thumbnailCanvas.toDataURL();
+								
+								if (dataURL != null && dataURL != undefined) {
+									var nImg = document.createElement('img');
+									nImg.src = dataURL;
+									$('{$arguments['thumbnail']}').html(nImg);
+								} else {
+									$('{$arguments['thumbnail']}').html( '<p><em>Unable to read the image.</em></p>' );
+								}
+							}
+						}
+					}
+				});";
+			}
 		}
 		
 		# Loop through the number of fields required to perform checks

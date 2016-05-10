@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.23.4';
+	var $version = '1.23.5';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -1478,6 +1478,10 @@ class form
 				'fix-backslash'	=> false,
 				'force-output'	=> true,
 				'bare'	=> true,	// Note: this replaces &ndash; and &mdash; hence they are cached above
+				# HTML5 support; see: http://stackoverflow.com/questions/11746455/php-tidy-removes-valid-tags
+				'new-blocklevel-tags' => 'article aside audio bdi canvas details dialog figcaption figure footer header hgroup main menu menuitem nav section source summary template track video',
+				'new-empty-tags' => 'command embed keygen source track wbr',
+				'new-inline-tags' => 'audio command datalist embed keygen mark menuitem meter output progress source time video wbr',
 			);
 			
 			# Tidy up the output; see http://www.zend.com/php5/articles/php5-tidy.php for a tutorial
@@ -8660,9 +8664,9 @@ class formWidget
 		
 		# Find clashes
 		if ($caseSensitiveComparison) {
-			$clash = in_array ($this->value, $this->arguments['current']);
+			$clash = (strlen ($this->value) && in_array ($this->value, $this->arguments['current']));
 		} else {
-			$clash = application::iin_array ($this->value, $this->arguments['current']);
+			$clash = (strlen ($this->value) && application::iin_array ($this->value, $this->arguments['current']));
 		}
 		
 		# Throw user error if any clashes

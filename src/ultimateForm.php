@@ -51,7 +51,7 @@
  * </code>
  * 
  * @package ultimateForm
- * @license	http://opensource.org/licenses/gpl-license.php GNU Public License
+ * @license	https://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
  * @copyright Copyright  2003-16, Martin Lucas-Smith, University of Cambridge
  * @version See $version below
@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.23.5';
+	var $version = '1.24.0';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -142,6 +142,7 @@ class form
 		'submitButtonPosition'				=> 'end',							# Whether the submit button appears at the end or the start/end/both of the form
 		'submitButtonText'					=> 'Submit!',						# The form submit button text
 		'submitButtonAccesskey'				=> 's',								# The form submit button accesskey
+		'submitButtonAccesskeyString'		=> false,							# Whether to show the accesskey string in the submit button
 		'submitButtonTabindex'				=> false,							# The form submit button tabindex (if any)
 		'submitButtonImage'					=> false,							# Location of an image to replace the form submit button
 		'refreshButton'						=> false,							# Whether to include a refresh button (i.e. submit form to redisplay but not process)
@@ -295,6 +296,10 @@ class form
 			'size'					=> $this->settings['size'],		# Visible size (optional; defaults to 30)
 			'minlength'				=> '',		# Minimum length (optional; defaults to no limit)
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
+			// 'min'	 	- implemented below
+			// 'max'	 	- implemented below
+			// 'step'	 	- implemented below
+			// 'roundFloat'	- implemented below; Whether to auto-round a float to the specified number of digits after a decimal point; e.g. 3 would change 0.4567 to 0.457
 			'placeholder'			=> '',		# HTML5 placeholder text
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> '',		# Default value (optional)
@@ -317,6 +322,7 @@ class form
 			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'displayedValue'		=> false,	# When using editable=false, optional text that should be displayed instead of the value; can be made into HTML using entities=false
 			'antispamWait'			=> false,	# Antispam wait in the event of any failure
+			'_cssHide--DONOTUSETHISFLAGEXTERNALLY'		=> false,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
@@ -345,6 +351,7 @@ class form
 			$argumentDefaults['min'] = false;
 			$argumentDefaults['max'] = false;
 			$argumentDefaults['step'] = false;
+			$argumentDefaults['roundFloat'] = false;
 		}
 		
 		# If an element is expandable, if it is boolean true, convert to default string
@@ -423,6 +430,14 @@ class form
 			}
 		} else {
 			$value = (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : '');
+		}
+		
+		# Auto-round floats if required
+		#!# No support yet for expandable
+		if (isSet ($arguments['roundFloat'])) {
+			if ($value != '') {
+				$value = round ($value, 6);
+			}
 		}
 		
 		# Set the value
@@ -512,7 +527,8 @@ class form
 					$subwidgetName = $arguments['name'] . "_{$subwidget}";
 					$subwidgetElementValue = (isSet ($values[$subwidget]) ? $values[$subwidget] : '');
 					$hasAutofocus = ($arguments['autofocus'] === false ? false : (($subwidget + 1) == $arguments['autofocus']));	// $arguments['autofocus'] will be either false or numeric 1...$subwidgets
-					$subwidgetsHtml[$subwidget] = '<input' . $this->nameIdHtml ($subwidgetName) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? " step=\"{$arguments['step']}\"" : '') . ($hasAutofocus ? ' autofocus="autofocus"' : '') . ($arguments['multiple'] ? ' multiple="multiple"' : '') . " value=\"" . htmlspecialchars ($subwidgetElementValue) . '"' . $widget->tabindexHtml () . ' />';
+					#!# Step formatting can end up with exponent if set to 0.00001 or lower; casting as (string) has no effect
+					$subwidgetsHtml[$subwidget] = '<input' . $this->nameIdHtml ($subwidgetName) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? ' step="' . $arguments['step'] . '"' : '') . ($hasAutofocus ? ' autofocus="autofocus"' : '') . ($arguments['multiple'] ? ' multiple="multiple"' : '') . " value=\"" . htmlspecialchars ($subwidgetElementValue) . '"' . $widget->tabindexHtml () . ' />';
 					if ($hasAutofocus) {
 						$arguments['autofocus'] = false;	// Ensure only one subwidget has autofocus
 						$this->clearAnyOtherAutofocus ();
@@ -527,7 +543,7 @@ class form
 				}
 				
 			} else {
-				$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? " step=\"{$arguments['step']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['multiple'] ? ' multiple="multiple"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
+				$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? ' step="' . $arguments['step'] . '"' : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['multiple'] ? ' multiple="multiple"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
 			}
 		} else {
 			$displayedValue = ($arguments['displayedValue'] ? $arguments['displayedValue'] : $this->form[$arguments['name']]);
@@ -607,6 +623,7 @@ class form
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR(' . ($arguments['maxlength'] ? $arguments['maxlength'] : '255') . ')') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => ($functionName == 'password' ? 'compiled' : false),
 			'after' => $arguments['after'],
+			'_cssHide--DONOTUSETHISFLAGEXTERNALLY' => $arguments['_cssHide--DONOTUSETHISFLAGEXTERNALLY'],
 		);
 		
 		#!# Temporary hacking to add hidden widgets when using the _hidden type in dataBinding
@@ -5764,6 +5781,10 @@ class form
 			# Select whether to show restriction guidelines
 			$displayRestriction = ($this->settings['displayRestrictions'] && $elementAttributes['restriction']);
 			
+			# Determine whether to hide using CSS; this is intermediate code due to be refactored
+			#!# No support yet for templating
+			$cssHide = (isSet ($elementAttributes['_cssHide--DONOTUSETHISFLAGEXTERNALLY']) && $elementAttributes['_cssHide--DONOTUSETHISFLAGEXTERNALLY']);
+			
 			# Clean the ID
 			#!# Move this into the element attributes set at a per-element level, for consistency so that <label> is correct
 			$id = $this->cleanId ($name);
@@ -5776,7 +5797,7 @@ class form
 					if ($elementAttributes['type'] == 'heading') {
 						$formHtml .= "\n" . $elementAttributes['html'];
 					} else {
-						$formHtml .= "\n" . '<p class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '"' . '>';
+						$formHtml .= "\n" . '<p class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '"' . ($cssHide ? ' style="display: none;"' : '') . '>';
 						$formHtml .= "\n\t";
 						if ($this->settings['displayTitles']) {
 							$formHtml .= $elementAttributes['title'] . '<br />';
@@ -5791,7 +5812,7 @@ class form
 					
 				# Display using divs for CSS layout mode; this is different to paragraphs as the form fields are not conceptually paragraphs
 				case 'css':
-					$formHtml .= "\n" . '<div class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '" id="' . $id . '">';
+					$formHtml .= "\n" . '<div class="row ' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '" id="' . $id . '"' . ($cssHide ? ' style="display: none;"' : '') . '>';
 					if ($elementAttributes['type'] == 'heading') {
 						$formHtml .= "\n\t<span class=\"title\">" . $elementAttributes['html'] . '</span>';
 					} else {
@@ -5809,16 +5830,18 @@ class form
 						$formHtml .= "\n\t<span class=\"data\">" . $elementAttributes['html'] . '</span>';
 						if ($displayDescriptions) {if ($elementAttributes['description']) {$formHtml .= "\n\t<span class=\"description\">" . $elementAttributes['description'] . '</span>';}}
 					}
-						$formHtml .= "\n</div>";
+					$formHtml .= "\n</div>";
 					break;
 					
 				# Templating - perform each replacement on a per-element basis
 				case 'template':
 					$standardScalarElementReplacement = (isSet ($this->displayTemplateElementReplacements[$name]['widget']));
 					if ($standardScalarElementReplacement) {
+						if ($cssHide) {$elementAttributes['html'] = '<span style="display: none;">'  . $elementAttributes['html'] . '</span>';}
 						$this->displayTemplateContents = str_replace ($this->displayTemplateElementReplacements[$name] /* i.e. array(widget=>..,label=>...) */, array ($elementAttributes['html'], $elementAttributes['title']), $this->displayTemplateContents);
 					} else {
 						foreach ($this->displayTemplateElementReplacements[$name] as $subelement => $replacements) {
+							if ($cssHide) {$elementAttributes['subelementsWidgetHtml'][$subelement] = '<span style="display: none;">'  . $elementAttributes['subelementsWidgetHtml'][$subelement] . '</span>';}
 							$this->displayTemplateContents = str_replace ($replacements['widget'], $elementAttributes['subelementsWidgetHtml'][$subelement], $this->displayTemplateContents);
 						}
 					}
@@ -5828,7 +5851,7 @@ class form
 				# Tables
 				case 'tables':
 				default:
-					$formHtml .= "\n\t" . '<tr class="' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '">';
+					$formHtml .= "\n\t" . '<tr class="' . $id . ($this->settings['classShowType'] ? " {$elementAttributes['type']}" : '') . ($elementIsRequired ? " {$this->settings['requiredFieldClass']}" : '') . '"' . ($cssHide ? ' style="display: none;"' : '') . '>';
 					if ($elementAttributes['type'] == 'heading') {
 						# Start by determining the number of columns which will be needed for headings involving a colspan
 						$colspan = 1 + ($this->settings['displayTitles']) + ($displayDescriptions);
@@ -5855,8 +5878,9 @@ class form
 		
 		# Add the form button, either at the start or end as required
 		#!# submit_x and submit_y should be treated as a reserved word when using submitButtonAccesskey (i.e. generating type="image")
+		#!# Accesskey string needs to detect the user's platform and browser type, as Shift+Alt is not always correct, and on a Mac does not exist
 		if (!$this->formDisabled) {
-			$submitButtonText = $this->settings['submitButtonText'] . (!empty ($this->settings['submitButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
+			$submitButtonText = $this->settings['submitButtonText'] . ((!empty ($this->settings['submitButtonAccesskey']) && $this->settings['submitButtonAccesskeyString']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
 			$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="button' . (isSet ($this->multipleSubmitReturnHandlerClass) ? " {$this->multipleSubmitReturnHandlerClass}" : '') . '" />';
 			if ($this->settings['refreshButton']) {
 				$refreshButtonText = $this->settings['refreshButtonText'] . (!empty ($this->settings['refreshButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['refreshButtonAccesskey'] . ']' : '');
@@ -6533,6 +6557,7 @@ class form
 		);
 		
 		# Copy types to avoid re-stating them
+		#!# This is weak code as it is liable to become inconsistent
 		$copyInputTypes = array ('url', 'tel', 'search', 'number', 'number', 'range', 'color');
 		foreach ($copyInputTypes as $copyInputType) {
 			$presentationDefaults[$copyInputType] = $presentationDefaults['input'];
@@ -7545,6 +7570,9 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 			# Assuming non-forcing of widget type
 			$forceType = false;
 			
+			# Assume no support for auto-rounding of floats
+			$roundFloat = false;
+			
 			# Add intelligence rules if required
 			#!# Bug: $int1ToCheckbox should avoid modifications but currently an int like mailToAdmin INT(1) is wrongly getting converted
 			if ($intelligence) {
@@ -7640,6 +7668,17 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					if (isSet ($fields[$detailsField])) {
 						$this->validation ('details', array ($fieldName, $detailsField));
 					}
+				}
+				
+				# Create a map if both latitude and longitude present
+				$mapFields = array ('latitude', 'longitude');
+				if (in_array ($fieldName, $mapFields) && (!array_diff ($mapFields, array_keys ($fields)))) {
+					$standardAttributes['enforceNumeric'] = true;
+					$standardAttributes['max'] = ($fieldName == 'latitude' ?  90 :  180);
+					$standardAttributes['min'] = ($fieldName == 'latitude' ? -90 : -180);
+					$roundFloat = true;
+					$standardAttributes['_cssHide--DONOTUSETHISFLAGEXTERNALLY'] = true;
+					// NB $floatAttributes below will force the decimal places to be correct, e.g. FLOAT(10,6) will give 6 decimal places, i.e. 10cm resolution; maxlength will also be set automatically
 				}
 			}
 			
@@ -7747,12 +7786,16 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 							'maxlength' => ((int) $matches[2] + 2),	// FLOAT(M,D) means "up to M digits in total, of which D digits may be after the decimal point", so maxlength is M + 1 (for the decimal point) + 1 (for a negative sign)
 							'regexp' => '^(-?)([0-9]{0,' . ($matches[2] - $matches[3]) . '})((\.)([0-9]{0,' . $matches[3] . '})$|$)',
 						);
+						if ($roundFloat) {
+							$floatAttributes['roundFloat'] = $matches[3];
+						}
 					} else {	// e.g. FLOAT or DOUBLE without any size specification
 						$floatAttributes = array (
 							'regexp' => '^(-?)([0-9]+)((\.)([0-9]+)$|$)',
 						);
 					}
-					$this->input ($standardAttributes + $floatAttributes);
+					$floatAttributes['step'] = 'any';
+					$this->number ($standardAttributes + $floatAttributes);
 					break;
 				
 				# CHAR/VARCHAR (character) field
@@ -7867,6 +7910,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 			}
 			
 			# If the field is unique, add a constraint
+			#!# Convert to prepared statements
 			if (strtolower ($fieldAttributes['Key']) == 'uni') {
 				if ($unfinalisedData = $this->getUnfinalisedData ()) {
 					if ($unfinalisedData[$fieldName]) {

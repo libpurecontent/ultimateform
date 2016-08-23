@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.24.0';
+	var $version = '1.24.1';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -960,6 +960,9 @@ class form
 				case 'lines':
 					# For the raw components version, split by the newline
 					$data['rawcomponents'] = explode ("\n", $this->form[$arguments['name']]);
+					foreach ($data['rawcomponents'] as $index => $line) {
+						$data['rawcomponents'][$index] = trim ($line);
+					}
 					break;
 					
 				default:
@@ -2410,7 +2413,9 @@ class form
 					}
 				}
 				if ($splittableString) {
-					$arguments['default'] = explode ($arguments['separator'], $arguments['default']);
+					$separator = str_replace ("\r\n", "\n", $arguments['separator']);
+					$default   = str_replace ("\r\n", "\n", $arguments['default']);
+					$arguments['default'] = explode ($separator, $default);
 				}
 			}
 		}
@@ -7670,6 +7675,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					}
 				}
 				
+/* Work-in-progress map integration code:
 				# Create a map if both latitude and longitude present
 				$mapFields = array ('latitude', 'longitude');
 				if (in_array ($fieldName, $mapFields) && (!array_diff ($mapFields, array_keys ($fields)))) {
@@ -7680,6 +7686,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					$standardAttributes['_cssHide--DONOTUSETHISFLAGEXTERNALLY'] = true;
 					// NB $floatAttributes below will force the decimal places to be correct, e.g. FLOAT(10,6) will give 6 decimal places, i.e. 10cm resolution; maxlength will also be set automatically
 				}
+*/
 			}
 			
 			# Add per-widget overloading if attributes supplied by the calling application
@@ -8250,6 +8257,7 @@ class formWidget
 		if (!$this->settings['autofocus']) {return false;}
 		
 		# End if this current widget is not editable, as that will never have autofocus
+		#!# Undefined index: editable
 		if (!$this->arguments['editable']) {return false;}
 		
 		# End if there is an editable, non-heading widget already defined

@@ -53,7 +53,7 @@
  * @package ultimateForm
  * @license	https://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-16, Martin Lucas-Smith, University of Cambridge
+ * @copyright Copyright  2003-17, Martin Lucas-Smith, University of Cambridge
  * @version See $version below
  */
 class form
@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.24.2';
+	var $version = '1.24.3';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -1014,6 +1014,7 @@ class form
 			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'disallow'				=> false,		# Regular expression against which the submission must not validate
+			'maxlength'				=> false,	# Maximum number of characters allowed, after HTML markup stripped
 			'current'				=> false,	# List of current values which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
@@ -1072,6 +1073,12 @@ class form
 		
 		# Perform uniqueness check
 		$widget->uniquenessCheck ();
+		
+		# Enable maxlength checking
+		$widget->checkMaxLength ($stripHtml = true);
+		if (is_numeric ($arguments['maxlength'])) {
+			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters';
+		}
 		
 		$elementValue = $widget->getValue ();
 		
@@ -1430,13 +1437,16 @@ class form
 			$data['presented'] = $elementValue;
 		}
 		
+		# Set restrictions
+		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
+		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
 			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
 			'title' => $arguments['title'],
 			'description' => $arguments['description'],
-			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
+			'restriction' => (isSet ($restrictions) && $arguments['editable'] ? $restrictions : false),
 			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
 			'required' => $arguments['required'],
 			'requiredButEmpty' => $requiredButEmpty,
@@ -1953,7 +1963,7 @@ class form
 			#!# Need to double-check that $arguments['default'] isn't being changed above this point [$arguments['default'] is deliberately used here because of the $identifier system above]
 			$presentableDefaults = array ();
 			foreach ($arguments['default'] as $argument) {
-				if (isSet ($arguments['values'][$argument])) {
+				if (array_key_exists ($argument, $arguments['values'])) {	// This is used rather than isSet ($arguments['values'][$argument]) because the visible value might be unset (hence NULL), resulting in the key not ending up in the eventual data
 					$presentableDefaults[$argument] = ($arguments['entities'] ? htmlspecialchars ($arguments['values'][$argument]) : $arguments['values'][$argument]);
 				}
 			}
@@ -8368,12 +8378,21 @@ class formWidget
 	
 	
 	# Function to check the maximum length of what is submitted
-	function checkMaxLength ()
+	function checkMaxLength ($stripHtml = false)
 	{
+		# Obtain the value, and strip HTML first if required
+		$value = $this->value;
+		if ($stripHtml) {
+			$value = strip_tags ($value);
+		}
+		
+		# Determine the string length
+		$length = strlen ($value);
+		
 		#!# Move the is_numeric check into the argument cleaning stage
 		if (is_numeric ($this->arguments['maxlength'])) {
-			if (strlen ($this->value) > $this->arguments['maxlength']) {
-				$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . strlen ($this->value) . '</strong>) than are allowed (<strong>' . $this->arguments['maxlength'] . '</strong>).';
+			if ($length > $this->arguments['maxlength']) {
+				$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . $length . '</strong>) than are allowed (<strong>' . $this->arguments['maxlength'] . '</strong>).';
 			}
 		}
 	}

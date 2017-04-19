@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.24.3';
+	var $version = '1.24.4';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -5726,6 +5726,7 @@ class form
 		if (($this->settings['display'] != 'template') && ($this->settings['requiredFieldIndicator'] === 'top')) {$html .= $requiredFieldIndicatorHtml;}
 		
 		# Add unsaved data protection HTML if required, ensuring that an ID exists for the form tag
+		#!# If there is more than one form on the page, unsavedDataProtection does not work, probably because window.onbeforeunload is being set twice
 		if ($this->settings['unsavedDataProtection']) {
 			#!# This needs to be handled more generically as this code is duplicated
 			if (!$this->settings['id']) {
@@ -7388,6 +7389,7 @@ class form
 			'enumRadiobuttonsInitialNullText' => array (),	// Whether an initial empty radiobutton should have a label, specified as an array of fieldname=>value
 			'int1ToCheckbox' => false,	// Whether an INT/TINYINT/etc(1) field will be converted to a checkbox
 			'textAsVarchar' => false,	// Force a TEXT type to be a VARCHAR(255) instead
+			'inputAsSearch' => false,	// Set input widgets to be search boxes instead; this is recommended for a multisearch-style interface
 			'lookupFunction' => false,
 			'simpleJoin' => false,	// Overrides lookupFunction, uses targetId as a join to <database>.target; lookupFunctionParameters can still be used
 			'lookupFunctionParameters' => array (),
@@ -7402,7 +7404,7 @@ class form
 			'floatChopTrailingZeros' => true,	// Whether to replace trailing zeros at the end of a value where there is a decimal point
 			'valuesNamesAutomatic'	=> false,	// For select/radiobuttons/checkboxes, whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
 			'autocomplete' => false,	// An autocomplete data endpoint URL; if %field is specified, it will be replaced with the fieldname
-			'autocompleteOptions' => false,	// Array of options that will be converted to a javascript array - see http://docs.jquery.com/UI/Autocomplete#options (this is the new plugin)
+			'autocompleteOptions' => false,	// Array of options that will be converted to a javascript array - see http://api.jqueryui.com/autocomplete/#options (this is the new plugin)
 			'editingUniquenessUniChecking' => true,	// Whether uniqueness checking for editing of a record when a UNI field is found in the database (should be set to false when doing a record clone)
 			'notNullFields' => array (),	// Array of elements (or single element as string) that should be treated as NOT NULL, even if the database structure says they are nullable
 			'notNullExceptFields' => array (),	// Assume all elements are treated as NOT NULL (even if the database structure says they are nullable), except for these specified elements (or single element as string)
@@ -7767,6 +7769,11 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					'truncate' => $truncate,
 				));
 				$skipWidgetCreation = true;
+			}
+			
+			# If the inputAsSearch option is on, convert standard text input field to search
+			if ($inputAsSearch && !$forceType && (strtolower ($fieldAttributes['Type']) == 'text')) {
+				$forceType = 'search';
 			}
 			
 			# If the textAsVarchar option is on, convert the type to VARCHAR(255)

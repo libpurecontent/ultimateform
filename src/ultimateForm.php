@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.24.4';
+	var $version = '1.24.5';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -168,7 +168,7 @@ class form
 		'opening'							=> false,							# Optional starting datetime as an SQL string
 		'closing'							=> false,							# Optional closing datetime as an SQL string
 		'validUsers'						=> false,							# Optional valid user(s) - if this is set, a user will be required. To set, specify string/array of valid user(s), or '*' to require any user
-		'user'								=> false,							# Explicitly-supplied username (if none specified, will check for REMOTE_USER being set
+		'user'								=> false,							# Explicitly-supplied username (if none specified, will check for REMOTE_USER being set)
 		'userKey'							=> false,							# Whether to log the username, as the key
 		'loggedUserUnique'					=> false,							# Run in user-uniqueness mode, making the key of any CSV the username and checking for resubmissions
 		'timestamping'						=> false,							# Add a timestamp to any CSV entry
@@ -2458,7 +2458,7 @@ class form
 		
 		# Check that the array of values is not empty
 		if (empty ($arguments['values'])) {
-			$this->formSetupErrors['checkboxesNoValues'] = 'No values have been set for the set of checkboxes.';
+			$this->formSetupErrors['checkboxesNoValues'] = 'No values have been set for the set of checkboxes for the <em>' . htmlspecialchars ($arguments['name']) . '</em> field.';
 			return false;
 		}
 		
@@ -2675,6 +2675,7 @@ class form
 	 * @param array $arguments Supplied arguments - see template
 	 */
 	#!# Need to add HTML5 equivalents
+	#!# Need to add support for 'current'
 	function datetime ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
@@ -7807,9 +7808,9 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					));
 					break;
 				
-				# FLOAT/DOUBLE (numeric with decimal point) field
-				case (preg_match ('/(float|double|double precision)\(([0-9]+),([0-9]+)\)/i', $type, $matches)):
-				case (preg_match ('/(float|double|double precision)$/i', $type, $matches)):
+				# FLOAT/DOUBLE (numeric with decimal point) / DECIMAL fields
+				case (preg_match ('/(float|decimal|double|double precision)\(([0-9]+),([0-9]+)\)/i', $type, $matches)):
+				case (preg_match ('/(float|decimal|double|double precision)$/i', $type, $matches)):
 					if ($floatChopTrailingZeros) {
 						if (substr_count ($standardAttributes['default'], '.')) {
 							$standardAttributes['default'] = preg_replace ('/0+$/', '', $standardAttributes['default']);
@@ -7965,6 +7966,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 	
 	
 	# Function to return a list of countries
+	#!# Add option to obtain as moniker => name
 	public static function getCountries ($additionalStart = array ())
 	{
 		# Define the main list

@@ -1441,6 +1441,11 @@ class form
 		# Set restrictions
 		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
 		
+		# Send header to avoid ERR_BLOCKED_BY_XSS_AUDITOR warnings / blank screens; requires output buffering
+		if (ini_get ('output_buffering')) {
+			header ('X-XSS-Protection: 0');
+		}
+		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,
@@ -2522,7 +2527,7 @@ class form
 					$elementValue[$value] = '';
 				}
 				
-//				# Construct the element ID, which must be unique	
+//				# Construct the element ID, which must be unique
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				# Determine whether to disable this checkbox
@@ -7881,7 +7886,9 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					if ($int1ToCheckbox && $matches[2] == '1') {
 						if (!$value) {	// i.e. 0 or '0' (or NULL)
 							$value = NULL;
-							$standardAttributes['default'] = NULL;	// Normalise 0 to NULL
+							if (!$standardAttributes['default']) {
+								$standardAttributes['default'] = NULL;	// Normalise 0 to NULL
+							}
 						}
 						$label = (is_string ($int1ToCheckbox) ? $int1ToCheckbox : '');	// Empty unless the 'int1ToCheckbox' value is a string
 						$this->checkboxes ($standardAttributes + array (

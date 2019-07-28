@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.25.2';
+	var $version = '1.25.3';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -3374,105 +3374,122 @@ class form
 		
 		# If thumbnail viewing is enabled, parse the argument and create the HTML5 code
 		if ($arguments['thumbnail']) {
-			if ($arguments['subfields'] == 1) {		// Currently only supported when single subfield due to callback problem below
-				$subfield = 0;
+			
+			# Enable jQuery
+			#!# Actually this is currently enabling jQuery as well as jQueryUI
+			$this->enableJqueryUi ();
+			
+			# Define the thumbnailing code; this is done once globally
+			$this->jQueryCode[__FUNCTION__] = "\n" . "
+			function thumbWrapper (files, selector) {
 				
-				# If set to boolean true, auto-create the div; otherwise the named selector will be used
-				$createDivJs = 'false';
-				$thumbnailDivId = false;
-				if ($arguments['thumbnail'] === true) {
-					$thumbnailDivId = 'thumbnailpreview';
-					$arguments['thumbnail'] = '#' . $thumbnailDivId;
-					$createDivJs = 'true';
+				thumb (files);
+				
+				function thumb(files) {
+					
+					if (files == null || files == undefined) {
+						$(selector).html( '<p><em>Unable to show a thumbnail, as this web browser is too old to support this.</em></p>' );
+						return false;
+					}
+					
+					for (var i = 0; i < files.length; i++) {
+						var file = files[i];
+						var imageType = /image.*/;
+						
+						if (!file.type.match(imageType)) {
+							continue;
+						}
+						
+						var reader = new FileReader();
+						
+						if (reader != null) {
+							reader.onload = GetThumbnail;
+							reader.readAsDataURL(file);
+						}
+					}
 				}
+				
+				function GetThumbnail(e) {
+					
+					var thumbnailCanvas = document.createElement('canvas');
+					var img = new Image();
+					img.src = e.target.result;
+					
+					img.onload = function () {
+						
+						var originalImageWidth = img.width;
+						var originalImageHeight = img.height;
+						
+						thumbnailCanvas.id = 'myTempCanvas';
+						thumbnailCanvas.width  = $(selector).width();
+						thumbnailCanvas.height = $(selector).height();
+						
+						// Scale the thumbnail to fit the box
+						if (originalImageWidth >= originalImageHeight) {
+							scaledWidth = Math.min(thumbnailCanvas.width, originalImageWidth);	// Ensure width is no greater than the available size
+							scaleFactor = (scaledWidth / originalImageWidth);
+							scaledHeight = Math.round(scaleFactor * originalImageHeight);	// Scale to same proportion, and round
+						} else {
+							scaledHeight = Math.min(thumbnailCanvas.height, originalImageHeight);
+							scaleFactor = (scaledHeight / originalImageHeight);
+							scaledWidth = Math.round(scaleFactor * originalImageWidth);
+						}
+						
+						if (thumbnailCanvas.getContext) {
+							var canvasContext = thumbnailCanvas.getContext('2d');
+							canvasContext.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+							var dataURL = thumbnailCanvas.toDataURL();
+							
+							if (dataURL != null && dataURL != undefined) {
+								var nImg = document.createElement('img');
+								nImg.src = dataURL;
+								$(selector).html(nImg);
+							} else {
+								$(selector).html( '<p><em>Unable to read the image.</em></p>' );
+							}
+						}
+					}
+				}
+			}";
+			
+			# For each subfield, add a thumbnail preview, creating the div if required
+			$this->jQueryCode[__FUNCTION__  . $arguments['name']] = '';	// Indexed by element to ensure that multiple upload instances do not overwrite
+			for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
 				
 				# Get the widget ID
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$subfield}]" : "{$arguments['name']}_{$subfield}");
 				
-				# Enable jQuery
-				#!# Actually this is currently enabling jQuery as well as jQueryUI
-				$this->enableJqueryUi ();
+				# Assign the thumbnail ID; if set to boolean true, auto-create the div; otherwise the named selector will be used
+				#!# Named selector will fail if multiple subfields, as they will all be the same
+				$createDivJs = 'false';
+				$thumbnailDivId = false;
+				$selector = $arguments['thumbnail'];
+				if ($arguments['thumbnail'] === true) {
+					$createDivJs = 'true';
+					$thumbnailDivId = $elementId . '_thumbnailpreview';
+					$selector = '#' . $thumbnailDivId;
+				}
+				
+				# Define the thumbnail text
+				if (!isSet ($thumbnailText)) {
+					$thumbnailText = '(Thumbnail will appear here.)';
+				}
 				
 				# Add the Javascript
-				#!# Need to find a way to pass $arguments['thumbnail'] into the callback in the Javascript, so that multiple subfields are possible
-				$this->jQueryCode[__FUNCTION__] = "\n" . "
+				$this->jQueryCode[__FUNCTION__  . $arguments['name']] .= "\n" . "
 				$(document).ready(function() {
 					
 					if ({$createDivJs}) {
-						$('<div />', {id: '{$thumbnailDivId}', width: '{$this->settings['uploadThumbnailWidth']}px', height: '{$this->settings['uploadThumbnailHeight']}px'}).insertAfter( $('#{$elementId}') );
-						$('{$arguments['thumbnail']}').html( '<p class=\"comment\">(Thumbnail willl appear here.)</p>' );
+						$('#{$elementId}').after ( $('<div />', {id: '{$thumbnailDivId}', width: '{$this->settings['uploadThumbnailWidth']}px', height: '{$this->settings['uploadThumbnailHeight']}px'}) );
+						$('{$selector}').html( '<p class=\"comment\">{$thumbnailText}</p>' );
 					}
 					
 					$('#{$elementId}').change(function() {
-						thumb(this.files);
+						thumbWrapper(this.files, '{$selector}');
 					});
-					
-					function thumb(files) {
-						
-						if (files == null || files == undefined) {
-							$('{$arguments['thumbnail']}').html( '<p><em>Unable to show a thumbnail, as this web browser is too old to support this.</em></p>' );
-							return false;
-						}
-						
-						for (var i = 0; i < files.length; i++) {
-							var file = files[i];
-							var imageType = /image.*/;
-							
-							if (!file.type.match(imageType)) {
-								continue;
-							}
-							
-							var reader = new FileReader();
-							
-							if (reader != null) {
-								reader.onload = GetThumbnail;
-								reader.readAsDataURL(file);
-							}
-						}
-					}
-					
-					function GetThumbnail(e) {
-						
-						var thumbnailCanvas = document.createElement('canvas');
-						var img = new Image();
-						img.src = e.target.result;
-						
-						img.onload = function () {
-							
-							var originalImageWidth = img.width;
-							var originalImageHeight = img.height;
-							
-							thumbnailCanvas.id = 'myTempCanvas';
-							thumbnailCanvas.width  = $('{$arguments['thumbnail']}').width();
-							thumbnailCanvas.height = $('{$arguments['thumbnail']}').height();
-							
-							// Scale the thumbnail to fit the box
-							if (originalImageWidth >= originalImageHeight) {
-								scaledWidth = Math.min(thumbnailCanvas.width, originalImageWidth);	// Ensure width is no greater than the available size
-								scaleFactor = (scaledWidth / originalImageWidth);
-								scaledHeight = Math.round(scaleFactor * originalImageHeight);	// Scale to same proportion, and round
-							} else {
-								scaledHeight = Math.min(thumbnailCanvas.height, originalImageHeight);
-								scaleFactor = (scaledHeight / originalImageHeight);
-								scaledWidth = Math.round(scaleFactor * originalImageWidth);
-							}
-							
-							if (thumbnailCanvas.getContext) {
-								var canvasContext = thumbnailCanvas.getContext('2d');
-								canvasContext.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-								var dataURL = thumbnailCanvas.toDataURL();
-								
-								if (dataURL != null && dataURL != undefined) {
-									var nImg = document.createElement('img');
-									nImg.src = dataURL;
-									$('{$arguments['thumbnail']}').html(nImg);
-								} else {
-									$('{$arguments['thumbnail']}').html( '<p><em>Unable to read the image.</em></p>' );
-								}
-							}
-						}
-					}
-				});";
+				});
+				";
+				
 			}
 		}
 		

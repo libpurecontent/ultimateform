@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.25.9';
+	var $version = '1.25.10';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -1140,7 +1140,7 @@ class form
 							['BulletedList','NumberedList','-','Outdent','Indent','Blockquote'],
 							['Subscript','Superscript','SpecialChar'],
 							['HorizontalRule'],
-							['ShowBlocks','CreateDiv'],
+							['ShowBlocks','CreateDiv','Iframe'],
 							['Table'],
 							['Link','Unlink','Anchor'],
 							['Image'],
@@ -1164,7 +1164,7 @@ class form
 							['BulletedList','NumberedList','-','Outdent','Indent','Blockquote'],
 							['Subscript','Superscript','SpecialChar'],
 							['HorizontalRule'],
-							['ShowBlocks','CreateDiv'],
+							['ShowBlocks','CreateDiv','Iframe'],
 							['Table'],
 							['Link','Unlink','Anchor'],
 							['Image'],
@@ -2214,28 +2214,29 @@ class form
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
-			'name'					=> NULL,	# Name of the element
-			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
-			'values'				=> array (),# Simple array of selectable values
-			'valuesNamesAutomatic'	=> false,	# Whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
-			'disabled'				=> array (),# Whether individual radiobuttons are disabled, either true for all (except for a default one), or false for none, or an array of the values that are disabled
-			'title'					=> '',		# Introductory text
-			'description'			=> '',		# Description text
-			'append'				=> '',		# HTML appended to the widget
-			'prepend'				=> '',		# HTML prepended to the widget
-			'output'				=> array (),# Presentation format
-			'required'				=> false,	# Whether required or not
-			'autofocus'				=> false,	# HTML5 autofocus (true/false)
-			'default'				=> array (),# Pre-selected item
+			'name'					=> NULL,		# Name of the element
+			'editable'				=> true,		# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
+			'values'				=> array (),	# Simple array of selectable values
+			'valuesNamesAutomatic'	=> false,		# Whether to create automatic value names based on the value itself (e.g. 'option1' would become 'Option 1')
+			'disabled'				=> array (),	# Whether individual radiobuttons are disabled, either true for all (except for a default one), or false for none, or an array of the values that are disabled
+			'title'					=> '',			# Introductory text
+			'description'			=> '',			# Description text
+			'append'				=> '',			# HTML appended to the widget
+			'prepend'				=> '',			# HTML prepended to the widget
+			'output'				=> array (),		# Presentation format
+			'required'				=> false,		# Whether required or not
+			'autofocus'				=> false,		# HTML5 autofocus (true/false)
+			'default'				=> array (),	# Pre-selected item
 			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
-			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
+			'forceAssociative'		=> false,		# Force the supplied array of values to be associative
 			'nullText'				=> $this->settings['nullText'],	# Override null text for a specific widget (if false, the master value is assumed)
-			'discard'				=> false,	# Whether to process the input but then discard it in the results
-			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'discard'				=> false,		# Whether to process the input but then discard it in the results
+			'datatype'				=> false,		# Datatype used for database writing emulation (or caching an actual value)
 			'truncate'				=> $this->settings['truncate'],	# Override truncation setting for a specific widget
-			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
-			'after'					=> false,	# Placing the widget after a specific other widget
-			'entities'				=> true,	# Convert HTML in label to entity equivalents
+			'tabindex'				=> false,		# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'					=> false,		# Placing the widget after a specific other widget
+			'entities'				=> true,		# Convert HTML in label to entity equivalents
+			'titles'				=> array (),	# Title attribute texts, as array (value => string, ...)
 		);
 		
 		# Create a new form widget
@@ -2345,8 +2346,13 @@ class form
 			foreach ($arguments['values'] as $value => $visible) {
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
+				# Determine whether to include a title attribute
+				$title = ($arguments['titles'] && isSet ($arguments['titles'][$value]) ? $arguments['titles'][$value] : false);
+				$titleHtml = ($title ? ' title="' . htmlspecialchars ($title) . '"' : '');
+				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$subelementsWidgetHtml[$value] = '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . (in_array ($value, $arguments['disabled'], true) ? ' disabled="disabled"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . " /><label for=\"" . $elementId . '">' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$subelementsWidgetHtml[$value]  = '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . (in_array ($value, $arguments['disabled'], true) ? ' disabled="disabled"' : '') . $titleHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' />';
+				$subelementsWidgetHtml[$value] .= '<label for="' . $elementId . '"' . $titleHtml . '>' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
 				$widgetHtml .= "\n\t\t\t" . $subelementsWidgetHtml[$value];
 				$firstItem = false;
 				
@@ -6287,7 +6293,8 @@ class form
 	 * @access private
 	 */
 	#!# The whole problems area needs refactoring
-	function getElementProblems ()
+	#!# Replace external access with new function returning bool hasElementProblems ()
+	public function getElementProblems ()
 	{
 		# If the form is not posted, end here
 		if (!$this->formPosted) {return false;}

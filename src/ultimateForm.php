@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.25.10';
+	var $version = '1.25.11';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -184,7 +184,7 @@ class form
 		'truncate'							=> false,							# Whether to truncate the visible part of a widget (global setting)
 		'listUnzippedFilesMaximum'			=> 5,								# When auto-unzipping an uploaded zip file, the maximum number of files contained that should be listed (beyond this, just 'x files' will be shown) in any visible result output
 		'fixMailHeaders'					=> false,							# Whether to add additional mail headers, for use with a server that fails to add Message-Id/Date/Return-Path; set as (bool) true or (str) application name
-		'size'								=> 30,								# Global setting for input widget - size
+		'size'								=> 50,								# Global setting for input widget - size
 		'cols'								=> 30,								# Global setting for textarea cols - number of columns
 		'rows'								=> 5,								# Global setting for textarea cols - number of rows
 		'richtextEditorBasePath'			=> '/_ckeditor/',					# Global default setting for of the editor files
@@ -220,6 +220,8 @@ class form
 		'uploadThumbnailWidth'				=> 300,								# Default upload thumbnail box width
 		'uploadThumbnailHeight'				=> 300,								# Default upload thumbnail box height
 		'redirectGet'						=> false,							# On successful submission, redirect, simplifying with non-empty values as GET parameters
+		#!# This should be made automatic, once the system is used to a parse-settings-then-render pattern
+		'enableNativeRequired'				=> false,							# Whether to enable native HTML5 required attributes; this should be disabled when using Save and continue or expandable
 	);
 	
 	
@@ -295,7 +297,7 @@ class form
 			'required'				=> false,	# Whether required or not
 			'expandable'			=> false,	# Whether the widget can be expanded into subwidgets (whose value is imploded in the result), whose number can be incremented by pressing a + button; either false / true (separator=\n) / separator string
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false) [ignored for e-mail type]
-			'size'					=> $this->settings['size'],		# Visible size (optional; defaults to 30)
+			'size'					=> $this->settings['size'],		# Visible size (optional; defaults to 60)
 			'minlength'				=> '',		# Minimum length (optional; defaults to no limit)
 			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
 			// 'min'	 	- implemented below
@@ -545,7 +547,7 @@ class form
 				}
 				
 			} else {
-				$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['required'] ? ' required="required"' : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? ' step="' . $arguments['step'] . '"' : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['multiple'] ? ' multiple="multiple"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
+				$widgetHtml = '<input' . $this->nameIdHtml ($arguments['name']) . ' type="' . ($functionName == 'input' ? 'text' : $functionName) . "\" size=\"{$arguments['size']}\"" . ($arguments['maxlength'] != '' ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . ((isSet ($arguments['min']) && $arguments['min'] !== false) ? " min=\"{$arguments['min']}\"" : '') . ((isSet ($arguments['max']) && $arguments['max'] !== false) ? " max=\"{$arguments['max']}\"" : '') . ((isSet ($arguments['step']) && $arguments['step'] !== false) ? ' step="' . $arguments['step'] . '"' : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['multiple'] ? ' multiple="multiple"' : '') . " value=\"" . htmlspecialchars ($this->form[$arguments['name']]) . '"' . $widget->tabindexHtml () . ' />';
 			}
 		} else {
 			$displayedValue = ($arguments['displayedValue'] ? $arguments['displayedValue'] : $this->form[$arguments['name']]);
@@ -932,7 +934,7 @@ class form
 			if ($arguments['maxlength']) {
 				$widgetHtml .= '<div' . $this->nameIdHtml ($arguments['name'], false, false, false, $idOnly = true, '__info') . ' class="charactersremaininginfo"></div>';
 			}
-			$widgetHtml .= '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['maxlength'] ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($arguments['required'] ? ' required="required"' : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
+			$widgetHtml .= '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['maxlength'] ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
 		} else {
 			if ($arguments['displayedValue']) {
 				$widgetHtml  = ($arguments['entities'] ? htmlspecialchars ($arguments['displayedValue']) : $arguments['displayedValue']);
@@ -4286,6 +4288,7 @@ class form
 	/**
 	 * Output the result as an e-mail
 	 */
+	#!# Needs ability to reply-to directory, rather than via a field
 	function setOutputEmail ($recipient, $administrator = '', $subjectTitle = 'Form submission results', $chosenElementSuffix = NULL, $replyToField = NULL, $displayUnsubmitted = true)
 	{
 		# Flag that this method is required
@@ -7566,7 +7569,7 @@ class form
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
 			'truncate' => 40,
-			'size' => 40,	#!# This default should use the top-level size setting
+			'size' => $this->settings['size'],		# Visible size (optional; defaults to 60)
 			'changeCase' => true,	// Convert 'fieldName' field names in camelCase style to 'Standard text'
 			'commentsAsDescription' => false,	// Whether to use column comments for the description field rather than for the title field
 			'prefix'	=> false,	// What to prefix all field names with (plus _ implied)
@@ -7825,7 +7828,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				if (preg_match ('/(website|http)/i', $fieldName) || $fieldName == 'url') {
 					$forceType = 'url';
 					$standardAttributes['regexp'] = '^(http|https)://';
-					$standardAttributes['description'] = 'Must begin http://';	// ' or https://' not added to this description just to keep it simple
+					$standardAttributes['description'] = 'Must begin https://';	// ' or https://' not added to this description just to keep it simple
 				}
 				
 				# Upload fields - fieldname containing photograph/upload or starting/ending with file/document

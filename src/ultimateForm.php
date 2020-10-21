@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.25.11';
+	var $version = '1.25.12';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -1131,12 +1131,12 @@ class form
 					# pureContent - cut-down, predominantly semantic toolbar
 					'pureContent' => "
 						[
-							['Source'],
 							['Templates'],
 							['Cut','Copy','Paste','PasteText','PasteWord','-',],
 							['Undo','Redo','-','Find','Replace','-','SelectAll'],
 							['Scayt'],
 							['Maximize'],
+							['Source'],
 							['About'],
 							'/',
 							['BulletedList','NumberedList','-','Outdent','Indent','Blockquote'],
@@ -1156,11 +1156,11 @@ class form
 					# pureContent plus formatting - cut-down, predominantly semantic toolbar, plus formatting
 					'pureContentPlusFormatting' => "
 						[
-							['Source'],
 							['Templates'],
 							['Cut','Copy','Paste','PasteText','PasteWord','-',],
 							['Undo','Redo','-','Find','Replace','-','SelectAll'],
 							['Scayt'],
+							['Source'],
 							['About'],
 							'/',
 							['BulletedList','NumberedList','-','Outdent','Indent','Blockquote'],
@@ -1202,11 +1202,11 @@ class form
 					# Basic, plus image
 					'BasicImage' => "
 						[
-							['Source'],
 							['Bold','Italic'],
 							['BulletedList','NumberedList'],
 							['Link','Unlink'],
 							['Image'],
+							['Source'],
 							['About']
 						]
 					",
@@ -1214,11 +1214,11 @@ class form
 					# A slightly more extensive version of the basic toolbar
 					'BasicLonger' => "
 						[
-							['Source'],
 							['Format'],
 							['Bold','Italic','RemoveFormat'],
 							['BulletedList','NumberedList'],
 							['Link','Unlink'],
+							['Source'],
 							['About']
 						]
 					",
@@ -1226,11 +1226,11 @@ class form
 					# A slightly more extensive version of the basic toolbar, plus formatting
 					'BasicLongerFormat' => "
 						[
-							['Source'],
 							['Format','Styles'],
 							['Bold','Italic','RemoveFormat'],
 							['BulletedList','NumberedList'],
 							['Link','Unlink'],
+							['Source'],
 							['About']
 						]
 					",
@@ -1524,7 +1524,7 @@ class form
 				'clean' => true,	// Note that this also removes style="clear: ..." from e.g. a <p> tag
 				'enclose-text'	=> true,
 				'drop-proprietary-attributes' => true,
-				'drop-font-tags' => true,
+				//'drop-font-tags' => true,		// Deprecated and now removed; see: https://api.html-tidy.org/tidy/quickref_5.4.0.html#drop-font-tags
 				'drop-empty-paras' => true,
 				'hide-comments' => $arguments['removeComments'],
 				'join-classes' => true,
@@ -7815,7 +7815,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				}
 				
 				# Richtext fields - text fields with html/richtext in fieldname; NB if changing the regexp, also change this in the addSettingsTableConfig method in frontControllerApplication.php
-				if (preg_match ('/(html|richtext)/i', $fieldName) && (strtolower ($fieldAttributes['Type']) == 'text')) {
+				if (preg_match ('/(html|richtext)/i', $fieldName) && (in_array (strtolower ($fieldAttributes['Type']), array ('text', 'tinytext', 'mediumtext', 'longtext')))) {
 					$forceType = 'richtext';
 					
 					# Use basic toolbar set for fieldnames containing 'basic/mini/simple'
@@ -7828,7 +7828,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				if (preg_match ('/(website|http)/i', $fieldName) || $fieldName == 'url') {
 					$forceType = 'url';
 					$standardAttributes['regexp'] = '^(http|https)://';
-					$standardAttributes['description'] = 'Must begin https://';	// ' or https://' not added to this description just to keep it simple
+					$standardAttributes['description'] = 'Must begin https://';	// ' or http://' not added to this description just to keep it simple
 				}
 				
 				# Upload fields - fieldname containing photograph/upload or starting/ending with file/document
@@ -7968,8 +7968,16 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 			# If the textAsVarchar option is on, convert the type to VARCHAR(255)
 			if ($textAsVarchar && (strtolower ($fieldAttributes['Type']) == 'text')) {$fieldAttributes['Type'] = 'VARCHAR(255)';}
 			
-			# Take the type and convert it into a form widget type
+			# Obtain the type
 			$type = $fieldAttributes['Type'];
+			
+			# Handle legacy MySQL types
+			if ($type == 'int') {$type = 'int(11)';}
+			if ($type == 'int unsigned') {$type = 'int(11) unsigned';}
+			if ($type == 'tinyint') {$type = 'int(1)';}
+			if ($type == 'year') {$type = 'year(4)';}
+			
+			# Take the type and convert it into a form widget type
 			switch (true) {
 				
 				# Skipping of this element
@@ -7989,7 +7997,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					break;
 				
 				# Hidden fields - deny editability
-				case ($fieldAttributes['Type'] == '_hidden'):
+				case ($type == '_hidden'):
 					$this->input ($standardAttributes + array (
 						'editable' => false,
 						'_visible--DONOTUSETHISFLAGEXTERNALLY' => false,

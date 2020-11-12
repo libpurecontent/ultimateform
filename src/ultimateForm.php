@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.25.12';
+	var $version = '1.26.0';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -194,6 +194,9 @@ class form
 		'richtextWidth'						=> '100%',							# Global default setting for richtext width; assumed to be px unless % specified
 		'richtextHeight'					=> 400,								# Global default setting for richtext height; assumed to be px unless % specified
 		'richtextEditorFileBrowser'			=> '/_ckfinder/',					# Global default setting for richtext file browser path (must have trailing slash), or false to disable
+		'richtextAutoembedKey'				=> false,							# Autoembed API key from IFramely
+		'richtextTemplates'					=> false,							# Path to templates file, also settable on a per-widget basis
+		'richtextSnippets'					=> false,							# Array of snippets, as array (title => HTML, ...)
 		'mailAdminErrors'					=> false,							# Whether to mail the admin with any errors in the form setup
 		'attachments'						=> false,							# Whether to send uploaded file(s) as attachment(s) (they will not be unzipped)
 		'attachmentsMaxSize'				=> '10M',							# Total maximum attachment(s) size; attachments will be allowed into an e-mail until they reach this limit
@@ -1030,6 +1033,8 @@ class form
 			'editorFileBrowser'					=> $this->settings['richtextEditorFileBrowser'],	// Path (must have trailing slash), or false to disable
 			'editorFileBrowserStartupPath'		=> '/',
 			'editorFileBrowserACL'				=> false,
+			'templates'							=> $this->settings['richtextTemplates'],
+			'snippets'							=> $this->settings['richtextSnippets'],
 			'width'								=> $this->settings['richtextWidth'],			// Same as config.width
 			'height'							=> $this->settings['richtextHeight'],			// Same as config.height
 			'config.width'						=> false,										// Takes precedence if 'width' also specified
@@ -1039,7 +1044,15 @@ class form
 			'config.bodyId'						=> false,										// Apply value of <body id="..."> to editing window
 			'config.bodyClass'					=> false,										// Apply value of <body class="..."> to editing window
 			'config.format_tags'				=> 'p;h1;h2;h3;h4;h5;h6;pre',
-			'config.stylesSet'					=> "[ { name: 'Warning (paragraph)', element: 'p', attributes: { 'class' : 'warning' } } ]",
+			'config.stylesSet'					=> "[
+				{name: 'Warning style (paragraph)', element: 'p', attributes: {'class': 'warning'}},
+				{name: 'Success style (paragraph)', element: 'p', attributes: {'class': 'success'}},
+				{name: 'Comment text (paragraph)', element: 'p', attributes: {'class': 'comment'}},
+				{name: 'Heavily-faded text (paragraph)', element: 'p', attributes: {'class': 'faded'}},
+				{name: 'Right-aligned (paragraph)', element: 'p', attributes: {'class': 'alignright'}},
+				{name: 'Signature (paragraph)', element: 'p', attributes: {'class': 'signature'}},
+				{name: 'Smaller text (paragraph)', element: 'p', attributes: {'class': 'small'}}
+			]",
 			'config.protectedSource'			=> "[ '/<\?[\s\S]*?\?>/g' ]",					// Protect PHP code
 			'config.disableNativeSpellChecker'	=> false,								// Disables the built-in spell checker if the browser provides one
 			'config.allowedContent'				=> true,										// http://docs.ckeditor.com/#!/api/CKEDITOR.config-cfg-allowedContent
@@ -1109,8 +1122,6 @@ class form
 				$arguments['config.height'] = ($arguments['config.height'] ? $arguments['config.height'] : $arguments['height']);
 			}
 			
-			#!# Need support for unsavedDataProtection; see: http://stackoverflow.com/a/12457674
-			
 			#!# Enable native support for protectedSource
 			
 			#!# Image caption and dragging in Chrome: http://ckeditor.com/addon/image2
@@ -1132,6 +1143,7 @@ class form
 					'pureContent' => "
 						[
 							['Templates'],
+							['divs'],
 							['Cut','Copy','Paste','PasteText','PasteWord','-',],
 							['Undo','Redo','-','Find','Replace','-','SelectAll'],
 							['Scayt'],
@@ -1145,6 +1157,8 @@ class form
 							['ShowBlocks','CreateDiv','Iframe'],
 							['Table'],
 							['Link','Unlink','Anchor'],
+							['Html5video'],
+							['Youtube'],
 							['Image'],
 							'/',
 							['Format'],
@@ -1157,6 +1171,7 @@ class form
 					'pureContentPlusFormatting' => "
 						[
 							['Templates'],
+							['divs'],
 							['Cut','Copy','Paste','PasteText','PasteWord','-',],
 							['Undo','Redo','-','Find','Replace','-','SelectAll'],
 							['Scayt'],
@@ -1169,6 +1184,8 @@ class form
 							['ShowBlocks','CreateDiv','Iframe'],
 							['Table'],
 							['Link','Unlink','Anchor'],
+							['Html5video'],
+							['Youtube'],
 							['Image'],
 							'/',
 							['Format'],
@@ -1243,8 +1260,41 @@ class form
 				}
 			}
 			
-			# Debugging; requires the devtools plugin to be installed; see: http://ckeditor.com/addon/devtools and http://docs.ckeditor.com/#!/guide/dev_howtos_dialog_windows
-			// $arguments['config.extraPlugins'] = 'devtools';
+			# Start extra plugins
+			$extraPlugins = array ();
+			
+			# Debugging; requires the devtools plugin to be installed; see: https://ckeditor.com/cke4/addon/devtools and https://ckeditor.com/docs/ckeditor4/latest/guide/dev_howtos_dialog_windows.html
+			//$extraPlugins[] = 'devtools';
+			
+			# HTML5 video; see: https://ckeditor.com/cke4/addon/html5video
+			$extraPlugins[] = 'html5video,widget,widgetselection,clipboard,lineutils';
+			
+			# YouTube; see: https://ckeditor.com/cke4/addon/youtube
+			$extraPlugins[] = 'youtube';
+			// videodetector: Basically doesn't work well, adding a rogue button in
+			
+			# Auto-embed - resolve URLs like YouTube videos and Twitter postings to HTML
+			$extraPlugins[] = 'embed,autoembed';
+			$arguments['config.embed_provider'] = '//ckeditor.iframe.ly/api/oembed?url={url}&callback={callback}';
+			if ($this->settings['richtextAutoembedKey']) {
+				$arguments['config.embed_provider'] .= '&api_key=' . $this->settings['richtextAutoembedKey'];
+			}
+			
+			# Templates (full-page)
+			if ($arguments['templates']) {
+				$arguments['config.templates_files'] = array ($arguments['templates']);
+			}
+			
+			# Widgets (HTML snippets)
+			if ($arguments['snippets']) {
+				$extraPlugins[] = 'htmlbuttons';
+				$arguments['config.htmlbuttons'] = $this->richtextSnippetsConfig ($arguments['snippets']);
+			} else {
+				$arguments['config.toolbar'] = str_replace ("['divs'],", '', $arguments['config.toolbar']);		// Remove from definition
+			}
+			
+			# Add the extra plugins
+			$arguments['config.extraPlugins'] = implode (',', $extraPlugins);
 			
 			# Construct the CKEditor arguments; see: http://docs.ckeditor.com/#!/api/CKEDITOR.editor
 			$editorConfig = array ();
@@ -1259,10 +1309,18 @@ class form
 					} else if (in_array ($editorConfigKey, array ('toolbar', 'stylesSet', ))) {
 						$editorConfig[$editorConfigKey] .= $argumentValue;	// Native JS string
 					} else if (is_array ($argumentValue)) {
+						$editorConfig[$editorConfigKey] .= json_encode ($argumentValue, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
+
+/*
 						foreach ($argumentValue as $index => $argumentSubValue) {
-							$argumentValue[$index] = "'" . $argumentSubValue . "'";	// Quote each value
+							if (is_array ($argumentSubValue)) {
+								$argumentValue[$index] = json_encode ($argumentSubValue);
+							} else {
+								$argumentValue[$index] = "'" . $argumentSubValue . "'";	// Quote each value
+							}
 						}
 						$editorConfig[$editorConfigKey] .= '[' . implode (', ', $argumentValue) . ']';
+*/
 					} else {
 						$editorConfig[$editorConfigKey] .= '"' . str_replace ('"', '\\"', $argumentValue) . '"';	// Appears as quoted string
 					}
@@ -1270,11 +1328,21 @@ class form
 			}
 			
 			# Define default dialog box settings; see: http://stackoverflow.com/questions/12464395/ and http://docs.ckeditor.com/#!/guide/dev_howtos_dialog_windows
+			# Use the devtools plugin (see above) to determine the internal names
 			$dialogBoxSettings = "
 				// Dialog box configuration
 				CKEDITOR.on( 'dialogDefinition', function( ev ) {
 					var dialogName = ev.data.name;
 					var dialogDefinition = ev.data.definition;
+					
+					// Link dialog
+					if (dialogName == 'link') {
+						var infoTab = dialogDefinition.getContents('info');
+						
+						// Remove the e-mail type; see: https://ckeditor.com/old/forums/Support/Remove-options-link-drop-down
+						var linkOptions = infoTab.get('linkType');
+						linkOptions['items'] = [ ['Website (URL)', 'url'], ['Link to anchor in the text', 'anchor'], ['Phone', 'tel'] ];
+					}
 					
 					// Table dialog
 					if ( dialogName == 'table' ) {
@@ -1289,8 +1357,8 @@ class form
 						infoTab.get( 'txtCellPad' )[ 'default' ] = '';	// Default cellpadding
 						
 						// Advanced tab - set class=lines
-						var advanced = dialogDefinition.getContents( 'advanced' );
-						advanced.get( 'advCSSClasses' )[ 'default' ] = '" . $arguments['editorDefaultTableClass'] . "';	// Default class
+						var advancedTab = dialogDefinition.getContents( 'advanced' );
+						advancedTab.get( 'advCSSClasses' )[ 'default' ] = '" . $arguments['editorDefaultTableClass'] . "';	// Default class
 					}
 					
 					// Image dialog
@@ -1309,6 +1377,24 @@ class form
 						dialogDefinition.removeContents( 'Upload' );
 					}
 					
+					/*
+					// Image dialog
+					if ( dialogName == 'image2' ) {
+						
+						// Info tab - improve 'Browse server' button, and remove legacy hspace/vspace
+						var infoTab = dialogDefinition.getContents( 'info' );
+						infoTab.get('src')['label'] = 'Select image:';
+						infoTab.get( 'browse' )[ 'label' ] = 'Add new image or browse existing...';	// Rename 'Browse server'
+						//infoTab.get( 'browse' )[ 'className' ] = 'cke_dialog_ui_button_ok';	// Make button more obvious
+						infoTab.get( 'browse' )[ 'style' ] = 'background: yellow !important;';	// Make button more obvious
+						infoTab.get( 'alt' )[ 'label' ] = '<strong>Alternative text</strong> (for accessibility / Google Images)';	// Clearer label
+						infoTab.get( 'alt' )[ 'validate' ] = CKEDITOR.dialog.validate.notEmpty('Please provide alternative text describing this image, for accessibility reasons.');	// Require alternative text
+						
+						// Upload tab - remove entirely
+						dialogDefinition.removeContents( 'Upload' );
+					}
+					*/
+					
 					// Link dialog
 					if ( dialogName == 'link' ) {
 						
@@ -1320,11 +1406,34 @@ class form
 						// Upload tab - remove entirely
 						dialogDefinition.removeContents( 'upload' );
 					}
+					
+					// HTML5 video
+					if (dialogName == 'html5video') {
+						var infoTab = dialogDefinition.getContents( 'info' );
+						infoTab.get ('controls')['default'] = true;		// #!# Doesn't actually seem to work
+						infoTab.get ('width')['default'] = 600;
+						infoTab.get ('align')['default'] = 'none';
+						var advancedTab = dialogDefinition.getContents( 'advanced' );
+						advancedTab.get ('allowdownload')['default'] = 'yes';
+						
+						// Upload tab - remove entirely
+						dialogDefinition.removeContents( 'Upload' );
+					}
+					
+					// YouTube plugin
+					if (dialogName == 'youtube') {
+						var youtubeTab = dialogDefinition.getContents( 'youtubePlugin' );
+						youtubeTab.get ('chkRelated')['default'] = false;
+						youtubeTab.get ('chkPrivacy')['default'] = true;
+						dialogDefinition.onFocus = function () {		// https://stackoverflow.com/a/21905673/180733
+							this.getContentElement( 'youtubePlugin', 'txtUrl' ).focus();
+						}
+					}
 				});
 			";
 			
 			# Add HTML filtering to deal with <img> tags emitting style=".." rather than height/width/border=".."; see: http://stackoverflow.com/a/11927911
-#!# Border support also needed
+			#!# Border support also needed
 			$htmlFilterSettings = "
 				// Fix <img> tags to use height/width/border rather than style
 				CKEDITOR.on('instanceReady', function (ev) {
@@ -1387,27 +1496,29 @@ class form
 				$arguments['config.height'] .= 'px';
 			}
 			
+			# Assemble the widget ID for use in script registration
+			$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
+			
 			# Start the widget HTML
 			$widgetHtml  = '
 			<!-- WYSIWYG editor; replace the <textarea> with a CKEditor instance -->
 			<textarea' . $this->nameIdHtml ($arguments['name']) . " style=\"width: {$arguments['config.width']}; height: {$arguments['config.height']}\"" . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . '>' . htmlspecialchars ($elementValue) . '</textarea>
-			<script src="' . $arguments['editorBasePath'] . 'ckeditor.js"></script>
-			<script>
+			';
+			$this->jQueryLibraries['CKEditor'] = '<script src="' . $arguments['editorBasePath'] . 'ckeditor.js"></script>';
+			$this->jQueryCode[__FUNCTION__ . $widgetId] = '
 				var editor = CKEDITOR.replace("' . $id . '", {
 					' . implode (",\n\t\t\t\t\t", $editorConfig) . '
 				});
 				' . $dialogBoxSettings . '
 				' . $htmlFilterSettings . '
-			</script>
 			';
 			
 			# Add the file manager if required; see: http://docs.cksource.com/CKFinder_2.x/Developers_Guide/PHP/CKEditor_Integration and http://docs.cksource.com/ckfinder_2.x_api/symbols/CKFinder.config.html
 			if ($arguments['editorFileBrowser']) {
+				
 				#!# startupFolderExpanded is not clear; see ticket: http://ckeditor.com/forums/Support/Documentation-suggestion-startupFolderExpanded-is-unclear
-				$widgetHtml .= '
-				<!-- File manager -->
-				<script src="' . $arguments['editorFileBrowser'] . 'ckfinder.js"></script>
-				<script>
+				$this->jQueryLibraries['CKFinder'] = '<script src="' . $arguments['editorFileBrowser'] . 'ckfinder.js"></script>';
+				$this->jQueryCode[__FUNCTION__ . $widgetId] .= '
 					// File manager settings
 					CKFinder.setupCKEditor( editor, {
 						basePath: "' . $arguments['editorFileBrowser'] . '",
@@ -1416,7 +1527,6 @@ class form
 						startupFolderExpanded: true,
 						rememberLastFolder: true
 					});
-				</script>
 				';
 				
 				# Use the ACL functionality if required, by writing it into the session
@@ -1588,6 +1698,7 @@ class form
 				'<h([1-6]+) id="Heading([0-9]+)">'      => '<h\\1>',    // Headings from R2Net converter
 				' class="MsoNormal"' => '',	// WordHTML
 				' class="MsoNormal c([0-9]+)"' => '',	// WordHTML
+				'<li>\s*<p>(.*?)</p>\s*</li>' => '<li>\1</li>',	// Remove paragraph breaks directly within a list item; note ungreedy *? modifier
 			);
 		}
 		
@@ -1638,6 +1749,36 @@ class form
 		
 		# Return the tidied and adjusted content
 		return $content;
+	}
+	
+	
+	# Function to compile richtext snippets configuration
+	private function richtextSnippetsConfig ($snippets)
+	{
+		# Construct the list of items for the drop-down
+		$items = array ();
+		$i = 0;
+		foreach ($snippets as $title => $html) {
+			$items[] = array (
+				'name'	=> 'item' . $i++,
+				'title'	=> $title,
+				'html'	=> $html,
+				'icon'	=> false,	// Doesn't actually work anyway
+			);
+		}
+		
+		# Assemble the configuration, containing all the items
+		$configuration = array (	// Array of individual buttons; we create only one with nested items
+			array (
+				'name'	=> 'divs',	// NB This seems to be a hard-coded name when used as a container for other buttons
+				'icon'	=> 'puzzle.png',
+				'title'	=> 'Insert items',
+				'items' => $items,
+			),
+		);
+		
+		# Return the configuration
+		return $configuration;
 	}
 	
 	
@@ -3612,7 +3753,9 @@ class form
 				} else {
 					
 					# If the file is not valid, add it to a list of invalid subfields
-					if (!application::filenameIsValid ($elementValue[$subfield]['name'], $arguments['disallowedExtensions'], $arguments['allowedExtensions'])) {
+					$allowedExtensions = $arguments['allowedExtensions'];
+					if (in_array ('.jpg', $allowedExtensions) && !in_array ('.jpeg', $allowedExtensions)) {$allowedExtensions[] = '.jpeg';}		// Treat .jpeg as an alias for .jpg, but avoid listing it explicitly
+					if (!application::filenameIsValid ($elementValue[$subfield]['name'], $arguments['disallowedExtensions'], $allowedExtensions)) {
 						$filenameInvalidSubfields[] = $elementValue[$subfield]['name'];
 					}
 				}
@@ -5823,15 +5966,44 @@ class form
 		
 		# Create the jQuery code
 		$this->jQueryCode[__FUNCTION__] = "
-			function removeCheck() { window.onbeforeunload = null; }
-			$(document).ready(function() {
-			    $('#" . $formId . " :input').one('change', function() {
-			        window.onbeforeunload = function() {
-			            return '" . $messageText . "';
+			
+			// Navigate-away protection for general widgets
+			function removeCheck () { window.onbeforeunload = null; }
+			$(document).ready (function () {
+			    $('#{$formId} :input').one ('change', function () {
+			        window.onbeforeunload = function () {
+			            return '{$messageText}';
 			        }
 			    });
-			    $('#" . $formId . " input[type=submit]').click(function() { removeCheck() });
+			    $('#{$formId} input[type=submit]').click (function () { removeCheck () });
 			});
+			
+			// Navigate-away protection for Richtext widgets; see: https://stackoverflow.com/a/25050155
+			if (typeof CKEDITOR !== 'undefined') {
+				var i;
+				var editable = {};
+				for (instanceName in CKEDITOR.instances) {
+					
+					// GUI-based changes
+					CKEDITOR.instances[instanceName].on ('change', function () {
+						window.onbeforeunload = function () {
+							return '{$messageText}';
+						}
+					});
+					
+					// Source-based changes
+					CKEDITOR.instances[instanceName].on ('mode', function () {
+						if (this.mode == 'source') {
+							editable[instanceName] = CKEDITOR.instances[instanceName].editable ();
+							editable[instanceName].attachListener (editable[instanceName], 'input', function () {
+								window.onbeforeunload = function () {
+									return '{$messageText}';
+								}
+							});
+						}
+					});
+				}
+			}
 		";
 	}
 	
@@ -6194,12 +6366,14 @@ class form
 		# Add each client function
 		if ($this->jQueryCode || $this->javascriptCode) {
 			$html .= "\n<script type=\"text/javascript\">";
+			$html .= "\n\t" . '$(function() {';
 			foreach ($this->jQueryCode as $key => $jsCode) {
 				$html .= "\n" . $jsCode;
 			}
 			foreach ($this->javascriptCode as $key => $jsCode) {
 				$html .= "\n" . $jsCode;
 			}
+			$html .= "\n\t" . '});';
 			$html .= "\n</script>\n\n";
 		}
 		

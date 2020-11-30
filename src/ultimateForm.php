@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.26.1';
+	var $version = '1.26.2';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -8148,7 +8148,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 			# Handle INT types without display width attribute, mapping them to older types, e.g. map INT to INT(11)
 			if (in_array ($type, array ('int', 'mediumint', 'smallint', 'bigint'))) {$type = 'int(11)';}
 			if (in_array ($type, array ('int unsigned', 'mediumint unsigned', 'smallint unsigned', 'bigint unsigned'))) {$type = 'int(11) unsigned';}
-			if ($type == 'tinyint') {$type = 'int(1)';}		// Essentially boolean
+			if ($type == 'tinyint' || $type == 'tinyint unsigned') {$type = 'int(1)';}		// Essentially boolean
 			if ($type == 'year') {$type = 'year(4)';}
 			
 			# Take the type and convert it into a form widget type

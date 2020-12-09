@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.26.2';
+	var $version = '1.26.3';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -3330,7 +3330,8 @@ class form
 			'append'				=> '',		# HTML appended to the widget
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
-			'directory'				=> NULL,	# Path to the file; any format acceptable
+			'directory'				=> NULL,	# Path on disk to the file; any format acceptable
+			'previewLocationPrefix'	=> '',		# Path in URL terms to the folder, to be prefixed to the filename, e.g. foo.jpg could become /url/path/for/foo.jpg
 			'subfields'				=> 1,		# The number of widgets within the widget set (i.e. available file slots)
 			'required'				=> 0,		# The minimum number which must be selected (defaults to 0)
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
@@ -3706,8 +3707,8 @@ class form
 					$thumbnailText = '(Thumbnail will appear here.)';
 				}
 				
-				# Determine whether there is a default image
-				$createDefaultImageJs = ($arguments['default'] && isSet ($arguments['default'][$subfield]) ? 'true' : 'false');
+				# Determine whether there is a default image, so that this can be set below
+				$createDefaultImage = ($arguments['default'] && isSet ($arguments['default'][$subfield]));
 				
 				# Add the Javascript
 				$this->jQueryCode[__FUNCTION__  . $arguments['name']] .= "\n" . "
@@ -3722,9 +3723,10 @@ class form
 						$('{$selector}').html( '<p class=\"comment\">{$thumbnailText}</p>' );
 					}
 					
-					if ({$createDefaultImageJs}) {
-						$('#{$thumbnailDivId}').html ('<img src=\"{$arguments['default'][$subfield]['name']}\" style=\"max-width: 100%; max-height: 100%;\" />');
-					}
+				" . ($createDefaultImage ? "
+					$('#{$thumbnailDivId}').html ('<img src=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" style=\"max-width: 100%; max-height: 100%;\" />');
+				" : '')
+				 . "
 					
 					$('#{$elementId}').change(function() {
 						thumbWrapper(this.files, '{$selector}');
@@ -5702,10 +5704,13 @@ class form
 			}
 			if ($this->settings['mailAdminErrors']) {
 				$administrator = (application::validEmail ($this->settings['mailAdminErrors']) ? $this->settings['mailAdminErrors'] : $_SERVER['SERVER_ADMIN']);
+				$message  = "The webform at \n" . $_SERVER['_PAGE_URL'] . "\nreports the following ultimateForm setup misconfiguration:";
+				$message .= "\n\n" . implode ("\n", $errorTexts);
+				$message .= "\n\n\nIP:    {$_SERVER['REMOTE_ADDR']}\nUser:  {$_SERVER['REMOTE_USER']}";
 				application::utf8Mail (
 					$administrator,
 					'Form setup error',
-					wordwrap ("The webform at \n" . $_SERVER['_PAGE_URL'] . "\nreports the following ultimateForm setup misconfiguration:\n\n" . implode ("\n", $errorTexts)),
+					wordwrap ($message),
 					$additionalHeaders = 'From: Website feedback <' . $administrator . ">\r\n"
 				);
 			}

@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.26.3';
+	var $version = '1.26.4';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -3354,6 +3354,7 @@ class form
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'progressbar'			=> false,	# Whether to enable a progress bar; if so, give the AJAX endpoint providing the data; requires the PECL uploadprogress module
 			'thumbnail'				=> false,	# Enable HTML5 thumbnail preview; either true (to auto-create a container div), or jQuery-style selector, specifying an existing element
+			'thumbnailExpandable'	=> false,	# Whether the thumbnail preview can be expanded in size; at present this merely opens the image in a new window
 			'draganddrop'			=> false,	# Whether to convert the element to be styled as a drag and drop zone
 		);
 		
@@ -3724,7 +3725,7 @@ class form
 					}
 					
 				" . ($createDefaultImage ? "
-					$('#{$thumbnailDivId}').html ('<img src=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" style=\"max-width: 100%; max-height: 100%;\" />');
+					$('#{$thumbnailDivId}').html ('" . ($arguments['thumbnailExpandable'] ? "<a href=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" target=\"_blank\">" : '') . "<img src=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" style=\"max-width: 100%; max-height: 100%;\" />" . ($arguments['thumbnailExpandable'] ? '</a>' : '') . "');
 				" : '')
 				 . "
 					
@@ -4330,6 +4331,9 @@ class form
 	 */
 	function mergeFilesIntoPost ()
 	{
+		# In _GET mode, do nothing
+		if ($this->method == 'get') {return;}
+		
 		# PHP's _FILES array is (stupidly) arranged differently depending on whether you are using 'formname[elementname]' or just 'elementname' as the element name - see "HTML array feature" note at www.php.net/features.file-upload
 		if ($this->settings['name']) {	// i.e. <input name="formname[widgetname]"
 			

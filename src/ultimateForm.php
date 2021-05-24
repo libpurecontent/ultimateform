@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.26.4';
+	var $version = '1.26.5';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -176,6 +176,7 @@ class form
 		'timestamping'						=> false,							# Add a timestamp to any CSV entry
 		'ipLogging'							=> false,							# Add the user IP address to any CSV entry
 		'escapeOutput'						=> false,							# Whether to escape output in the processing output ONLY (will not affect other types)
+		'emailName'							=> 'Website feedback',				# Name string for emitted e-mails
 		'emailIntroductoryText'				=> '',								# Introductory text for e-mail output type
 		'emailShowFieldnames'				=> true,							# Whether to show the underlying fieldnames in the e-mail output type
 		'confirmationEmailIntroductoryText'	=> '',								# Introductory text for confirmation e-mail output type
@@ -3913,6 +3914,9 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 		);
 		
+		# Hidden elements are not editable
+		$argumentDefaults['editable'] = false;
+		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
 		
@@ -4446,7 +4450,7 @@ class form
 		# Flag whether to display as empty (rather than absent) those widgets which are optional and have had nothing submitted
 		$this->configureResultEmailShowUnsubmitted = $displayUnsubmitted;
 		
-		# If the recipient is an array, split it into a recipient as the first and cc: as the remainder:
+		# If the recipient is an array, split it into a recipient as the first and cc: as the remainder
 		if (is_array ($recipient)) {
 			$recipientList = $recipient;
 			$recipient = array_shift ($recipientList);
@@ -4474,21 +4478,24 @@ class form
 	function _setTitle ($title)
 	{
 		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
-		if (preg_match_all ('/\{([^\}]+)\}/', $title, $matches)) {
-			#!# Add more when tested
-			$supportedWidgetTypes = array ('input', 'email', 'url', 'tel', 'search', 'number', 'range', 'color', 'select', 'radiobuttons');
-			foreach ($matches[1] as $element) {
+		if ($this->formPosted) {	// This only needs to be run when the form is posted; otherwise the replacement by output type will give an offset as there will be no output type when initially showing the form
+			if (preg_match_all ('/\{([^\}]+)\}/', $title, $matches)) {
 				
-				# Extract any output format specifier
-				$placeholder = $element;	// Cache this, as $element may get overwritten
-				$outputFormat = 'presented';
-				if (substr_count ($element, '|')) {
-					list ($element, $outputFormat) = explode ('|', $element, 2);
-				}
-				
-				# Replace this element placeholder in the string
-				if (isSet ($this->elements[$element]) && (in_array ($this->elements[$element]['type'], $supportedWidgetTypes))) {
-					$title = str_replace ('{' . $placeholder . '}', $this->elements[$element]['data'][$outputFormat], $title);
+				#!# Add more when tested
+				$supportedWidgetTypes = array ('input', 'email', 'url', 'tel', 'search', 'number', 'range', 'color', 'select', 'radiobuttons');
+				foreach ($matches[1] as $element) {
+					
+					# Extract any output format specifier
+					$placeholder = $element;	// Cache this, as $element may get overwritten
+					$outputFormat = 'presented';
+					if (substr_count ($element, '|')) {
+						list ($element, $outputFormat) = explode ('|', $element, 2);
+					}
+					
+					# Replace this element placeholder in the string
+					if (isSet ($this->elements[$element]) && (in_array ($this->elements[$element]['type'], $supportedWidgetTypes))) {
+						$title = str_replace ('{' . $placeholder . '}', $this->elements[$element]['data'][$outputFormat], $title);
+					}
 				}
 			}
 		}
@@ -5715,7 +5722,7 @@ class form
 					$administrator,
 					'Form setup error',
 					wordwrap ($message),
-					$additionalHeaders = 'From: Website feedback <' . $administrator . ">\r\n"
+					$additionalHeaders = "From: {$this->settings['emailName']} <" . $administrator . ">\r\n"
 				);
 			}
 		}
@@ -7205,7 +7212,7 @@ class form
 		
 		# Add support for "Visible name <name@email>" rather than just "name@email"
 		$sender = ($outputType == 'email' ? $this->configureResultEmailAdministrator : $this->configureResultConfirmationEmailAdministrator);
-		$emailName = 'Website feedback';
+		$emailName = $this->settings['emailName'];
 		$emailAddress = $sender;
 		if (preg_match ('/^(.+)<([^>]+)>$/', $sender, $matches)) {
 			$emailName = $matches[1];
@@ -8008,7 +8015,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				}
 				
 				# Website fields - for fieldnames containing 'url/website/http'
-				if (preg_match ('/(website|http)/i', $fieldName) || $fieldName == 'url') {
+				if (preg_match ('/(website|http)/i', $fieldName) || preg_match ('/.+Url$/', $fieldName) || $fieldName == 'url') {
 					$forceType = 'url';
 					$standardAttributes['regexp'] = '^(http|https)://';
 					$standardAttributes['description'] = 'Must begin https://';	// ' or http://' not added to this description just to keep it simple
@@ -8669,7 +8676,6 @@ class formWidget
 		if (!$this->settings['autofocus']) {return false;}
 		
 		# End if this current widget is not editable, as that will never have autofocus
-		#!# Undefined index: editable generated from __timestamp
 		if (!$this->arguments['editable']) {return false;}
 		
 		# End if there is an editable, non-heading widget already defined

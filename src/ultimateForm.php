@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.26.5';
+	var $version = '1.27.0';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -3517,6 +3517,106 @@ class form
 			$widgetHtml .= "\n\t\t\t" . '<input type="hidden" name="UPLOAD_IDENTIFIER" value="' . $uploadProgressIdentifier . '">';
 		}
 		
+		# Convert to drag and drop zone if required; this merely styles the input box and does not use HTML5 Drag and Drop; see: https://codepen.io/TheLukasWeb/pen/qlGDa
+		if ($arguments['draganddrop']) {
+			$thumbnailText = 'Click here to pick photo, or drag and drop into this box.';
+			$widgetHtml .= "
+				<style type=\"text/css\">
+					form tr.upload div.draganddrop {
+						width: calc({$this->settings['uploadThumbnailWidth']}px + 4px + 4px);
+						height: calc({$this->settings['uploadThumbnailHeight']}px + 4px + 4px);
+						border: 4px dashed gray;
+					}
+					form tr.upload p {
+						width: {$this->settings['uploadThumbnailWidth']}px;
+						height: {$this->settings['uploadThumbnailHeight']}px;
+						text-align: center;
+						padding: 15px;
+						color: gray;
+					}
+					form tr.upload div input {
+						position: absolute;
+						margin: 0;
+						padding: 0;
+						width: {$this->settings['uploadThumbnailWidth']}px;
+						height: {$this->settings['uploadThumbnailHeight']}px;
+						outline: none;
+						opacity: 0;
+					}
+				</style>
+			";
+		}
+		
+		# If thumbnail viewing is enabled, parse the argument and assemble the HTML5/JS code
+		if ($arguments['thumbnail']) {
+			$thumbnailHtmlBySubfield = array ();
+			
+			# Enable jQuery
+			#!# Actually this is currently enabling jQuery as well as jQueryUI
+			$this->enableJqueryUi ();
+			
+			# Define the thumbnailing code; this is done once globally
+			$this->jQueryCode[__FUNCTION__] = "\n" . $this->thumbWrapperJs ();
+			
+			# For each subfield, add a thumbnail preview, creating the div if required
+			$this->jQueryCode[__FUNCTION__  . $arguments['name']] = '';	// Indexed by element to ensure that multiple upload instances do not overwrite
+			for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
+				$thumbnailHtml = '';
+				
+				# Get the widget ID
+				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$subfield}]" : "{$arguments['name']}_{$subfield}");
+				
+				# Assign the thumbnail ID
+				$selector = $arguments['thumbnail'];
+				if ($arguments['thumbnail'] === true) {
+					$thumbnailDivId = $elementId . '_thumbnailpreview';
+					$selector = '#' . $thumbnailDivId;
+				}
+				
+				# Create the div if set to boolean true; otherwise the named selector that the client code has created on its page will be used
+				#!# Named selector will fail if multiple subfields, as they will all be the same
+				if ($arguments['thumbnail'] === true) {
+					
+					# Open div to contain the thumbnail
+					$thumbnailHtml .= "\n\t\t\t\t<div id=\"{$thumbnailDivId}\" style=\"width: {$this->settings['uploadThumbnailWidth']}px; height: {$this->settings['uploadThumbnailHeight']}px;\">";
+					
+					# Determine whether there is a default image, so that this can be set below
+					$createDefaultImage = ($arguments['default'] && isSet ($arguments['default'][$subfield]));
+					
+					# Add default image, or text
+					if ($createDefaultImage) {
+						$thumbnailImage = "<img src=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" style=\"max-width: 100%; max-height: 100%;\" />";
+						if ($arguments['thumbnailExpandable']) {
+							$thumbnailImage = "<a href=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" target=\"_blank\">" . $thumbnailImage . '</a>';
+						}
+						$thumbnailHtml .= $thumbnailImage;
+					} else {
+						
+						# Set the thumbnail text
+						if (!isSet ($thumbnailText)) {
+							$thumbnailText = '(Thumbnail will appear here.)';
+						}
+						$thumbnailHtml .= "\n\t\t\t\t\t<p class=\"comment\">{$thumbnailText}</p>";
+					}
+					
+					# Complete div
+					$thumbnailHtml .= "\n\t\t\t\t</div>\n";
+				}
+				
+				# Add JS handler to set the thumbnail on file selection
+				$this->jQueryCode[__FUNCTION__  . $arguments['name']] .= "\n" . "
+				$(document).ready (function () {
+					$('#{$elementId}').change (function () {
+						thumbWrapper (this.files, '{$selector}');
+					});
+				});
+				";
+				
+				# Register the thumbnail HTML for this subfield
+				$thumbnailHtmlBySubfield[$subfield] = $thumbnailHtml;
+			}
+		}
+		
 		
 		# Loop through the number of fields required to create the widget
 		if ($arguments['subfields'] > 1) {$widgetHtml .= "\n\t\t\t";}
@@ -3533,9 +3633,12 @@ class form
 			// $widgetHtml .= '<input type="hidden" name="MAX_FILE_SIZE" value="' . application::convertSizeToBytes (ini_get ('upload_max_filesize')) . '" />';
 			if ($arguments['editable']) {
 				if ($arguments['draganddrop']) {
-					$widgetHtml .= '<div class="draganddrop">' . "\n\t\t\t\t";
+					$widgetHtml .= "\n\t\t\t" . '<div class="draganddrop">' . "\n\t\t\t\t";
 				}
 				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($mimeTypes ? ' accept="' . implode (', ', $mimeTypes) . '"' : '') . ' />';
+				if ($arguments['thumbnail']) {
+					$widgetHtml .= "\n" . $thumbnailHtmlBySubfield[$subfield];
+				}
 				if ($arguments['draganddrop']) {
 					$widgetHtml .= "\n\t\t\t" . '</div>' . "\n\t\t\t";
 				}
@@ -3545,36 +3648,6 @@ class form
 					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . ' type="hidden" value="' . htmlspecialchars (basename ($arguments['default'][$subfield]['name'])) . '" />' . "\n\t\t\t";
 				}
 			}
-		}
-		
-		# Convert to drag and drop zone if required; this merely styles the input box and does not use HTML5 Drag and Drop; see: https://codepen.io/TheLukasWeb/pen/qlGDa
-		if ($arguments['draganddrop']) {
-			$thumbnailText = 'Click here to pick photo, or drag and drop into this box.';
-			$widgetHtml .= "
-			<style type=\"text/css\">
-				form tr.upload div.draganddrop {
-					width: calc({$this->settings['uploadThumbnailWidth']}px + 4px + 4px);
-					height: calc({$this->settings['uploadThumbnailHeight']}px + 4px + 4px);
-					border: 4px dashed gray;
-				}
-				form tr.upload p {
-					width: {$this->settings['uploadThumbnailWidth']}px;
-					height: {$this->settings['uploadThumbnailHeight']}px;
-					text-align: center;
-					padding: 15px;
-					color: gray;
-				}
-				form tr.upload div input {
-					position: absolute;
-					margin: 0;
-					padding: 0;
-					width: {$this->settings['uploadThumbnailWidth']}px;
-					height: {$this->settings['uploadThumbnailHeight']}px;
-					outline: none;
-					opacity: 0;
-				}
-			</style>
-			";
 		}
 		
 		# Progress bar handler
@@ -3604,138 +3677,6 @@ class form
 					});
 				});
 			";
-		}
-		
-		# If thumbnail viewing is enabled, parse the argument and create the HTML5 code
-		if ($arguments['thumbnail']) {
-			
-			# Enable jQuery
-			#!# Actually this is currently enabling jQuery as well as jQueryUI
-			$this->enableJqueryUi ();
-			
-			# Define the thumbnailing code; this is done once globally
-			$this->jQueryCode[__FUNCTION__] = "\n" . "
-			function thumbWrapper (files, selector) {
-				
-				thumb (files);
-				
-				function thumb(files) {
-					
-					if (files == null || files == undefined) {
-						$(selector).html( '<p><em>Unable to show a thumbnail, as this web browser is too old to support this.</em></p>' );
-						return false;
-					}
-					
-					for (var i = 0; i < files.length; i++) {
-						var file = files[i];
-						var imageType = /image.*/;
-						
-						if (!file.type.match(imageType)) {
-							continue;
-						}
-						
-						var reader = new FileReader();
-						
-						if (reader != null) {
-							reader.onload = GetThumbnail;
-							reader.readAsDataURL(file);
-						}
-					}
-				}
-				
-				function GetThumbnail(e) {
-					
-					var thumbnailCanvas = document.createElement('canvas');
-					var img = new Image();
-					img.src = e.target.result;
-					
-					img.onload = function () {
-						
-						var originalImageWidth = img.width;
-						var originalImageHeight = img.height;
-						
-						thumbnailCanvas.id = 'myTempCanvas';
-						thumbnailCanvas.width  = $(selector).width();
-						thumbnailCanvas.height = $(selector).height();
-						
-						// Scale the thumbnail to fit the box
-						if (originalImageWidth >= originalImageHeight) {
-							scaledWidth = Math.min(thumbnailCanvas.width, originalImageWidth);	// Ensure width is no greater than the available size
-							scaleFactor = (scaledWidth / originalImageWidth);
-							scaledHeight = Math.round(scaleFactor * originalImageHeight);	// Scale to same proportion, and round
-						} else {
-							scaledHeight = Math.min(thumbnailCanvas.height, originalImageHeight);
-							scaleFactor = (scaledHeight / originalImageHeight);
-							scaledWidth = Math.round(scaleFactor * originalImageWidth);
-						}
-						
-						if (thumbnailCanvas.getContext) {
-							var canvasContext = thumbnailCanvas.getContext('2d');
-							canvasContext.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-							var dataURL = thumbnailCanvas.toDataURL();
-							
-							if (dataURL != null && dataURL != undefined) {
-								var nImg = document.createElement('img');
-								nImg.src = dataURL;
-								$(selector).html(nImg);
-							} else {
-								$(selector).html( '<p><em>Unable to read the image.</em></p>' );
-							}
-						}
-					}
-				}
-			}";
-			
-			# For each subfield, add a thumbnail preview, creating the div if required
-			$this->jQueryCode[__FUNCTION__  . $arguments['name']] = '';	// Indexed by element to ensure that multiple upload instances do not overwrite
-			for ($subfield = 0; $subfield < $arguments['subfields']; $subfield++) {
-				
-				# Get the widget ID
-				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$subfield}]" : "{$arguments['name']}_{$subfield}");
-				
-				# Assign the thumbnail ID; if set to boolean true, auto-create the div; otherwise the named selector will be used
-				#!# Named selector will fail if multiple subfields, as they will all be the same
-				$createDivJs = 'false';
-				$thumbnailDivId = false;
-				$selector = $arguments['thumbnail'];
-				if ($arguments['thumbnail'] === true) {
-					$createDivJs = 'true';
-					$thumbnailDivId = $elementId . '_thumbnailpreview';
-					$selector = '#' . $thumbnailDivId;
-				}
-				
-				# Define the thumbnail text
-				if (!isSet ($thumbnailText)) {
-					$thumbnailText = '(Thumbnail will appear here.)';
-				}
-				
-				# Determine whether there is a default image, so that this can be set below
-				$createDefaultImage = ($arguments['default'] && isSet ($arguments['default'][$subfield]));
-				
-				# Add the Javascript
-				$this->jQueryCode[__FUNCTION__  . $arguments['name']] .= "\n" . "
-				$(document).ready(function() {
-					
-					if ({$createDivJs}) {
-						$('#{$elementId}').after ( $('<div />', {
-							id: '{$thumbnailDivId}',
-							width: '{$this->settings['uploadThumbnailWidth']}px',
-							height: '{$this->settings['uploadThumbnailHeight']}px'
-						}) );
-						$('{$selector}').html( '<p class=\"comment\">{$thumbnailText}</p>' );
-					}
-					
-				" . ($createDefaultImage ? "
-					$('#{$thumbnailDivId}').html ('" . ($arguments['thumbnailExpandable'] ? "<a href=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" target=\"_blank\">" : '') . "<img src=\"{$arguments['previewLocationPrefix']}{$arguments['default'][$subfield]['name']}\" style=\"max-width: 100%; max-height: 100%;\" />" . ($arguments['thumbnailExpandable'] ? '</a>' : '') . "');
-				" : '')
-				 . "
-					
-					$('#{$elementId}').change(function() {
-						thumbWrapper(this.files, '{$selector}');
-					});
-				});
-				";
-			}
 		}
 		
 		# Loop through the number of fields required to perform checks
@@ -3868,6 +3809,87 @@ class form
 			'default'	=> $arguments['default'],
 			'after' => $arguments['after'],
 		);
+	}
+	
+	
+	# Thumbnail wrapper JS
+	private function thumbWrapperJs ()
+	{
+		# Create the JS
+		$js = "
+		function thumbWrapper (files, selector) {
+			
+			thumb (files);
+			
+			function thumb(files) {
+				
+				if (files == null || files == undefined) {
+					$(selector).html( '<p><em>Unable to show a thumbnail, as this web browser is too old to support this.</em></p>' );
+					return false;
+				}
+				
+				for (var i = 0; i < files.length; i++) {
+					var file = files[i];
+					var imageType = /image.*/;
+					
+					if (!file.type.match(imageType)) {
+						continue;
+					}
+					
+					var reader = new FileReader();
+					
+					if (reader != null) {
+						reader.onload = GetThumbnail;
+						reader.readAsDataURL(file);
+					}
+				}
+			}
+			
+			function GetThumbnail(e) {
+				
+				var thumbnailCanvas = document.createElement('canvas');
+				var img = new Image();
+				img.src = e.target.result;
+				
+				img.onload = function () {
+					
+					var originalImageWidth = img.width;
+					var originalImageHeight = img.height;
+					
+					thumbnailCanvas.id = 'myTempCanvas';
+					thumbnailCanvas.width  = $(selector).width();
+					thumbnailCanvas.height = $(selector).height();
+					
+					// Scale the thumbnail to fit the box
+					if (originalImageWidth >= originalImageHeight) {
+						scaledWidth = Math.min(thumbnailCanvas.width, originalImageWidth);	// Ensure width is no greater than the available size
+						scaleFactor = (scaledWidth / originalImageWidth);
+						scaledHeight = Math.round(scaleFactor * originalImageHeight);	// Scale to same proportion, and round
+					} else {
+						scaledHeight = Math.min(thumbnailCanvas.height, originalImageHeight);
+						scaleFactor = (scaledHeight / originalImageHeight);
+						scaledWidth = Math.round(scaleFactor * originalImageWidth);
+					}
+					
+					if (thumbnailCanvas.getContext) {
+						var canvasContext = thumbnailCanvas.getContext('2d');
+						canvasContext.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+						var dataURL = thumbnailCanvas.toDataURL();
+						
+						if (dataURL != null && dataURL != undefined) {
+							var nImg = document.createElement('img');
+							nImg.src = dataURL;
+							$(selector).html(nImg);
+						} else {
+							$(selector).html( '<p><em>Unable to read the image.</em></p>' );
+						}
+					}
+				}
+			}
+		}";
+		
+		# Return the JS
+		return $js;
 	}
 	
 	

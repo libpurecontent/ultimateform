@@ -53,7 +53,7 @@
  * @package ultimateForm
  * @license	https://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-20, Martin Lucas-Smith, University of Cambridge
+ * @copyright Copyright  2003-21, Martin Lucas-Smith, University of Cambridge
  * @version See $version below
  */
 class form
@@ -70,7 +70,7 @@ class form
 	var $name;									// The name of the form
 	var $location;								// The location where the form is submitted to
 	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
-	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added
+	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added; those whose key is prefixed with _ are warnings
 	var $elementProblems = array ();			// Array of submitted element problems
 	var $externalProblems = array ();			// Array of external element problems as inserted by the calling applications
 	var $validationRules = array ();			// Array of validation rules
@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.27.0';
+	var $version = '1.27.1';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -1046,6 +1046,7 @@ class form
 			'config.bodyClass'					=> false,										// Apply value of <body class="..."> to editing window
 			'config.format_tags'				=> 'p;h1;h2;h3;h4;h5;h6;pre',
 			'config.stylesSet'					=> "[
+				{name: 'No paragraph style', element: 'p', attributes: {'class': ''}},
 				{name: 'Warning style (paragraph)', element: 'p', attributes: {'class': 'warning'}},
 				{name: 'Success style (paragraph)', element: 'p', attributes: {'class': 'success'}},
 				{name: 'Comment text (paragraph)', element: 'p', attributes: {'class': 'comment'}},
@@ -1824,6 +1825,7 @@ class form
 			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
 			'entities'				=> true,	# Convert HTML in label to entity equivalents
 			'data'					=> array (),	# Values for data-* attributes
+			'tolerateInvalid'		=> false,	# Whether to tolerate an invalid default value, and reset the value to empty
 		);
 		
 		# Create a new form widget
@@ -1999,7 +2001,7 @@ class form
 		}
 		
 		# Ensure that all initial values are in the array of values
-		$this->ensureDefaultsAvailable ($arguments);
+		$this->ensureDefaultsAvailable ($arguments, $warningHtml /* returned by reference */);
 		
 		# Emulate the need for the field to be 'required', i.e. the minimum number of fields is greater than 0
 		$required = ($arguments['required'] > 0);
@@ -2148,6 +2150,9 @@ class form
 			$elementValue = array_keys ($presentableDefaults);
 		}
 		
+		# If a warning has been generated, show this
+		$widgetHtml .= $this->showWarning ($warningHtml);
+		
 		# Support copyTo - sets the value of another field to the selected option's visible text if it is currently empty or changed again
 		$this->copyTo ($arguments);
 		
@@ -2222,6 +2227,15 @@ class form
 			'groupValidation' => 'compiled',
 			'after' => $arguments['after'],
 		);
+	}
+	
+	
+	# Function to render a warning
+	private function showWarning ($warningHtml)
+	{
+		# Show the warning if present
+		if (!$warningHtml) {return false;}
+		return '<br /><span class="warning"><strong>&#9888; Warning:</strong> ' . $warningHtml . '</span>';
 	}
 	
 	
@@ -2381,6 +2395,7 @@ class form
 			'after'					=> false,		# Placing the widget after a specific other widget
 			'entities'				=> true,		# Convert HTML in label to entity equivalents
 			'titles'				=> array (),	# Title attribute texts, as array (value => string, ...)
+			'tolerateInvalid'		=> false,		# Whether to tolerate an invalid default value, and reset the value to empty
 		);
 		
 		# Create a new form widget
@@ -2454,7 +2469,7 @@ class form
 		}
 		
 		# Ensure that all initial values are in the array of values
-		$this->ensureDefaultsAvailable ($arguments);
+		$this->ensureDefaultsAvailable ($arguments, $warningHtml /* returned by reference */);
 		
 		# If the field is not a required field (and therefore there is a null text field), ensure that none of the values have an empty string as the value (which is reserved for the null)
 		#!# Policy question: should empty values be allowed at all? If so, make a special constant for a null field but which doesn't have the software name included
@@ -2518,6 +2533,9 @@ class form
 				}
 			}
 		}
+		
+		# If a warning has been generated, show this
+		$widgetHtml .= $this->showWarning ($warningHtml);
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
@@ -2606,6 +2624,7 @@ class form
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'entities'				=> true,	# Convert HTML in label to entity equivalents
+			'tolerateInvalid'		=> false,	# Whether to tolerate an invalid default value, and reset the value to empty
 		);
 		
 		# Create a new form widget
@@ -2673,7 +2692,7 @@ class form
 		if ($arguments['maximum'] && $arguments['required'] && ($arguments['maximum'] < $arguments['required'])) {$this->formSetupErrors['checkboxesMaximumMismatch'] = "In the <strong>{$arguments['name']}</strong> element, A maximum and a minimum number of checkboxes have both been specified but this maximum (<strong>{$arguments['maximum']}</strong>) is less than the minimum (<strong>{$arguments['required']}</strong>) required.";}
 		
 		# Ensure that all initial values are in the array of values
-		$this->ensureDefaultsAvailable ($arguments);
+		$this->ensureDefaultsAvailable ($arguments, $warningHtml /* returned by reference */);
 		
 		# Start a tally to check the number of checkboxes checked
 		$checkedTally = 0;
@@ -2788,6 +2807,9 @@ class form
 		if (isSet ($restriction)) {
 			$restriction = implode (';<br />', $restriction);
 		}
+		
+		# If a warning has been generated, show this
+		$widgetHtml .= $this->showWarning ($warningHtml);
 		
 		# Re-assign back the value
 		$this->form[$arguments['name']] = $elementValue;
@@ -4258,7 +4280,7 @@ class form
 	
 	
 	# Function to ensure that all initial values are in the array of values
-	function ensureDefaultsAvailable ($arguments)
+	function ensureDefaultsAvailable ($arguments, &$warningHtml = false)
 	{
 		# Convert to an array (for this local function only) if not already
 		if (!is_array ($arguments['default'])) {
@@ -4279,8 +4301,20 @@ class form
 		
 		# Construct the warning message
 		if (isSet ($missingValues)) {
+			
+			# Construct the message
 			$totalMissingValues = count ($missingValues);
-			$this->formSetupErrors['defaultMissingFromValuesArray'] = "In the <strong>{$arguments['name']}</strong> element, the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . '<em>' . htmlspecialchars (implode (', ', $missingValues)) . '</em>' . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items for selection by the user.';
+			$message = "the default " . ($totalMissingValues > 1 ? 'values ' : 'value ') . '<em>' . htmlspecialchars (implode (', ', $missingValues)) . '</em>' . ($totalMissingValues > 1 ? ' were' : ' was') . ' not found in the list of available items';
+			
+			# If tolerating invalid values, show a warning to the user
+			if ($arguments['tolerateInvalid']) {
+				$warningHtml = ucfirst ($message) . '. As such, the value for this field has been reset, but you should review it.';
+			}
+			
+			# Flag the error to the admin
+			$errorKey = 'defaultMissingFromValuesArray' . '_' . $arguments['name'];		// Name appended to avoid hiding if multiple widget throw the same error
+			if ($arguments['tolerateInvalid']) {$errorKey = '_' . $errorKey;}	// Prefix with _ to indicate warning
+			$this->formSetupErrors[$errorKey] = "In the <strong>{$arguments['name']}</strong> element, " . $message . ' for selection by the user.';
 		}
 	}
 	
@@ -5435,6 +5469,7 @@ class form
 		
 		# If the form is not posted or contains problems, display it and flag that it has been displayed
 		$elementProblems = $this->getElementProblems ();
+		#!# Form saving bypassing validation can be problematic if, e.g. "You submitted more characters (174) than are allowed (130)" occurs, and the database then tries to save this, resulting in truncation; form save should still error on invalid data submitted (e.g. too long) but not absent values
 		if ($this->formSave) {$elementProblems = false;}	// A form save bypasses validation
 		if (!$this->formPosted || $elementProblems || $formRefreshed || ($this->settings['reappear'] && $this->formPosted && !$elementProblems)) {
 			
@@ -5727,22 +5762,46 @@ class form
 		$this->_checkGroupValidations ();
 		
 		# If there are any form setup errors - a combination of those just defined and those assigned earlier in the form processing, show them
+		$errorTexts = array ();
+		$warningTexts = array ();
 		if (!empty ($this->formSetupErrors)) {
-			$setupErrorText = application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, (count ($this->formSetupErrors) > 1 ? 'Various errors were' : 'An error was') . " found in the setup of the form. The website's administrator needs to correct the configuration before the form will work:", false, $this->settings['errorsCssClass']);
+			
+			# Split the setup errors into errors and warnings
+			foreach ($this->formSetupErrors as $errorKey => $error) {
+				$errorText = "\n- " . strip_tags ($error);
+				if (substr ($errorKey, 0, 1) == '_') {
+					$warningTexts[] = $errorText;
+				} else {
+					$errorTexts[] = $errorText;
+				}
+			}
+			
+			# Show the setup errors/warnings
+			$introductionMessageComponents = array ();
+			if ($errorTexts) {
+				$introductionMessageComponents[] = (count ($errorTexts) > 1 ? 'various errors' : 'an error');
+			}
+			if ($warningTexts) {
+				$introductionMessageComponents[] = (count ($warningTexts) > 1 ? 'various warnings' : 'a warning');
+			}
+			$introductionMessage = ucfirst (implode (' and ', $introductionMessageComponents)) . ' ' . (count ($this->formSetupErrors) > 1 ? 'were' : 'was') . ' found in the setup of the form.' . ($warningTexts && !$errorTexts /* Form not shown if any errors, so don't point to warnings in that scenario */ ? ' Please see the warning(s) below.' : '') . ($errorTexts ? " The website's administrator needs to correct the error before the form will work." : '');
+			$setupErrorText = application::showUserErrors ($this->formSetupErrors, $parentTabLevel = 1, $introductionMessage, false, $this->settings['errorsCssClass']);
 			$this->html .= $setupErrorText;
 			
 			# E-mail the errors to the admin if wanted
-			foreach ($this->formSetupErrors as $error) {
-				$errorTexts[] = "\n- " . strip_tags ($error);
-			}
 			if ($this->settings['mailAdminErrors']) {
 				$administrator = (application::validEmail ($this->settings['mailAdminErrors']) ? $this->settings['mailAdminErrors'] : $_SERVER['SERVER_ADMIN']);
-				$message  = "The webform at \n" . $_SERVER['_PAGE_URL'] . "\nreports the following ultimateForm setup misconfiguration:";
-				$message .= "\n\n" . implode ("\n", $errorTexts);
+				$message  = "The webform at \n" . $_SERVER['_PAGE_URL'] . "\nreports the following ultimateForm setup misconfiguration:\n";
+				if ($errorTexts) {
+					$message .= "\n\nERRORS:\n" . implode ("\n", $errorTexts);
+				}
+				if ($warningTexts) {
+					$message .= "\n\nWARNINGS:\n" . implode ("\n", $warningTexts);
+				}
 				$message .= "\n\n\nIP:    {$_SERVER['REMOTE_ADDR']}\nUser:  {$_SERVER['REMOTE_USER']}";
 				application::utf8Mail (
 					$administrator,
-					'Form setup error',
+					'Form setup ' . ($errorTexts ? 'error' : 'warning'),
 					wordwrap ($message),
 					$additionalHeaders = "From: {$this->settings['emailName']} <" . $administrator . ">\r\n"
 				);
@@ -5752,8 +5811,8 @@ class form
 		# Set that the form has effectively been displayed
 		$this->formDisplayed = true;
 		
-		# Return true (i.e. form set up OK) if the errors array is empty
-		return (empty ($this->formSetupErrors));
+		# Return true (i.e. form set up OK) if the errors (i.e. excluding warnings) array is empty
+		return (empty ($errorTexts));
 	}
 	
 	
@@ -7344,6 +7403,7 @@ class form
 			$message .= 'Content-type: text/plain; charset="UTF-8"' . $eol;
 			$message .= "Content-Transfer-Encoding: 8bit" . $eol;
 			$message .= $eol;
+			#!# The note about files being saved on the webserver will not be correct if $this->settings['attachmentsDeleteIfMailed'] is off
 			$message .= wordwrap ($introductoryText . "\n\n" . ($totalAttachments == 1 ? 'There is also an attachment.' : "There are also {$totalAttachments} attachments. Please take care when opening them.") . ($totalAttachmentsDifference ? ' ' . ($totalAttachmentsDifference == 1 ? 'One other submitted file was too large to e-mail, so it has' : "{$totalAttachmentsDifference} other submitted files were too large to e-mail, so they have") . " been saved on the webserver. Please contact the webserver's administrator to retrieve " . ($totalAttachmentsDifference == 1 ? 'it' : 'them') . '.' : '') . "\n\n\n\n" . implode ("\n\n\n", $resultLines)) . "{$eol}{$eol}{$eol}" . $eol;
 			$message .= '--' . $mimeBoundary;
 			

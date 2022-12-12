@@ -53,7 +53,7 @@
  * @package ultimateForm
  * @license	https://opensource.org/licenses/gpl-license.php GNU Public License
  * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-21, Martin Lucas-Smith, University of Cambridge
+ * @copyright Copyright  2003-22, Martin Lucas-Smith, University of Cambridge
  * @version See $version below
  */
 class form
@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.27.1';
+	var $version = '1.27.2';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -325,7 +325,7 @@ class form
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'multiple'				=> false,	# For e-mail types only: whether the field can accept multiple e-mail addresses (separated with comma-space)
 			'autocomplete'			=> false,	# URL of data provider
-			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
+			'autocompleteOptions'	=> false,	# Autocomplete options; see: https://jqueryui.com/autocomplete/#remote (this is the new plugin)
 			'tags'					=> false,	# Tags mode
 			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'displayedValue'		=> false,	# When using editable=false, optional text that should be displayed instead of the value; can be made into HTML using entities=false
@@ -778,7 +778,7 @@ class form
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'autocomplete'			=> false,	# URL of data provider
-			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
+			'autocompleteOptions'	=> false,	# Autocomplete options; see: https://jqueryui.com/autocomplete/#remote (this is the new plugin)
 			'autocompleteTokenised'	=> false,	# URL of data provider
 			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'displayedValue'		=> false,	# When using editable=false, optional text that should be displayed instead of the value; can be made into HTML using entities=false
@@ -1822,7 +1822,7 @@ class form
 			'onchangeSubmit'		=> false,	# Whether to submit the form onchange
 			'copyTo'				=> false,	# Whether to copy the value, onchange, to another form widget if that widget's value is currently empty
 			'autocomplete'			=> false,	# URL of data provider
-			'autocompleteOptions'	=> false,	# Autocomplete options; see: http://jqueryui.com/demos/autocomplete/#remote (this is the new plugin)
+			'autocompleteOptions'	=> false,	# Autocomplete options; see: https://jqueryui.com/autocomplete/#remote (this is the new plugin)
 			'entities'				=> true,	# Convert HTML in label to entity equivalents
 			'data'					=> array (),	# Values for data-* attributes
 			'tolerateInvalid'		=> false,	# Whether to tolerate an invalid default value, and reset the value to empty
@@ -3138,7 +3138,7 @@ class form
 				$minDate = (($arguments['min'] && preg_match ('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $arguments['min'], $matches)) ? "new Date({$matches[1]}, " . ($matches[2] - 1) . ', ' . (int) $matches[3] . ')' : 'null');	// e.g. 2012-07-22 becomes new Date(2012, 6, 22)
 				$maxDate = (($arguments['min'] && preg_match ('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $arguments['max'], $matches)) ? "new Date({$matches[1]}, " . ($matches[2] - 1) . ', ' . (int) $matches[3] . ')' : 'null');
 				
-				# Add jQuery UI javascript for the date picker; see: http://jqueryui.com/demos/datepicker/
+				# Add jQuery UI javascript for the date picker; see: https://jqueryui.com/datepicker/
 				$this->enableJqueryUi ();
 				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
 				# NB This has to be done in Javascript rather than PHP because the main part of this is client-side testing of actual browser support rather than just a browser number
@@ -3156,7 +3156,7 @@ class form
 					}
 				}
 				if(!html5Support) {
-					var dateDefaultDate_{$arguments['name']} = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// http://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
+					var dateDefaultDate_{$arguments['name']} = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// https://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
 					$(function() {
 						$('#{$widgetId}').datepicker({
 							changeMonth: true,
@@ -3186,7 +3186,7 @@ class form
 					});
 				}";
 				
-				# Enable autosubmit if required; see: http://stackoverflow.com/questions/11532433 for the HTML5 picker, and http://stackoverflow.com/questions/6471959 for the jQuery picker
+				# Enable autosubmit if required; see: http://stackoverflow.com/questions/11532433 for the HTML5 picker, and https://stackoverflow.com/questions/6471959/ for the jQuery picker
 				if ($arguments['pickerAutosubmit']) {
 					$this->jQueryCode[__FUNCTION__ . $widgetId] .= "\n
 				// Date picker autosubmit (HTML/jQuery picker)
@@ -4127,14 +4127,14 @@ class form
 		# Need to keep this in sync with a compatible jQuery version
 		if ($this->settings['jQueryUi']) {
 			$this->jQueryLibraries['jQueryUI'] = '
-				<script src="//code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
-				<link href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css" rel="stylesheet" type="text/css"/>
+				<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js" integrity="sha256-xLD7nhI62fcsEZK2/v8LsBcb4lG7dgULkuXoXB/j91c=" crossorigin="anonymous"></script>
+				<link href="https://code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css" rel="stylesheet" type="text/css"/>
 			';
 		}
 	}
 	
 	
-	# Function to add jQuery-based autocomplete; see: http://jqueryui.com/demos/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: http://www.learningjquery.com/2010/06/autocomplete-migration-guide
+	# Function to add jQuery-based autocomplete; see: https://jqueryui.com/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: https://learningjquery.com/2010/06/autocomplete-migration-guide
 	function autocompleteJQuery ($id, $data, $options = array (), $subwidgets = false)
 	{
 		# Ensure that jQuery UI is loaded
@@ -6444,10 +6444,11 @@ class form
 		$html  = '';
 		
 		# Add the library if required
+		#!# Rework this function so that the subresource integrity can be included in the <script> URL
 		if ($this->jQueryLibraries || $this->jQueryCode) {
 			if ($this->settings['jQuery']) {
 				if ($this->settings['jQuery'] === true) {	// If not a URL, use the default, respecting HTTP/HTTPS to avoid mixed content warnings
-					$this->settings['jQuery'] = '//code.jquery.com/jquery.min.js';
+					$this->settings['jQuery'] = 'https://code.jquery.com/jquery-3.6.1.min.js';
 				}
 				if ($this->settings['jQuery']) {
 					$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";

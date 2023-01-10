@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.27.3';
+	var $version = '1.28.0';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -226,6 +226,12 @@ class form
 		'redirectGet'						=> false,							# On successful submission, redirect, simplifying with non-empty values as GET parameters
 		#!# This should be made automatic, once the system is used to a parse-settings-then-render pattern
 		'enableNativeRequired'				=> false,							# Whether to enable native HTML5 required attributes; this should be disabled when using Save and continue or expandable
+		'mapTileUrl'						=> 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+		'mapTileCopyrightHtml'				=> 'Map data &copy; <a href=\"https://openstreetmap.org/\">OpenStreetMap</a> contributors, ODbL',
+		'mapTileMaxZoom'					=> 18,
+		'mapGeocoder'						=> 'geocoder.js',	# Whether to enable geocoder, and if so, JS path
+		'mapGeocoderApiKey'					=> false,	# Geocoder API key for external provider
+		'mapGeocoderAutocompleteBbox'		=> '-6.6577,49.9370,1.7797,57.6924',	# Geocoder autocomplete bbox as W,S,E,N; default here is UK area
 	);
 	
 	
@@ -749,6 +755,283 @@ class form
 	{
 		# Pass through to the standard input widget, but in password mode
 		$this->input ($suppliedArguments, __FUNCTION__);
+	}
+	
+	
+	/**
+	 * Create a Map widget
+	 * @param array $arguments Supplied arguments same as input type plus those below
+	 */
+	public function map ($suppliedArguments)
+	{
+		# Specify available arguments as defaults or as NULL (to represent a required argument)
+		$argumentDefaults = array (
+			'name'						=> NULL,	# Name of the element
+			'editable'					=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
+			'title'						=> '',		# Introductory text
+			'description'				=> '',		# Description text
+			'append'					=> '',		# HTML appended to the widget
+			'prepend'					=> '',		# HTML prepended to the widget
+			'output'					=> array (),# Presentation format
+			'required'					=> false,	# Whether required or not
+			'default'					=> '',		# Default value (optional)
+			'regexp'					=> '',		# Case-sensitive regular expression against which the submission must validate
+			'regexpi'					=> '',		# Case-insensitive regular expression against which the submission must validate
+			'disallow'					=> false,	# Regular expression against which the submission must not validate
+			'antispam'					=> $this->settings['antispam'],		# Whether to switch on anti-spam checking
+			'discard'					=> false,	# Whether to process the input but then discard it in the results
+			'datatype'					=> false,	# Datatype used for database writing emulation (or caching an actual value)
+			'confirmation'				=> false,	# Whether to generate a confirmation field
+			'tabindex'					=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
+			'after'						=> false,	# Placing the widget after a specific other widget
+			'width'						=> 'auto',	# Map width in px, or string e.g. 'auto'
+			'height'					=> 400,		# Map height in px, or string value
+			'defaultLocationLatitude'	=> NULL,	# Default location: latitude
+			'defaultLocationLongitude'	=> NULL,	# Default location: longitude
+			'defaultLocationZoom'		=> NULL,	# Default location: zoom
+			#!# Currently these are set globally and if there is more than one map element, the first only is used
+			'tileUrl'					=> $this->settings['mapTileUrl'],
+			'tileCopyrightHtml'			=> $this->settings['mapTileCopyrightHtml'],
+			'tileMaxZoom'				=> $this->settings['mapTileMaxZoom'],
+			'geocoder'					=> $this->settings['mapGeocoder'],
+			'geocoderApiKey'			=> $this->settings['mapGeocoderApiKey'],
+			'geocoderAutocompleteBbox'	=> $this->settings['mapGeocoderAutocompleteBbox'],
+			'instructionsHtml'			=> '<p>Zoom in and click on the map to set the exact location:</p>',
+		);
+		
+		# Create a new form widget
+		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
+		
+		$arguments = $widget->getArguments ();
+		
+		# If the widget is not editable, fix the form value to the default
+		if (!$arguments['editable']) {$this->form[$arguments['name']] = $arguments['default'];}
+		
+		# Obtain the value of the form submission (which may be empty)
+		$value = (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : '');
+		
+		# Set the value
+		$widget->setValue ($value);
+		
+		# Handle whitespace issues
+		$widget->handleWhiteSpace ();
+		
+		# Perform pattern checks
+		$regexpCheck = $widget->regexpCheck ();
+		
+		# Perform antispam checks
+		$widget->antispamCheck ();
+		
+		$elementValue = $widget->getValue ();
+		
+		# Assign the initial value if the form is not posted (this bypasses any checks, because there needs to be the ability for the initial value deliberately not to be valid)
+		if (!$this->formPosted) {$elementValue = $arguments['default'];}
+		
+		# Re-assign back the value
+		$this->form[$arguments['name']] = $elementValue;
+		
+		# Assemble the widget ID for use in script registration
+		$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
+		
+		# Start the widget HTML
+		$widgetHtml = '';
+		
+		# Define the map JS/CSS; these are loaded only once even if there are multiple map widgets, so are namespaced
+		$this->jsCssAssets['mapCode']  = '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />';
+		$this->jsCssAssets['mapCode'] .= '<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>';
+		$this->jsCssAssets['mapCode'] .= $this->mapCss ($arguments);
+		$this->jQueryCode['mapCode'] = $this->mapJs ($arguments);
+		
+		# Add geocoder if required; this input element is not related to the form itself but a standalone control
+		$geocoderHtml = '';
+		if ($arguments['geocoder']) {
+			$this->enableJqueryUi ();
+			$this->jsCssAssets['mapCode'] .= '<script src="' . htmlspecialchars ($arguments['geocoder']) . '"></script>';
+			$geocoderHtml .= "\n\t" . '<div class="mapgeocoder">';
+			$geocoderHtml .= "\n\t\t" . '<input id="' . $widgetId . '_geocoder" type="text" name="location" autocomplete="off" placeholder="Search locations and move map" spellcheck="false" />';
+			$geocoderHtml .= "\n\t" . '</div>';
+		}
+		
+		# Add instructions if required
+		if ($arguments['instructionsHtml']) {
+			$widgetHtml .= "\n\n" . $arguments['instructionsHtml'];
+		}
+		
+		# Assemble the form and map, which is a hidden input plus a Leaflet map div that writes into the field
+		$widgetHtml .= "\n" . '<textarea class="mapinput"' . $this->nameIdHtml ($arguments['name']) . $widget->tabindexHtml () . ' cols="60" rows="8"' . ($arguments['editable'] ? '' : ' readonly="readonly"') . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
+		$widgetHtml .= "\n" . '<div class="mapcontainer" style="width: ' . (is_int ($arguments['width']) ? $arguments['width'] . 'px' : $arguments['width']) . '; height: ' . (is_int ($arguments['height']) ? $arguments['height'] . 'px' : $arguments['height']) . ';">';
+		$widgetHtml .= $geocoderHtml;
+		$widgetHtml .= "\n\t" . '<div id="' . $widgetId . '_map" class="mapdiv" data-initiallocation="' . "{$arguments['defaultLocationZoom']}/{$arguments['defaultLocationLatitude']}/{$arguments['defaultLocationLongitude']}" . '"></div>';
+		$widgetHtml .= "\n" . '</div>';
+		
+		# Check for element problems
+		$problems = $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false);
+		
+		# Get the posted data
+		if ($this->formPosted) {
+			$data['rawcomponents'] = json_encode (json_decode ($this->form[$arguments['name']]), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);		// Reformat for consistency
+			$data['compiled'] = 'Location on map';
+			//$data['presented'] = $widgetHtml;		// #!# Would need more work to implement, as jQuery code will get omitted
+		}
+		
+		# Add the widget to the master array for eventual processing
+		$this->elements[$arguments['name']] = array (
+			'type' => __FUNCTION__,
+			'html' => $arguments['prepend'] . $widgetHtml . $arguments['append'],
+			'title' => $arguments['title'],
+			'description' => $arguments['description'],
+			'restriction' => (isSet ($restriction) && $arguments['editable'] ? $restriction : false),
+			'problems' => $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false),
+			'required' => $arguments['required'],
+			'requiredButEmpty' => $widget->requiredButEmpty (),
+			'suitableAsEmailTarget' => false,
+			'output' => $arguments['output'],
+			'discard' => $arguments['discard'],
+			'editable' => $arguments['editable'],
+			'data' => (isSet ($data) ? $data : NULL),
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'TEXT') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'after' => $arguments['after'],
+		);
+	}
+	
+	
+	# Function to create the CSS for the map
+	private function mapCss ($arguments)
+	{
+		# Define the CSS
+		$css = "
+			<style type=\"text/css\">
+				.{$this->settings['div']} .mapinput {display: none;}
+				.{$this->settings['div']} .mapcontainer {position: relative;}	/* Width/height is set on the element itself */
+				.{$this->settings['div']} .mapcontainer .mapdiv {display: block; width: 100%; height: 100%;}
+				.{$this->settings['div']} .mapcontainer .mapdiv a {text-decoration: none;}
+				.{$this->settings['div']} .mapcontainer .mapgeocoder {position: absolute; top: 10px; left: 55px; z-index: 450;}		/* Z-indexes at: https://leafletjs.com/reference.html#map-mappane */
+				.{$this->settings['div']} .mapcontainer .mapgeocoder input {width: 300px;}
+				.{$this->settings['div']} .ui-front {z-index: 999 !important;}
+				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item, .ui-autocomplete li.ui-menu-item a {width: 100%; padding: 0; font-size: 0.9em; padding-bottom: 10px;}
+				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item a span {color: gray;}
+			</style>
+		";
+		
+		# Return the CSS
+		return $css;
+	}
+	
+	
+	# Function to create the JS for the map(s)
+	private function mapJs ($arguments)
+	{
+		# Define the JS, which will be wrapped in jQuery document ready
+		$js = "
+			ultimateFormMap ();
+			
+			function ultimateFormMap () {
+				
+				// Create each map with a matching div input on the page; see: https://stackoverflow.com/a/71349246/180733
+				$('.{$this->settings['div']} .mapinput').each (function() {
+					
+					// Create a closure, so that this.id is fixed for each handler, to avoid crosstalk; see: https://stackoverflow.com/a/21472993/180733
+					(function (widgetId) {		// this.id passed in
+						
+						// Determine the map ID
+						var mapId = widgetId + '_map';		// e.g. form_location1_map
+						
+						// Settings
+						var _settings = {
+							geocoderApiBaseUrl: 'https://api.cyclestreets.net/v2/geocoder',
+							geocoderApiKey: '" . htmlspecialchars ($arguments['geocoderApiKey']) . "',		// Obtain at https://www.cyclestreets.net/api/apply/
+							autocompleteBbox: '" . htmlspecialchars ($arguments['geocoderAutocompleteBbox']) . "',
+						};
+						
+						// Determine if the widget is editable
+						var isEditable = !($('#' + widgetId).is ('[readonly]'));
+						
+						// Get the initial location from the div
+						var initialLocation = $('#' + mapId).data ('initiallocation').split ('/');		// Zoom, lat, lon
+						
+						// Create the map
+						var map = L.map (mapId).setView ([ initialLocation[1], initialLocation[2] ], initialLocation[0]);
+						L.tileLayer ('" . htmlspecialchars ($arguments['tileUrl']) . "', {
+							attribution: '" . $arguments['tileCopyrightHtml'] . "',
+							maxZoom: " . $arguments['tileMaxZoom'] . "
+						}).addTo (map);
+						
+						// Set required and minimum zoom for map marker
+						var requiredZoom = 16;
+						var maximumZoom = 18;
+						
+						// Add geocoder
+						var geocoderId = widgetId + '_geocoder';		// e.g. form_location1_geocoder
+						autocomplete.addTo ('input#' + geocoderId, {
+							sourceUrl: _settings.geocoderApiBaseUrl + '?key=' + _settings.geocoderApiKey + '&bounded=1&bbox=' + _settings.autocompleteBbox,
+							select: function (event, ui) {
+								var bbox = ui.item.feature.properties.bbox.split(',');
+								map.fitBounds ([ [bbox[1], bbox[0]], [bbox[3], bbox[2]] ]);
+								event.preventDefault();
+							}
+						});
+						
+						// Set initial value if page reloaded
+						var marker;
+						var initialLocation = $('#' + widgetId).val ();
+						if (initialLocation) {
+							var geojson = JSON.parse (initialLocation);
+							var latlng = [geojson.features[0].geometry.coordinates[1], geojson.features[0].geometry.coordinates[0]];
+							setMarker (latlng);
+							map.setView (latlng, requiredZoom);
+						}
+						
+						// Capture value on marker location selection to form
+						function setFormValue (marker) {
+							var geojsonFeature = marker.toGeoJSON ();	// Default precision value is 6 decimal places
+							var geojson = {type: \"FeatureCollection\", features: [geojsonFeature]};
+							$('#' + widgetId).val (JSON.stringify (geojson));
+						}
+						
+						// Click on the map to set location, unless disabled
+						if (isEditable) {
+							map.on ('click', function (e) {
+								
+								// Require high zoom level to ensure accuracy
+								var currentZoom = map.getZoom ();
+								if (currentZoom < requiredZoom) {
+									map.flyTo (e.latlng, (currentZoom + 2));
+									return;
+								}
+								
+								// Set the marker
+								setMarker (e.latlng);
+							});
+						}
+						
+						// Function to set the marker
+						function setMarker (latlng)
+						{
+							// Ensure singleton
+							if (marker) {
+								map.removeLayer (marker);
+							}
+							
+							// Create the marker and set location
+							marker = new L.marker (latlng, {
+								draggable: isEditable,
+								autoPan: true
+							}).addTo (map);
+							setFormValue (marker);
+							
+							// If the marker is set as draggable, update the location on click/drag
+							marker.on ('drag', function (e) {
+								setFormValue (marker);
+							});
+						}
+					}) (this.id);	// End of closure for this map
+					
+				});		// End foreach map ID
+			}
+		";
+		
+		# Return the JS
+		return $js;
 	}
 	
 	
@@ -6963,6 +7246,20 @@ class form
 				'screen'			=> array ('presented', 'compiled'), #, 'rawcomponents'
 				'processing'		=> array ('compiled'), #, 'rawcomponents'
 				'database'			=> array ('presented'),
+			),
+			
+			'map' => array (
+				'_descriptions' => array (
+					'rawcomponents'	=> 'GeoJSON string',
+					'compiled'		=> 'Textual summary of submitted map data',
+					//'presented'		=> 'Show as visual map',
+				),
+				'file'				=> array ('rawcomponents', 'compiled'),
+				'email'				=> array ('compiled', 'rawcomponents'),
+				'confirmationEmail'	=> array ('compiled', 'rawcomponents'),
+				'screen'			=> array (/* 'presented', */ 'compiled', 'rawcomponents'),
+				'processing'		=> array ('rawcomponents', 'compiled'),
+				'database'			=> array ('rawcomponents', 'compiled'),
 			),
 			
 			'radiobuttons' => array (

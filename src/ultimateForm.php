@@ -52,8 +52,8 @@
  * 
  * @package ultimateForm
  * @license	https://opensource.org/licenses/gpl-license.php GNU Public License
- * @author	{@link http://www.geog.cam.ac.uk/contacts/webmaster.html Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-22, Martin Lucas-Smith, University of Cambridge
+ * @author	{@link https://www.geog.cam.ac.uk/contacts/webmaster/ Martin Lucas-Smith}, University of Cambridge
+ * @copyright Copyright  2003-23, Martin Lucas-Smith, University of Cambridge
  * @version See $version below
  */
 class form
@@ -89,7 +89,7 @@ class form
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
 	var $antispamWait = 0;						// Time to wait in the event of spam attempt detection, in seconds
 	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
-	var $jQueryLibraries = array ();			// Array of jQuery client library loading HTML tags, if any, which are treated as plain HTML
+	var $jsCssAssets = array ();				// Array of JS/CSS client library loading HTML tags, if any, which are treated as plain HTML
 	var $jQueryCode = array ();					// Array of jQuery client code, if any, which will get wrapped in a script tag
 	var $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
 	var $formSave = false;						// Whether the submission is a save rather than a proper submission
@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.27.2';
+	var $version = '1.27.3';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -287,7 +287,7 @@ class form
 	 * Create a standard input widget
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function input ($suppliedArguments, $functionName = __FUNCTION__)
+	function input ($suppliedArguments, $functionName = __FUNCTION__, /* internal */ $additionalArgumentDefaults = array ())
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -334,32 +334,15 @@ class form
 			'_visible--DONOTUSETHISFLAGEXTERNALLY'		=> true,	# DO NOT USE - this is present for internal use only and exists prior to refactoring
 		);
 		
-		# Add in password-specific defaults
-		#!# These blocks ought to be specifiable in the native password()/email()/etc. functions
-		if ($functionName == 'password') {
-			$argumentDefaults['generate'] = false;		# Whether to generate a password if no value supplied as default
-			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation password field
-		}
+		# Add any element type -specific argument defaults, overriding any existing ones
+		$argumentDefaults = array_merge ($argumentDefaults, $additionalArgumentDefaults);
 		
 		# Add in email-specific defaults
+		#!# These do not appear to do anything - should these be $suppliedArguments ?
 		if ($functionName == 'email') {
 			$argumentDefaults['confirmation'] = false;	# Whether to generate a second confirmation e-mail field
 		} else {
 			$argumentDefaults['multiple'] = false;	# Ensure this option is disabled for non-email types
-		}
-		
-		# Add in URL-specific defaults
-		if ($functionName == 'url') {
-			$argumentDefaults['regexpi'] = '^(http|https)://(.+)\.(.+)';
-		}
-		
-		# Add in Number-specific defaults
-		#!# This needs to have min/max/step value validation and restriction text, and make enforceNumeric set numeric
-		if (($functionName == 'number') || ($functionName == 'range')) {
-			$argumentDefaults['min'] = false;
-			$argumentDefaults['max'] = false;
-			$argumentDefaults['step'] = false;
-			$argumentDefaults['roundFloat'] = false;
 		}
 		
 		# If an element is expandable, if it is boolean true, convert to default string
@@ -654,12 +637,18 @@ class form
 	
 	/**
 	 * Create a password widget (same as an input widget but using the HTML 'password' type)
-	 * @param array $arguments Supplied arguments same as input type
+	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
 	function password ($suppliedArguments)
 	{
+		# Additional argument defaults
+		$additionalArgumentDefaults = array (
+			'generate' => false,		# Whether to generate a password if no value supplied as default
+			'confirmation' => false,	# Whether to generate a second confirmation password field
+		);
+		
 		# Pass through to the standard input widget, but in password mode
-		$this->input ($suppliedArguments, __FUNCTION__);
+		$this->input ($suppliedArguments, __FUNCTION__, $additionalArgumentDefaults);
 	}
 	
 	
@@ -676,12 +665,17 @@ class form
 	
 	/**
 	 * Create a URL widget (same as an input widget but using the HTML5 'url' type)
-	 * @param array $arguments Supplied arguments same as input type
+	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
 	function url ($suppliedArguments)
 	{
+		# Additional argument defaults
+		$additionalArgumentDefaults = array (
+			'regexpi' => '^(http|https)://(.+)\.(.+)',
+		);
+		
 		# Pass through to the standard input widget
-		$this->input ($suppliedArguments, __FUNCTION__);
+		$this->input ($suppliedArguments, __FUNCTION__, $additionalArgumentDefaults);
 	}
 	
 	
@@ -709,23 +703,41 @@ class form
 	
 	/**
 	 * Create a Number widget (same as an input widget but using the HTML5 'number' type)
-	 * @param array $arguments Supplied arguments same as input type
+	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
 	function number ($suppliedArguments)
 	{
+		# Additional argument defaults
+		#!# This needs to have min/max/step value validation and restriction text, and make enforceNumeric set numeric
+		$additionalArgumentDefaults = array (
+			'min' => false,
+			'max' => false,
+			'step' => false,
+			'roundFloat' => false,
+		);
+		
 		# Pass through to the standard input widget
-		$this->input ($suppliedArguments, __FUNCTION__);
+		$this->input ($suppliedArguments, __FUNCTION__, $additionalArgumentDefaults);
 	}
 	
 	
 	/**
 	 * Create a Range widget (same as an input widget but using the HTML5 'range' type)
-	 * @param array $arguments Supplied arguments same as input type
+	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
 	function range ($suppliedArguments)
 	{
+		# Additional argument defaults
+		#!# This needs to have min/max/step value validation and restriction text, and make enforceNumeric set numeric
+		$additionalArgumentDefaults = array (
+			'min' => false,
+			'max' => false,
+			'step' => false,
+			'roundFloat' => false,
+		);
+		
 		# Pass through to the standard input widget
-		$this->input ($suppliedArguments, __FUNCTION__);
+		$this->input ($suppliedArguments, __FUNCTION__, $additionalArgumentDefaults);
 	}
 	
 	
@@ -1506,7 +1518,7 @@ class form
 			<!-- WYSIWYG editor; replace the <textarea> with a CKEditor instance -->
 			<textarea' . $this->nameIdHtml ($arguments['name']) . " style=\"width: {$arguments['config.width']}; height: {$arguments['config.height']}\"" . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . '>' . htmlspecialchars ($elementValue) . '</textarea>
 			';
-			$this->jQueryLibraries['CKEditor'] = '<script src="' . $arguments['editorBasePath'] . 'ckeditor.js"></script>';
+			$this->jsCssAssets['CKEditor'] = '<script src="' . $arguments['editorBasePath'] . 'ckeditor.js"></script>';
 			$this->jQueryCode[__FUNCTION__ . $widgetId] = '
 				var editor = CKEDITOR.replace("' . $id . '", {
 					' . implode (",\n\t\t\t\t\t", $editorConfig) . '
@@ -1519,7 +1531,7 @@ class form
 			if ($arguments['editorFileBrowser']) {
 				
 				#!# startupFolderExpanded is not clear; see ticket: http://ckeditor.com/forums/Support/Documentation-suggestion-startupFolderExpanded-is-unclear
-				$this->jQueryLibraries['CKFinder'] = '<script src="' . $arguments['editorFileBrowser'] . 'ckfinder.js"></script>';
+				$this->jsCssAssets['CKFinder'] = '<script src="' . $arguments['editorFileBrowser'] . 'ckfinder.js"></script>';
 				$this->jQueryCode[__FUNCTION__ . $widgetId] .= '
 					// File manager settings
 					CKFinder.setupCKEditor( editor, {
@@ -4109,7 +4121,7 @@ class form
 	# Function to inject a jQuery library loading
 	function addJQueryLibrary ($id, $code)
 	{
-		$this->jQueryLibraries[$id] = $code;
+		$this->jsCssAssets[$id] = $code;
 	}
 	
 	
@@ -4126,7 +4138,7 @@ class form
 		# Add the libraries, ensuring that the loading respects the protocol type (HTTP/HTTPS) of the current page, to avoid mixed content warnings
 		# Need to keep this in sync with a compatible jQuery version
 		if ($this->settings['jQueryUi']) {
-			$this->jQueryLibraries['jQueryUI'] = '
+			$this->jsCssAssets['jQueryUI'] = '
 				<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js" integrity="sha256-xLD7nhI62fcsEZK2/v8LsBcb4lG7dgULkuXoXB/j91c=" crossorigin="anonymous"></script>
 				<link href="https://code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css" rel="stylesheet" type="text/css"/>
 			';
@@ -4188,11 +4200,11 @@ class form
 	function autocompleteTokenisedJQuery ($id, $jsonUrl, $optionsJsString = '', $singleLine = true)
 	{
 		# Add the main function
-		$this->jQueryLibraries[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/') . 'jquery.tokeninput.js"></script>';
+		$this->jsCssAssets[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/') . 'jquery.tokeninput.js"></script>';
 		
 		# Add the stylesheet
 		$uniqueFunctionId = __FUNCTION__ . ($singleLine ? '_singleline' : '_multiline');
-		$this->jQueryLibraries[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/styles/') . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
+		$this->jsCssAssets[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/styles/') . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
 		
 		# Compile the options; they are listed at https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/jquery.tokeninput.js ; note that the final item in a list must not have a comma at the end
 		$functionOptions = array ();
@@ -6438,14 +6450,14 @@ class form
 	function loadJavascriptCode ()
 	{
 		# End if no jQuery use
-		if (!$this->jQueryLibraries && !$this->jQueryCode && !$this->javascriptCode) {return false;}
+		if (!$this->jsCssAssets && !$this->jQueryCode && !$this->javascriptCode) {return false;}
 		
 		# Start the HTML
 		$html  = '';
 		
 		# Add the library if required
 		#!# Rework this function so that the subresource integrity can be included in the <script> URL
-		if ($this->jQueryLibraries || $this->jQueryCode) {
+		if ($this->jsCssAssets || $this->jQueryCode) {
 			if ($this->settings['jQuery']) {
 				if ($this->settings['jQuery'] === true) {	// If not a URL, use the default, respecting HTTP/HTTPS to avoid mixed content warnings
 					$this->settings['jQuery'] = 'https://code.jquery.com/jquery-3.6.1.min.js';
@@ -6457,7 +6469,7 @@ class form
 		}
 		
 		# Add plugin libraries
-		foreach ($this->jQueryLibraries as $key => $htmlCode) {
+		foreach ($this->jsCssAssets as $key => $htmlCode) {
 			$html .= "\n" . $htmlCode;
 		}
 		
@@ -8899,12 +8911,12 @@ class formWidget
 		$this->form->enableJqueryUi ();
 		
 		# Add the main function
-		$this->form->jQueryLibraries[__FUNCTION__]  = "\n\t\t\t" . '<script type="text/javascript" src="' . $this->settings['scripts'] . 'tag-it/js/tag-it.js"></script>';	// https://rawgithub.com/aehlke/tag-it/master/js/tag-it.js
+		$this->form->jsCssAssets[__FUNCTION__]  = "\n\t\t\t" . '<script type="text/javascript" src="' . $this->settings['scripts'] . 'tag-it/js/tag-it.js"></script>';	// https://rawgithub.com/aehlke/tag-it/master/js/tag-it.js
 		
 		# Add the stylesheets
-		$this->form->jQueryLibraries[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'http://ajax.googleapis.com/ajax/libs') . '/jqueryui/1/themes/flick/jquery-ui.css" type="text/css" />';
-		$this->form->jQueryLibraries[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/jquery.tagit.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/jquery.tagit.css
-		$this->form->jQueryLibraries[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/tagit.ui-zendesk.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/tagit.ui-zendesk.css
+		$this->form->jsCssAssets[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'http://ajax.googleapis.com/ajax/libs') . '/jqueryui/1/themes/flick/jquery-ui.css" type="text/css" />';
+		$this->form->jsCssAssets[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/jquery.tagit.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/jquery.tagit.css
+		$this->form->jsCssAssets[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/tagit.ui-zendesk.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/tagit.ui-zendesk.css
 		
 		# Options
 		$functionOptions = array ();

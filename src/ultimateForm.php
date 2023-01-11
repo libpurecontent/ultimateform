@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.1';
+	var $version = '1.28.2';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -911,6 +911,7 @@ class form
 				.{$this->settings['div']} .ui-front {z-index: 999 !important;}
 				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item, .ui-autocomplete li.ui-menu-item a {width: 100%; padding: 0; font-size: 0.9em; padding-bottom: 10px;}
 				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item a span {color: gray;}
+				.{$this->settings['div']} .popuptemplate {display: none;}
 			</style>
 		";
 		
@@ -975,43 +976,40 @@ class form
 							}
 						});
 						
-						// Create a layer group of markers
-						var markerLayer = L.featureGroup ().addTo (map);	// featureGroup is a superset of layerGroup that includes fitBounds
+						// Get initial data state
+						var geojson;
+						var initialData = $('#' + widgetId).val ();
+						if (initialData) {
+							geojson = JSON.parse (initialData);
+						} else {
+							geojson = {type: 'FeatureCollection', features: []};
+						}
 						
-						// Set initial marker(s) if page reloaded
-						var initialLocation = $('#' + widgetId).val ();
-						if (initialLocation) {
-							var geojson = JSON.parse (initialLocation);
-							var latlng;
-							$.each (geojson.features, function (index, feature) {
-								latlng = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
-								addMarker (latlng);
-							});
+						// Define initial GeoJSON data (e.g. initial state or after unsuccessful form result)
+						var markerLayer = L.geoJSON (geojson, {
 							
-							// Set the bounds to the single location at the required zoom, limited to the required zoom (to avoid a single location being very close)
+							onEachFeature: function (feature, /* layer as */ marker) {
+								
+								// Set as draggable, and update the form value on update
+								marker.options.draggable = isEditable;
+								marker.on ('drag', function (e) {
+									updateFormValue ();
+								});
+								
+								// Enable auto-pan
+								marker.options.autoPan = true;
+								
+								// Bind popup
+								marker.bindPopup (popupHtml (feature));
+							}
+						}).addTo (map);
+						
+						// Set the bounds of the content, limited to the required zoom (to avoid a single location being very close)
+						if (markerLayer.getLayers ().length) {
 							map.fitBounds (markerLayer.getBounds (), {maxZoom: requiredZoom});
 						}
 						
-						// Capture value on marker location selection to form
-						function updateFormValue ()
-						{
-							// If empty layer, treat as empty value (i.e. not a GeoJSON structure with zero features)
-							if (!markerLayer.getLayers ().length) {
-								$('#' + widgetId).val ('');
-								return;
-							}
-							
-							// Create a feature collection, adding each marker
-							var geojson = {type: 'FeatureCollection', features: []};
-							markerLayer.eachLayer (function (marker) {
-								geojson.features.push (marker.toGeoJSON ());	// Default precision value is 6 decimal places
-							});
-							
-							// Convert GeoJSON to string
-							$('#' + widgetId).val (JSON.stringify (geojson));
-						}
-						
-						// Click on the map to set location, unless disabled
+						// Add additional markers by clicking on the map (unless editing disabled)
 						if (isEditable) {
 							map.on ('click', function (e) {
 								
@@ -1022,67 +1020,140 @@ class form
 									return;
 								}
 								
-								// Add the marker
-								addMarker (e.latlng);
+								// Handle max features
+								if (maxFeatures) {
+									
+									// If a singleton, treat as implicit delete
+									if (maxFeatures == 1) {
+										markerLayer.clearLayers ();		// I.e. clear all layers before adding below
+									} else {
+										
+										// If the current number of markers has reached the limit, prevent addition; we cannot do any implicit delete as we do not know which to delete
+										var currentTotal = markerLayer.getLayers ().length;
+										if (currentTotal == maxFeatures) {
+											alert ('You have reached the maximum number of locations; please delete an existing location.');
+											return false;
+										}
+									}
+								}
+								
+								// Create the marker and set location
+								var marker = new L.marker (e.latlng, {
+									draggable: isEditable,
+									autoPan: true
+								});
+								marker.feature = {		// Create skeleton GeoJSON structure, which will get populated
+									type: 'Feature',
+									properties: {},
+									geometry: {}
+								};
+								marker.bindPopup (popupHtml (marker.feature));
+								marker.on ('drag', function (e) {
+									updateFormValue ();
+								});
+								markerLayer.addLayer (marker);
+								
+								// Update form
+								updateFormValue ();
 							});
 						}
 						
-						// Function to add a marker
-						function addMarker (latlng)
+						// Function to create the popup HTML
+						function popupHtml (feature)
 						{
-							// Handle max features
-							if (maxFeatures) {
+							// Start with deletion button
+							var popupHtml = popupDeletion (feature);
+							
+							// Prepend content from an HTML template if present, cloning it into the template
+							$(popupHtml).prepend (popupContent (feature));
+							
+							// Return the popup HTML
+							return popupHtml;
+						}
+						
+						// Function to handle popup deletion
+						function popupDeletion (feature, popupHtml)
+						{
+							// Obtain (or create) the object's internalId, so we can use this in a clickable deletion link within this popup
+							var internalId = L.Util.stamp (feature);
+							
+							// Define the delete popup content, with its own removal handler
+							var confirmRemove = false;
+							var popupContent = document.createElement ('p');
+							popupContent.className = 'small comment';
+							popupContent.innerHTML = '<a href=\"#\" class=\"mapremovelocation\" data-internalid=\"' + internalId + '\">&#x1f5d1; Remove this location?' + (confirmRemove ? '&hellip;' : '') + '</a>';
+							popupContent.onclick = function (e) {
+								e.preventDefault ();
 								
-								// If a singleton, treat as implicit delete
-								if (maxFeatures == 1) {
-									markerLayer.clearLayers ();		// I.e. clear all layers
-								} else {
-									
-									// If the current number of markers has reached the limit, prevent addition; we cannot do any implicit delete as we do not know which to delete
-									var currentTotal = markerLayer.getLayers ().length;
-									if (currentTotal == maxFeatures) {
-										alert ('You have reached the maximum number of locations; please delete an existing location.');
-										return false;
-									}
+								// Confirm deletion
+								if (confirmRemove) {
+									if (!window.confirm ('Are you sure?')) {return;}
 								}
-							}
-							
-							// Create the marker and set location
-							var marker;
-							marker = new L.marker (latlng, {
-								draggable: isEditable,
-								autoPan: true
-							}).addTo (map);
-							marker.addTo (markerLayer);
-							updateFormValue ();
-							
-							// Add a popup to enable deletion of the marker
-							if (isEditable) {
 								
-								// Removal confirmation
-								confirmRemove = false;
+								// Identify the clicked item, which we can use to identify the marker from this feature
+								var clickedId = parseInt (e.target.dataset.internalid);	// See data-internalid above
 								
-								// Define the popup content, with its own removal handler
-								var popupContent = document.createElement ('p');
-								popupContent.innerHTML = '<a href=\"#\" class=\"mapremovelocation\">&#x1f5d1; Remove this location?' + (confirmRemove ? '&hellip;' : '') + '</a>';
-								popupContent.onclick = function (e) {
-									e.preventDefault ();
-									if (confirmRemove) {
-										if (!window.confirm ('Are you sure?')) {return;}
+								// Remove the matching marker
+								markerLayer.eachLayer (function (marker) {
+									thisMarkerInternalId = L.Util.stamp (marker.feature)
+									if (thisMarkerInternalId == clickedId) {
+										markerLayer.removeLayer (marker);
 									}
-									markerLayer.removeLayer (marker);
-									updateFormValue ();
-								};
+								});
 								
-								// Create the poup
-								var popup = L.popup ().setContent (popupContent);
-								marker.bindPopup (popup);
+								// Update the form value, now that the marker has been deleted
+								updateFormValue ();
+							};
+							
+							// Return the popup content
+							return popupContent;
+						}
+						
+						// Function to create the popup content, currently a table of HTML
+						function popupContent (feature)
+						{
+							// If no properties, add no content
+							if ($.isEmptyObject (feature.properties)) {return '';}
+							
+							// Render a table
+							var popupContent = '<table>';
+							$.each (feature.properties, function (key, value) {
+								popupContent += '<tr><td>' + htmlspecialchars (key) + ':</td><td>' + htmlspecialchars (value) + '</td></tr>';
+							});
+							popupContent += '</table>';
+							
+							// Return the table
+							return popupContent;
+						}
+						
+						// Function to make data entity-safe
+						function htmlspecialchars (string)
+						{
+							if (typeof string !== 'string') {return string;}
+							return string.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+						}
+						
+						// Capture value on marker location selection to form
+						function updateFormValue ()
+						{
+							// If no markers, set the form value to empty (as distinct from than a GeoJSON structure with zero features)
+							if (!markerLayer.getLayers ().length) {
+								$('#' + widgetId).val ('');
+								return;
 							}
 							
-							// If the marker is set as draggable, update the location on click/drag
-							marker.on ('drag', function (e) {
-								updateFormValue (marker);
+							// Get the data
+							var geojson = markerLayer.toGeoJSON ();		// Default precision value is 6 decimal places
+							
+							// Strip any internal _leaflet_id references
+							$.each (geojson.features, function (index, feature) {
+								if (geojson.features[index].hasOwnProperty ('_leaflet_id')) {
+									delete geojson.features[index]._leaflet_id;
+								}
 							});
+							
+							// Stringify and write to the form value
+							$('#' + widgetId).val (JSON.stringify (geojson));
 						}
 						
 					}) (this.id);	// End of closure for this map

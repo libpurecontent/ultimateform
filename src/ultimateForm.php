@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.2';
+	var $version = '1.28.3';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -798,6 +798,7 @@ class form
 			'geocoderAutocompleteBbox'	=> $this->settings['mapGeocoderAutocompleteBbox'],
 			'instructionsHtml'			=> '<p>Zoom in and click on the map to set the exact location:</p>',
 			'max'						=> 1,		# Max number of features that can be placed on the map
+			'popupHtml'					=> false,	# Customised HTML popup (in addition to standard deletion button); placeholders as '{properties.id}' can be used to populate data
 		);
 		
 		# Create a new form widget
@@ -865,6 +866,13 @@ class form
 		$widgetHtml .= "\n\t" . '<div id="' . $widgetId . '_map" class="mapdiv" data-initiallocation="' . "{$arguments['defaultLocationZoom']}/{$arguments['defaultLocationLatitude']}/{$arguments['defaultLocationLongitude']}" . '" data-maxfeatures="' . (int) $arguments['max'] . '"></div>';
 		$widgetHtml .= "\n" . '</div>';
 		
+		# If popupHtml is defined, add as hidden template so that the JS can pick it up and clone to the popup
+		if ($arguments['popupHtml']) {
+			$widgetHtml .= "\n" . '<div id="' . $widgetId . '_popuptemplate" class="popuptemplate">';
+			$widgetHtml .= "\n" . $arguments['popupHtml'];
+			$widgetHtml .= "\n" . '</div>';
+		}
+		
 		# Check for element problems
 		$problems = $widget->getElementProblems (isSet ($elementProblems) ? $elementProblems : false);
 		
@@ -912,6 +920,7 @@ class form
 				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item, .ui-autocomplete li.ui-menu-item a {width: 100%; padding: 0; font-size: 0.9em; padding-bottom: 10px;}
 				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item a span {color: gray;}
 				.{$this->settings['div']} .popuptemplate {display: none;}
+				.{$this->settings['div']} .mapremovelocationparagraph {display: inline;}
 			</style>
 		";
 		
@@ -1078,11 +1087,11 @@ class form
 							var internalId = L.Util.stamp (feature);
 							
 							// Define the delete popup content, with its own removal handler
-							var confirmRemove = false;
-							var popupContent = document.createElement ('p');
-							popupContent.className = 'small comment';
-							popupContent.innerHTML = '<a href=\"#\" class=\"mapremovelocation\" data-internalid=\"' + internalId + '\">&#x1f5d1; Remove this location?' + (confirmRemove ? '&hellip;' : '') + '</a>';
-							popupContent.onclick = function (e) {
+							var confirmRemove = (propertiesEditable);	// Require confirmation if there is property editing, as accidental deletion could be quite destructive
+							var paragraph = document.createElement ('p');
+							paragraph.className = 'small comment mapremovelocationparagraph';
+							paragraph.innerHTML = '<a href=\"#\" class=\"mapremovelocation\" data-internalid=\"' + internalId + '\">&#x1f5d1; Remove this location?' + (confirmRemove ? '&hellip;' : '') + '</a>';
+							paragraph.onclick = function (e) {
 								e.preventDefault ();
 								
 								// Confirm deletion
@@ -1105,22 +1114,55 @@ class form
 								updateFormValue ();
 							};
 							
-							// Return the popup content
-							return popupContent;
+							// Create a div
+							var div = document.createElement ('div');
+							div.className = 'popupcontent';
+							
+							// Add the paragraph to the div
+							div.appendChild (paragraph);
+							
+							// Return the popup content div
+							return div;
 						}
 						
-						// Function to create the popup content, currently a table of HTML
+						// Function to create the popup content
 						function popupContent (feature)
 						{
-							// If no properties, add no content
-							if ($.isEmptyObject (feature.properties)) {return '';}
+							// Start the popup content
+							var popupContent;
 							
-							// Render a table
-							var popupContent = '<table>';
-							$.each (feature.properties, function (key, value) {
-								popupContent += '<tr><td>' + htmlspecialchars (key) + ':</td><td>' + htmlspecialchars (value) + '</td></tr>';
+							// If no template, auto-generate a table (if properties present)
+							var templateSelector = '#' + widgetId + '_popuptemplate';
+							if (!$(templateSelector).length) {
+								
+								// If no properties, add no content
+								if ($.isEmptyObject (feature.properties)) {return '';}
+								
+								// Render a table
+								popupContent = '<table>';
+								$.each (feature.properties, function (key, value) {
+									popupContent += '<tr><td>' + htmlspecialchars (key) + ':</td><td>' + htmlspecialchars (value) + '</td></tr>';
+								});
+								popupContent += '</table>';
+								
+								// Return the table
+								return popupContent;
+							}
+							
+							// Get the template, which can include placeholders such as '{properties.id}'
+							template = $(templateSelector).html ();
+							
+							// Define a path parser, so that the template can define properties.foo which would obtain feature.properties.foo; see: https://stackoverflow.com/a/22129960
+							Object.resolve = function(path, obj) {
+								return path.split ('.').reduce (function (prev, curr) {
+									return (prev ? prev[curr] : undefined);
+								}, obj || self);
+							};
+							
+							// Substitute template placeholders; see: https://stackoverflow.com/a/378000
+							popupContent = template.replace (/\{[^{}]+\}/g, function (path) {
+								return Object.resolve (path.replace (/[{}]+/g, ''), feature) || '';
 							});
-							popupContent += '</table>';
 							
 							// Return the table
 							return popupContent;

@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.3';
+	var $version = '1.28.4';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -798,6 +798,7 @@ class form
 			'geocoderAutocompleteBbox'	=> $this->settings['mapGeocoderAutocompleteBbox'],
 			'instructionsHtml'			=> '<p>Zoom in and click on the map to set the exact location:</p>',
 			'max'						=> 1,		# Max number of features that can be placed on the map
+			'propertiesEditable'		=> true,	# Whether the properties are editable in the popup
 			'popupHtml'					=> false,	# Customised HTML popup (in addition to standard deletion button); placeholders as '{properties.id}' can be used to populate data
 		);
 		
@@ -863,7 +864,7 @@ class form
 		$widgetHtml .= "\n" . '<textarea class="mapinput"' . $this->nameIdHtml ($arguments['name']) . $widget->tabindexHtml () . ' cols="60" rows="8"' . ($arguments['editable'] ? '' : ' readonly="readonly"') . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
 		$widgetHtml .= "\n" . '<div class="mapcontainer" style="width: ' . (is_int ($arguments['width']) ? $arguments['width'] . 'px' : $arguments['width']) . '; height: ' . (is_int ($arguments['height']) ? $arguments['height'] . 'px' : $arguments['height']) . ';">';
 		$widgetHtml .= $geocoderHtml;
-		$widgetHtml .= "\n\t" . '<div id="' . $widgetId . '_map" class="mapdiv" data-initiallocation="' . "{$arguments['defaultLocationZoom']}/{$arguments['defaultLocationLatitude']}/{$arguments['defaultLocationLongitude']}" . '" data-maxfeatures="' . (int) $arguments['max'] . '"></div>';
+		$widgetHtml .= "\n\t" . '<div id="' . $widgetId . '_map" class="mapdiv" data-initiallocation="' . "{$arguments['defaultLocationZoom']}/{$arguments['defaultLocationLatitude']}/{$arguments['defaultLocationLongitude']}" . '" data-maxfeatures="' . (int) $arguments['max'] . '" data-propertieseditable="' . (int) $arguments['propertiesEditable'] . '"></div>';
 		$widgetHtml .= "\n" . '</div>';
 		
 		# If popupHtml is defined, add as hidden template so that the JS can pick it up and clone to the popup
@@ -907,20 +908,23 @@ class form
 	# Function to create the CSS for the map
 	private function mapCss ($arguments)
 	{
+		# Assemble the div, converting spaces to dots
+		$div = implode ('.', explode (' ', $this->settings['div']));
+		
 		# Define the CSS
 		$css = "
 			<style type=\"text/css\">
-				.{$this->settings['div']} .mapinput {display: none;}
-				.{$this->settings['div']} .mapcontainer {position: relative;}	/* Width/height is set on the element itself */
-				.{$this->settings['div']} .mapcontainer .mapdiv {display: block; width: 100%; height: 100%;}
-				.{$this->settings['div']} .mapcontainer .mapdiv a {text-decoration: none;}
-				.{$this->settings['div']} .mapcontainer .mapgeocoder {position: absolute; top: 10px; left: 55px; z-index: 450;}		/* Z-indexes at: https://leafletjs.com/reference.html#map-mappane */
-				.{$this->settings['div']} .mapcontainer .mapgeocoder input {width: 300px;}
-				.{$this->settings['div']} .ui-front {z-index: 999 !important;}
-				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item, .ui-autocomplete li.ui-menu-item a {width: 100%; padding: 0; font-size: 0.9em; padding-bottom: 10px;}
-				.{$this->settings['div']} .ui-autocomplete li.ui-menu-item a span {color: gray;}
-				.{$this->settings['div']} .popuptemplate {display: none;}
-				.{$this->settings['div']} .mapremovelocationparagraph {display: inline;}
+				.{$div} .mapinput {display: none;}
+				.{$div} .mapcontainer {position: relative;}	/* Width/height is set on the element itself */
+				.{$div} .mapcontainer .mapdiv {display: block; width: 100%; height: 100%;}
+				.{$div} .mapcontainer .mapdiv a {text-decoration: none;}
+				.{$div} .mapcontainer .mapgeocoder {position: absolute; top: 10px; left: 55px; z-index: 450;}		/* Z-indexes at: https://leafletjs.com/reference.html#map-mappane */
+				.{$div} .mapcontainer .mapgeocoder input {width: 300px;}
+				.{$div} .ui-front {z-index: 999 !important;}
+				.{$div} .ui-autocomplete li.ui-menu-item, .ui-autocomplete li.ui-menu-item a {width: 100%; padding: 0; font-size: 0.9em; padding-bottom: 10px;}
+				.{$div} .ui-autocomplete li.ui-menu-item a span {color: gray;}
+				.{$div} .popuptemplate {display: none;}
+				.{$div} .mapremovelocationparagraph {display: inline;}
 			</style>
 		";
 		
@@ -932,6 +936,9 @@ class form
 	# Function to create the JS for the map(s)
 	private function mapJs ($arguments)
 	{
+		# Assemble the div, converting spaces to dots
+		$div = implode ('.', explode (' ', $this->settings['div']));
+		
 		# Define the JS, which will be wrapped in jQuery document ready
 		$js = "
 			ultimateFormMap ();
@@ -939,7 +946,7 @@ class form
 			function ultimateFormMap () {
 				
 				// Create each map with a matching div input on the page; see: https://stackoverflow.com/a/71349246/180733
-				$('.{$this->settings['div']} .mapinput').each (function() {
+				$('.{$div} .mapinput').each (function() {
 					
 					// Create a closure, so that this.id is fixed for each handler, to avoid crosstalk; see: https://stackoverflow.com/a/21472993/180733
 					(function (widgetId) {		// this.id passed in
@@ -962,6 +969,9 @@ class form
 						
 						// Determine number of markers
 						var maxFeatures = $('#' + mapId).data ('maxfeatures');
+						
+						// Determine whether faeture properties are editable
+						var propertiesEditable = $('#' + mapId).data ('propertieseditable');
 						
 						// Create the map
 						var map = L.map (mapId).setView ([ initialLocation[1], initialLocation[2] ], initialLocation[0]);
@@ -1021,6 +1031,8 @@ class form
 						// Add additional markers by clicking on the map (unless editing disabled)
 						if (isEditable) {
 							map.on ('click', function (e) {
+								
+								// NB Ideally we would treat a map click away from an open popup as an implicit close, but this cannot be detected as this is the built-in behaviour and thus too late to capture
 								
 								// Require high zoom level to ensure accuracy
 								var currentZoom = map.getZoom ();
@@ -1128,6 +1140,9 @@ class form
 						// Function to create the popup content
 						function popupContent (feature)
 						{
+							// Get the internal ID of this feature
+							var internalId = L.Util.stamp (feature);
+							
 							// Start the popup content
 							var popupContent;
 							
@@ -1149,20 +1164,71 @@ class form
 								return popupContent;
 							}
 							
-							// Get the template, which can include placeholders such as '{properties.id}'
-							template = $(templateSelector).html ();
-							
 							// Define a path parser, so that the template can define properties.foo which would obtain feature.properties.foo; see: https://stackoverflow.com/a/22129960
-							Object.resolve = function(path, obj) {
+							Object.resolve = function (path, obj) {
 								return path.split ('.').reduce (function (prev, curr) {
 									return (prev ? prev[curr] : undefined);
 								}, obj || self);
 							};
 							
+							// Get the template, which can include placeholders such as '{properties.id}'
+							template = $(templateSelector).html ();
+							
 							// Substitute template placeholders; see: https://stackoverflow.com/a/378000
 							popupContent = template.replace (/\{[^{}]+\}/g, function (path) {
-								return Object.resolve (path.replace (/[{}]+/g, ''), feature) || '';
+								var field = path.replace (/[{}]+/g, '');	// '{properties.id}' will have field 'properties.id'
+								var value = Object.resolve (field, feature) || '';
+								
+								// Convert the value to an editable input; these are not in a <form> to avoid a form within a form
+								if (propertiesEditable) {
+									value = '<input name=\"' + htmlspecialchars (field) + '\" value=\"' + htmlspecialchars (value) + '\" data-internalid=\"' + internalId + '\" class=\"mappropertiesinput_' + internalId + '\" />';
+								}
+								
+								// Return the value / input field with value
+								return value;
 							});
+							
+							// If the properties are editable, register a handler to manage changes to the input(s)
+							// #!# propertiesEditable is not being isolated between map instances - there is a general crosstalk issue here
+							if (propertiesEditable) {
+								
+								// Prevent return within the map properties inputs
+								$(document).on ('keydown', '.mappropertiesinput_' + internalId, function (e) {	// late binding
+									if (e.keyCode == 13) {
+										return false;
+									}
+								});
+								
+								// Function to assign a value within an object based on a string path; see: https://stackoverflow.com/a/13719799/180733
+								function objectAssignPathValue (obj, path, value) {
+									if (typeof path === 'string') {
+										path = path.split ('.');
+									}
+									if (path.length > 1) {
+										var e = path.shift ();
+										objectAssignPathValue (obj[e] = (Object.prototype.toString.call (obj[e]) === '[object Object]' ? obj[e] : {}), path, value);
+									} else {
+										obj[path[0]] = value;
+									}
+								}
+								
+								// On change (i.e. move away from element and it has changed), scan the form and write each value into the feature value
+								$(document).on ('change', '.mappropertiesinput_' + internalId, function (e) {		// late binding
+									
+									// We need to loop through each property field, to ensure a comlete set is written to the feature
+									// #!# This ought to be run on the popup creation, to ensure that a newly-created marker always has the properties set
+									$('.mappropertiesinput_' + internalId).each (function (index, input) {
+										
+										// Update the feature, by taking the path represented as the input name (e.g. 'properties.name') as a path string, and setting the value
+										var path = $(input).prop ('name');
+										var value = $(input).val ();
+										objectAssignPathValue (feature, path, value);
+									});
+									
+									// Feature seems to be a reference, so the form value can be updated directly rather than having to find which feature it is
+									updateFormValue ();
+								});
+							}
 							
 							// Return the table
 							return popupContent;
@@ -6531,6 +6597,7 @@ class form
 		$messageText = ($this->settings['unsavedDataProtection'] === true ? 'Leaving this page will cause edits to be lost. Press the submit button on the page if you wish to save your data.' : $this->settings['unsavedDataProtection']);
 		
 		# Create the jQuery code
+		#!# Custom text return status is now deprecated: https://chromestatus.com/feature/5349061406228480
 		$this->jQueryCode[__FUNCTION__] = "
 			
 			// Navigate-away protection for general widgets

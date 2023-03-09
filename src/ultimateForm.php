@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.4';
+	var $version = '1.28.5';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -2418,14 +2418,22 @@ class form
 				}
 			}
 			
-			# If a string (i.e. a URL), make sure the values list is empty, and when confirmed, 
+			# If a string (i.e. a URL), make sure the values list is empty, and when confirmed, fill with an arbitrary fixed set including the existing default
 			if (is_string ($arguments['autocomplete'])) {
 				if ($arguments['values'] === false) {
 					$autocompleteAutovaluesMode = true;
 					
 					# Create an array of arbitrary values to emulate a fixed supplied set
+					#!# Purpose of this is really not clear
 					$createValues = 200;	// Arbitrarily high number of (arbitrary) values to create; this is a little poor but it is otherwise hard to work out how many to create; it basically needs always to be at least one more than the current number of widgets being displayed
 					$arguments['values'] = array_fill (0, $createValues, $arbitraryValue = true);	// Create an arbitrary value(s) list, to ensure that the widget(s) get(s) created
+					
+					# Ensure the existing value is present
+					if ($arguments['default']) {
+						foreach ($arguments['default'] as $default) {
+							$arguments['values'][$default] = $default;
+						}
+					}
 					
 				} else {
 					$this->formSetupErrors['autocompleteValuesMismatch'] = "Autocomplete from an external data source is enabled for {$arguments['name']}. The values list must therefore be set to false, but this is not the case.";
@@ -3518,8 +3526,9 @@ class form
 		# Obtain the value of the form submission (which may be empty)  (ensure that a full date and time array exists to prevent undefined offsets in case an incomplete set has been posted)
 		$value = (isSet ($this->form[$arguments['name']]) ? $this->form[$arguments['name']] : array ());
 		$fields = array ('time', 'day', 'month', 'year', );
+		if (is_null ($value) || $value == '') {$value = array ();}
 		foreach ($fields as $field) {
-			if (!isSet ($value[$field])) {
+			if (!array_key_exists ($field, $value)) {
 				$value[$field] = '';
 			}
 		}

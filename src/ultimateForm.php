@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.5';
+	var $version = '1.28.6';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -8657,10 +8657,12 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				}
 				
 				# Website fields - for fieldnames containing 'url/website/http'
-				if (preg_match ('/(website|http)/i', $fieldName) || preg_match ('/.+Url$/', $fieldName) || $fieldName == 'url') {
-					$forceType = 'url';
-					$standardAttributes['regexp'] = '^(http|https)://';
-					$standardAttributes['description'] = 'Must begin https://';	// ' or http://' not added to this description just to keep it simple
+				if ($forceType != 'email') {	// E.g. 'websiteEmail' results in email, not url
+					if (preg_match ('/(website|http)/i', $fieldName) || preg_match ('/.+Url$/', $fieldName) || $fieldName == 'url') {
+						$forceType = 'url';
+						$standardAttributes['regexp'] = '^(http|https)://';
+						$standardAttributes['description'] = 'Must begin https://';	// ' or http://' not added to this description just to keep it simple
+					}
 				}
 				
 				# Upload fields - fieldname containing photograph/upload or starting/ending with file/document

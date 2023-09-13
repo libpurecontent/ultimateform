@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.6';
+	var $version = '1.28.7';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -192,6 +192,7 @@ class form
 		'richtextEditorToolbarSet'			=> 'pureContent',					# Global default setting for richtext editor toolbar set
 		'richtextEditorAreaCSS'				=> '',								# Global default setting for richtext editor CSS
 		'richtextEditorConfig.docType'		=> '<!DOCTYPE html>',				# Global default setting for richtext editor config.docType
+		'richtextEditorConfig.bodyClass'	=> false,							# Global default setting for richtext editor config.bodyClass
 		'richtextWidth'						=> '100%',							# Global default setting for richtext width; assumed to be px unless % specified
 		'richtextHeight'					=> 400,								# Global default setting for richtext height; assumed to be px unless % specified
 		'richtextEditorFileBrowser'			=> '/_ckfinder/',					# Global default setting for richtext file browser path (must have trailing slash), or false to disable
@@ -1571,14 +1572,14 @@ class form
 			'editorFileBrowserACL'				=> false,
 			'templates'							=> $this->settings['richtextTemplates'],
 			'snippets'							=> $this->settings['richtextSnippets'],
-			'width'								=> $this->settings['richtextWidth'],			// Same as config.width
-			'height'							=> $this->settings['richtextHeight'],			// Same as config.height
-			'config.width'						=> false,										// Takes precedence if 'width' also specified
-			'config.height'						=> false,										// Takes precedence if 'height' also specified
-			'config.contentsCss'				=> $this->settings['richtextEditorAreaCSS'],	// Or array of stylesheets
-			'config.skin'						=> 'moonocolor',								// NB Requires download from http://ckeditor.com/addon/moonocolor
-			'config.bodyId'						=> false,										// Apply value of <body id="..."> to editing window
-			'config.bodyClass'					=> false,										// Apply value of <body class="..."> to editing window
+			'width'								=> $this->settings['richtextWidth'],					// Same as config.width
+			'height'							=> $this->settings['richtextHeight'],					// Same as config.height
+			'config.width'						=> false,												// Takes precedence if 'width' also specified
+			'config.height'						=> false,												// Takes precedence if 'height' also specified
+			'config.contentsCss'				=> $this->settings['richtextEditorAreaCSS'],			// Or array of stylesheets
+			'config.skin'						=> 'moonocolor',										// NB Requires download from http://ckeditor.com/addon/moonocolor
+			'config.bodyId'						=> false,												// Apply value of <body id="..."> to editing window
+			'config.bodyClass'					=> $this->settings['richtextEditorConfig.bodyClass'],	// Apply value of <body class="..."> to editing window
 			'config.format_tags'				=> 'p;h1;h2;h3;h4;h5;h6;pre',
 			'config.stylesSet'					=> "[
 				{name: 'No paragraph style', element: 'p', attributes: {'class': ''}},
@@ -4837,6 +4838,7 @@ class form
 		}
 		
 		# For an array of defaults, check through each
+		$missingValues = array ();
 		foreach ($arguments['default'] as $defaultValue) {
 			if (!in_array ($defaultValue, array_keys ($arguments['values']))) {
 				$missingValues[] = $defaultValue;
@@ -4844,7 +4846,7 @@ class form
 		}
 		
 		# Construct the warning message
-		if (isSet ($missingValues)) {
+		if ($missingValues) {
 			
 			# Construct the message
 			$totalMissingValues = count ($missingValues);

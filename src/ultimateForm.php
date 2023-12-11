@@ -111,7 +111,7 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.7';
+	var $version = '1.28.8';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -1805,11 +1805,15 @@ class form
 			//$extraPlugins[] = 'devtools';
 			
 			# HTML5 video; see: https://ckeditor.com/cke4/addon/html5video
-			$extraPlugins[] = 'html5video,widget,widgetselection,clipboard,lineutils';
+			if (substr_count ($arguments['config.toolbar'], 'Html5video')) {
+				$extraPlugins[] = 'html5video,widget,widgetselection,clipboard,lineutils';
+			}
 			
 			# YouTube; see: https://ckeditor.com/cke4/addon/youtube
-			$extraPlugins[] = 'youtube';
-			// videodetector: Basically doesn't work well, adding a rogue button in
+			if (substr_count ($arguments['config.toolbar'], 'Youtube')) {
+				$extraPlugins[] = 'youtube';
+				// videodetector: Basically doesn't work well, adding a rogue button in
+			}
 			
 			# Auto-embed - resolve URLs like YouTube videos and Twitter postings to HTML
 			$extraPlugins[] = 'embed,autoembed';
@@ -2925,7 +2929,8 @@ class form
 			'description'			=> '',			# Description text
 			'append'				=> '',			# HTML appended to the widget
 			'prepend'				=> '',			# HTML prepended to the widget
-			'output'				=> array (),		# Presentation format
+			'wrapOption'			=> '',			# Tag to wrap each option in, e.g. 'span'
+			'output'				=> array (),	# Presentation format
 			'required'				=> false,		# Whether required or not
 			'autofocus'				=> false,		# HTML5 autofocus (true/false)
 			'default'				=> array (),	# Pre-selected item
@@ -3054,8 +3059,11 @@ class form
 				$titleHtml = ($title ? ' title="' . htmlspecialchars ($title) . '"' : '');
 				
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
-				$subelementsWidgetHtml[$value]  = '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . (in_array ($value, $arguments['disabled'], true) ? ' disabled="disabled"' : '') . $titleHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' />';
+				$subelementsWidgetHtml[$value]  = '';
+				$subelementsWidgetHtml[$value] .= ($arguments['wrapOption'] ? "<{$arguments['wrapOption']}>" : '');
+				$subelementsWidgetHtml[$value] .= '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . (in_array ($value, $arguments['disabled'], true) ? ' disabled="disabled"' : '') . $titleHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' />';
 				$subelementsWidgetHtml[$value] .= '<label for="' . $elementId . '"' . $titleHtml . '>' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
+				$subelementsWidgetHtml[$value] .= ($arguments['wrapOption'] ? "</{$arguments['wrapOption']}>" : '');
 				$widgetHtml .= "\n\t\t\t" . $subelementsWidgetHtml[$value];
 				$firstItem = false;
 				

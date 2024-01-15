@@ -1,0 +1,16 @@
+{
+    "name": "libpurecontent/ultimateform",
+    "description": "PHP library ultimateForm within the pureContent library suite",
+    "type": "library",
+    "license": "GPL-3.0-only",
+    "minimum-stability": "stable",
+    "authors": [
+        {
+            "name": "mvl22"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "classmap": ["src/ultimateForm.php"]
+    }
+}

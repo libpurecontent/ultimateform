@@ -5459,7 +5459,7 @@ class form
 		if (!$this->settings['akismetApiKey']) {return NULL;}
 		
 		# Set the user agent, as requested at https://akismet.com/development/api/#detailed-docs
-		$userAgent = ($this->settings['applicationName'] ? $this->settings['applicationName'] . ' ' : '') . 'ultimateForm/' . $this->version;
+		$userAgent = ($this->settings['applicationName'] ? $this->settings['applicationName'] . ' ' : '') . 'ultimateForm/';
 		
 		# Validate API key
 		$siteUrl = $_SERVER['_SITE_URL'] . '/';

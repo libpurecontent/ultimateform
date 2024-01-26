@@ -49,12 +49,6 @@
  * php_admin_value upload_max_filesize 10M // Only way of setting the maximum size
  * php_admin_value post_max_size 10M
  * </code>
- * 
- * @package ultimateForm
- * @license	https://opensource.org/licenses/gpl-license.php GNU Public License
- * @author	{@link https://www.geog.cam.ac.uk/contacts/webmaster/ Martin Lucas-Smith}, University of Cambridge
- * @copyright Copyright  2003-23, Martin Lucas-Smith, University of Cambridge
- * @version See $version below
  */
 class form
 {
@@ -111,7 +105,6 @@ class form
 	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $version = '1.28.8';
 	var $timestamp;
 	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
 	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
@@ -244,9 +237,6 @@ class form
 	 */
 	function __construct ($suppliedArguments = array ())
 	{
-		# Load the application support library which itself requires the pureContent framework file, pureContent.php; this will clean up $_SERVER
-		require_once ('application.php');
-		
 		# Assign constants
 		$this->timestamp = date ('Y-m-d H:i:s');
 		
@@ -3484,10 +3474,6 @@ class form
 			'year'		=> 'Y',				// Widget order: y
 		);
 		
-		# Load the date processing library
-		#!# Ideally this really should be higher up in the class, e.g. in the setup area
-		require_once ('timedate.php');
-		
 		# Create a new form widget
 		$widget = new formWidget ($this, $suppliedArguments, $argumentDefaults, __FUNCTION__);
 		
@@ -6408,7 +6394,6 @@ class form
 		}
 		
 		# Create the connection using the credentials array now assigned
-		require_once ('database.php');
 		$this->databaseConnection = new database ($credentials['hostname'], $credentials['username'], $credentials['password']);
 		if (!$this->databaseConnection->connection) {
 			$this->formSetupErrors['databaseCredentialsFile'] = 'The database connection failed for some reason.';

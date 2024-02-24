@@ -57,21 +57,29 @@ class form
 	# Principal arrays
 	var $elements = array ();					// Master array of form element setup
 	var $form;									// Master array of posted form data
+	var $settings;								// Settings
 	var $outputData;							// Master array of arranged data for output
 	var $outputMethods = array ();				// Master array of output methods
 	
 	# Main variables
 	var $name;									// The name of the form
 	var $location;								// The location where the form is submitted to
+	var $method;								// GET/POST data method
+	var $collection;							// GET/POST data collection
 	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
 	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added; those whose key is prefixed with _ are warnings
 	var $elementProblems = array ();			// Array of submitted element problems
 	var $externalProblems = array ();			// Array of external element problems as inserted by the calling applications
 	var $validationRules = array ();			// Array of validation rules
+	var $validationTypes;			// Array of validation rules
 	var $databaseConnection = NULL;				// Database connection
 	var $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
 	var $prefixedGroups = array ();				// Groups of element names when using prefixing in dataBinding
 	var $attachments = array ();				// Array of attachments
+	var $displayTemplateContents;
+	var $displayTemplateElementReplacements;
+	var $displayTemplateElementReplacementsSpecials;
+	var $autocompleteJQueryEntries = array ();
 	
 	# State control
 	var $formPosted;							// Flag for whether the form has been posted
@@ -9267,11 +9275,13 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 class formWidget
 {
 	# Class variables
-	var $arguments;
+	var $form;
 	var $settings;
+	var $functionName;
+	var $formSetupErrors;
+	var $arguments;
 	var $value;
 	var $elementProblems = array ();
-	var $functionName;
 	var $arrayType;
 	
 	

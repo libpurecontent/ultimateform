@@ -4091,26 +4091,40 @@ class form
 			$thumbnailText = 'Click here to pick photo, or drag and drop into this box.';
 			$widgetHtml .= "
 				<style type=\"text/css\">
-					form tr.upload div.draganddrop {
-						width: calc({$this->settings['uploadThumbnailWidth']}px + 4px + 4px);
-						height: calc({$this->settings['uploadThumbnailHeight']}px + 4px + 4px);
-						border: 4px dashed gray;
-					}
-					form tr.upload p {
+					form div.draganddrop {
 						width: {$this->settings['uploadThumbnailWidth']}px;
 						height: {$this->settings['uploadThumbnailHeight']}px;
-						text-align: center;
-						padding: 15px;
-						color: gray;
+						padding: 0;	/* Must be zero, to ensure whole area is clickable */
+						border: 2px dashed #999;
 					}
-					form tr.upload div input {
+					form div.draganddrop:has(img) {
+						height: auto;
+						border-color: #ddd;
+					}
+					form div.draganddrop input {
 						position: absolute;
+						width: calc({$this->settings['uploadThumbnailWidth']}px - 20px);
+						height: calc({$this->settings['uploadThumbnailHeight']}px - 20px);
 						margin: 0;
-						padding: 0;
-						width: {$this->settings['uploadThumbnailWidth']}px;
-						height: {$this->settings['uploadThumbnailHeight']}px;
+						padding: 10px;
 						outline: none;
 						opacity: 0;
+						cursor: copy;
+					}
+					form div.draganddrop p {
+						width: calc(100% - 40px);
+						height: calc(100% - 40px);
+						margin: 0;
+						padding: 20px;
+						text-align: center;
+						color: gray;
+					}
+					form div.draganddrop img {
+						width: calc(100% - 20px);
+						height: calc(100% - 20px);
+						margin: 0;
+						padding: 10px;
+						text-align: center;
 					}
 				</style>
 			";
@@ -4147,7 +4161,7 @@ class form
 				if ($arguments['thumbnail'] === true) {
 					
 					# Open div to contain the thumbnail
-					$thumbnailHtml .= "\n\t\t\t\t<div id=\"{$thumbnailDivId}\" style=\"width: {$this->settings['uploadThumbnailWidth']}px; height: {$this->settings['uploadThumbnailHeight']}px;\">";
+					$thumbnailHtml .= "\n\t\t\t\t<div id=\"{$thumbnailDivId}\" style=\"width: 100%; height: 100%; margin: 0;\">";
 					
 					# Determine whether there is a default image, so that this can be set below
 					$createDefaultImage = ($arguments['default'] && isSet ($arguments['default'][$subfield]));

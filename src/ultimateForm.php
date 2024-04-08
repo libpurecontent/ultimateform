@@ -197,6 +197,7 @@ class form
 		'richtextWidth'						=> '100%',							# Global default setting for richtext width; assumed to be px unless % specified
 		'richtextHeight'					=> 400,								# Global default setting for richtext height; assumed to be px unless % specified
 		'richtextEditorFileBrowser'			=> '/_ckfinder/',					# Global default setting for richtext file browser path (must have trailing slash), or false to disable
+		'richtextEditorPluginPaths'			=> array (),						# Plugin paths; see: https://ckeditor.com/docs/ckeditor4/latest/api/CKEDITOR_plugins.html#method-addExternal
 		'richtextAutoembedKey'				=> false,							# Autoembed API key from IFramely
 		'richtextTemplates'					=> false,							# Path to templates file, also settable on a per-widget basis
 		'richtextSnippets'					=> false,							# Array of snippets, as array (title => HTML, ...)
@@ -1566,6 +1567,7 @@ class form
 			'editorToolbarSet'					=> $this->settings['richtextEditorToolbarSet'],
 			'editorDefaultTableClass'			=> 'lines',
 			'editorFileBrowser'					=> $this->settings['richtextEditorFileBrowser'],	// Path (must have trailing slash), or false to disable
+			'editorPluginPaths'					=> $this->settings['richtextEditorPluginPaths'],
 			'editorFileBrowserStartupPath'		=> '/',
 			'editorFileBrowserACL'				=> false,
 			'templates'							=> $this->settings['richtextTemplates'],
@@ -1813,6 +1815,13 @@ class form
 				// videodetector: Basically doesn't work well, adding a rogue button in
 			}
 			
+			# Plugin paths; see: https://ckeditor.com/docs/ckeditor4/latest/api/CKEDITOR_plugins.html#method-addExternal
+			$pluginPaths = '';
+			foreach ($arguments['editorPluginPaths'] as $plugin => $pluginPath) {
+				$pluginPaths .= "\n\t\t\t\t" . "CKEDITOR.plugins.addExternal ('{$plugin}', '{$pluginPath}');";
+			}
+			if ($pluginPaths) {$pluginPaths .= "\n";}
+			
 			# Auto-embed - resolve URLs like YouTube videos and Twitter postings to HTML
 			$extraPlugins[] = 'embed,autoembed';
 			$arguments['config.embed_provider'] = '//ckeditor.iframe.ly/api/oembed?url={url}&callback={callback}';
@@ -2046,6 +2055,7 @@ class form
 			';
 			$this->jsCssAssets['CKEditor'] = '<script src="' . $arguments['editorBasePath'] . 'ckeditor.js"></script>';
 			$this->jQueryCode[__FUNCTION__ . $widgetId] = '
+				' . $pluginPaths . '
 				var editor = CKEDITOR.replace("' . $id . '", {
 					' . implode (",\n\t\t\t\t\t", $editorConfig) . '
 				});

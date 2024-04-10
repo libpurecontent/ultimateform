@@ -1798,8 +1798,21 @@ class form
 				}
 			}
 			
+			# Reset removeButtons; see: https://www.drupal.org/project/wysiwyg_ckeditor/issues/1887174
+			$arguments['config.removeButtons'] = '';
+			
 			# Start extra plugins
 			$extraPlugins = array ();
+			
+			# Enable basic plugins
+			$extraPlugins[] = 'find';
+			$extraPlugins[] = 'selectall';
+			$extraPlugins[] = 'showblocks';
+			$extraPlugins[] = 'div';
+			$extraPlugins[] = 'iframe';
+			
+			# Enable advanced dialogs
+			$extraPlugins[] = 'dialogadvtab';	// Used to add 'Advanced' tabs to link/table dialogs
 			
 			# Debugging; requires the devtools plugin to be installed; see: https://ckeditor.com/cke4/addon/devtools and https://ckeditor.com/docs/ckeditor4/latest/guide/dev_howtos_dialog_windows.html
 			//$extraPlugins[] = 'devtools';
@@ -1831,6 +1844,7 @@ class form
 			
 			# Templates (full-page)
 			if ($arguments['templates']) {
+				$extraPlugins[] = 'templates';
 				$arguments['config.templates_files'] = array ($arguments['templates']);
 			}
 			

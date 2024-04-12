@@ -9535,9 +9535,9 @@ class formWidget
 						$.ajax({
 							url: '{$parameter}',
 							data: search,
-							success: function(data) {
-								data = JSON.parse(data);
-								showChoices(data);
+							dataType: 'json',
+							success: function (data) {
+								showChoices (data);
 							}
 						});
 					}";

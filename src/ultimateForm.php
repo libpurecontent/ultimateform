@@ -9006,6 +9006,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				case (strtolower ($type) == 'mediumtext'):
 				case (strtolower ($type) == 'longtext'):
 				case (strtolower ($type) == 'text'):
+				case (strtolower ($type) == 'json'):
 					$this->textarea ($standardAttributes + array (
 						// 'cols' => 50,
 						// 'rows' => 6,

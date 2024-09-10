@@ -1859,6 +1859,9 @@ class form
 			# Add the extra plugins
 			$arguments['config.extraPlugins'] = implode (',', $extraPlugins);
 			
+			# Disable version check, as later versions have a commercial-only license so upgrading will not be done
+			$arguments['config.versionCheck'] = false;
+			
 			# Construct the CKEditor arguments; see: http://docs.ckeditor.com/#!/api/CKEDITOR.editor
 			$editorConfig = array ();
 			foreach ($arguments as $argument => $argumentValue) {

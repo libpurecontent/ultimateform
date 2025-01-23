@@ -3708,73 +3708,16 @@ class form
 				# Create the basic widget; NB the submission of a type="date" widget will always be YYYY-MM-DD (ISO 8601 Extended) whatever the input GUI format is - see http://dev.w3.org/html5/spec-author-view/forms.html#input-author-notes
 				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($elementValueIso) . '"' . $widget->tabindexHtml () . ($arguments['min'] ? " min=\"{$arguments['min']}\"" : '') . ($arguments['max'] ? " max=\"{$arguments['max']}\"" : '') . ' />';
 				
-				# Determine min and max dates for the fallback picker
-				$minDate = (($arguments['min'] && preg_match ('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $arguments['min'], $matches)) ? "new Date({$matches[1]}, " . ($matches[2] - 1) . ', ' . (int) $matches[3] . ')' : 'null');	// e.g. 2012-07-22 becomes new Date(2012, 6, 22)
-				$maxDate = (($arguments['min'] && preg_match ('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/', $arguments['max'], $matches)) ? "new Date({$matches[1]}, " . ($matches[2] - 1) . ', ' . (int) $matches[3] . ')' : 'null');
-				
-				# Add jQuery UI javascript for the date picker; see: https://jqueryui.com/datepicker/
-				$this->enableJqueryUi ();
-				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
-				# NB This has to be done in Javascript rather than PHP because the main part of this is client-side testing of actual browser support rather than just a browser number
-				$this->jQueryCode[__FUNCTION__ . $widgetId] = "
-				// Date picker
-				var i = document.createElement('input');	// Create a bogus element for testing browser support of <input type=date>
-				i.setAttribute('type', 'date');
-				var html5Support = (i.type !== 'text');
-				if (navigator.userAgent.match(/Chrom(e|ium)\//i) && parseInt(navigator.userAgent.match(/Chrom(e|ium)\/([0-9]+)\./i)[2]) < 21) {	// Prior to Chrome 20, the date picker just had an up/down rocker
-					html5Support = false;
-				}
-				if (!navigator.userAgent.match(/Chrom(e|ium)\//i)) {
-					if (navigator.userAgent.match(/Safari\//i) && parseInt(navigator.userAgent.match(/Version\/([0-9]+)\./i)[1]) < 6) {	// Safari 5 date picker just had an up/down rocker
-						html5Support = false;
-					}
-				}
-				if(!html5Support) {
-					var dateDefaultDate_{$arguments['name']} = " . ($elementValue['year'] ? "new Date({$elementValue['year']}, {$elementValue['month']} - 1, {$elementValue['day']})" : 'null') . ";	// https://stackoverflow.com/questions/1953840/datepickersetdate-issues-in-jquery
-					$(function() {
-						$('#{$widgetId}').datepicker({
-							changeMonth: true,
-							changeYear: true,
-							dateFormat: 'dd/mm/yy',
-							defaultDate: dateDefaultDate_{$arguments['name']},
-							minDate: {$minDate},
-							maxDate: {$maxDate}
-						});
-						$('#{$widgetId}').datepicker('setDate', dateDefaultDate_{$arguments['name']});
-						$('#{$widgetId}').after('<br /><span class=\"small comment\">Enter as dd/mm/yyyy</span>');
-						
-						// IE fix to avoid picker being in wrong position on page; see: http://stackoverflow.com/a/16925979/180733
-						$('#{$widgetId}').on('click', function() {
-							if (navigator.userAgent.match(/msie/i)) {
-								var self;
-								self = $(this);
-								$('#ui-datepicker-div').hide();
-								setTimeout(function(){
-									$('#ui-datepicker-div').css({
-										top: self.offset().top + document.body.scrollTop + 30
-									});
-									$('#ui-datepicker-div').show();
-								}, 0);
-							}
-						});
-					});
-				}";
-				
 				# Enable autosubmit if required; see: http://stackoverflow.com/questions/11532433 for the HTML5 picker, and https://stackoverflow.com/questions/6471959/ for the jQuery picker
+				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
 				if ($arguments['pickerAutosubmit']) {
-					$this->jQueryCode[__FUNCTION__ . $widgetId] .= "\n
-				// Date picker autosubmit (HTML/jQuery picker)
+					$this->jQueryCode[__FUNCTION__ . $widgetId] = "\n
+				// Date picker autosubmit
 				$(function() {
-					if(html5Support) {
-						var el = document.getElementById('{$widgetId}');
-						el.addEventListener('input', function(e) {	// i.e. oninput
-							$('form[name={$this->settings['name']}]').submit();
-						}, false);
-					} else {
-						$('#{$widgetId}').change(function() {
-							$('form[name={$this->settings['name']}]').submit();
-						});
-					}
+					var el = document.getElementById('{$widgetId}');
+					el.addEventListener('input', function(e) {	// i.e. oninput
+						$('form[name={$this->settings['name']}]').submit();
+					}, false);
 				});
 				";
 				}

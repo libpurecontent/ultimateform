@@ -232,8 +232,9 @@ class form
 		'mapTileUrl'						=> 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
 		'mapTileCopyrightHtml'				=> 'Map data &copy; <a href=\"https://openstreetmap.org/\">OpenStreetMap</a> contributors, ODbL',
 		'mapTileMaxZoom'					=> 18,
-		'mapGeocoder'						=> 'geocoder.js',	# Whether to enable geocoder, and if so, JS path
-		'mapGeocoderApiKey'					=> false,	# Geocoder API key for external provider
+		'mapGeocoder'						=> 'geocoder.js',					# Whether to enable geocoder, and if so, JS path
+		'mapGeocoderApiBaseUrl'				=> 'https://api.cyclestreets.net/v2/geocoder',	# Obtain key for this default provider at: https://www.cyclestreets.net/api/apply/
+		'mapGeocoderApiKey'					=> false,							# Geocoder API key for external provider
 		'mapGeocoderAutocompleteBbox'		=> '-6.6577,49.9370,1.7797,57.6924',	# Geocoder autocomplete bbox as W,S,E,N; default here is UK area
 	);
 	
@@ -794,6 +795,7 @@ class form
 			'tileCopyrightHtml'			=> $this->settings['mapTileCopyrightHtml'],
 			'tileMaxZoom'				=> $this->settings['mapTileMaxZoom'],
 			'geocoder'					=> $this->settings['mapGeocoder'],
+			'geocoderApiBaseUrl'		=> $this->settings['mapGeocoderApiBaseUrl'],
 			'geocoderApiKey'			=> $this->settings['mapGeocoderApiKey'],
 			'geocoderAutocompleteBbox'	=> $this->settings['mapGeocoderAutocompleteBbox'],
 			'instructionsHtml'			=> '<p>Zoom in and click on the map to set the exact location:</p>',
@@ -956,8 +958,8 @@ class form
 						
 						// Settings
 						var _settings = {
-							geocoderApiBaseUrl: 'https://api.cyclestreets.net/v2/geocoder',
-							geocoderApiKey: '" . htmlspecialchars ($arguments['geocoderApiKey']) . "',		// Obtain at https://www.cyclestreets.net/api/apply/
+							geocoderApiBaseUrl: '" . htmlspecialchars ($arguments['geocoderApiBaseUrl']) . "',
+							geocoderApiKey: '" . htmlspecialchars ($arguments['geocoderApiKey']) . "',
 							autocompleteBbox: '" . htmlspecialchars ($arguments['geocoderAutocompleteBbox']) . "',
 						};
 						

@@ -233,9 +233,11 @@ class form
 		'mapTileCopyrightHtml'				=> 'Map data &copy; <a href=\"https://openstreetmap.org/\">OpenStreetMap</a> contributors, ODbL',
 		'mapTileMaxZoom'					=> 18,
 		'mapGeocoder'						=> 'geocoder.js',					# Whether to enable geocoder, and if so, JS path
-		'mapGeocoderApiBaseUrl'				=> 'https://api.cyclestreets.net/v2/geocoder',	# Obtain key for this default provider at: https://www.cyclestreets.net/api/apply/
+		'mapGeocoderApiBaseUrl'				=> 'https://api.cyclestreets.net/v2/',	# Obtain key for this provider at: https://www.cyclestreets.net/api/apply/
 		'mapGeocoderApiKey'					=> false,							# Geocoder API key for external provider
-		'mapGeocoderAutocompleteBbox'		=> '-6.6577,49.9370,1.7797,57.6924',	# Geocoder autocomplete bbox as W,S,E,N; default here is UK area
+		'mapGeocoderBbox'					=> '-6.6577,49.9370,1.7797,57.6924',	# Geocoder autocomplete bbox as W,S,E,N; default here is UK area
+		'mapGeocoderCountryCodes'			=> 'gb,ie',
+		'mapGeocoderStylesContainer'		=> false,
 	);
 	
 	
@@ -797,7 +799,9 @@ class form
 			'geocoder'					=> $this->settings['mapGeocoder'],
 			'geocoderApiBaseUrl'		=> $this->settings['mapGeocoderApiBaseUrl'],
 			'geocoderApiKey'			=> $this->settings['mapGeocoderApiKey'],
-			'geocoderAutocompleteBbox'	=> $this->settings['mapGeocoderAutocompleteBbox'],
+			'geocoderBbox'				=> $this->settings['mapGeocoderBbox'],
+			'geocoderCountryCodes'		=> $this->settings['mapGeocoderCountryCodes'],
+			'geocoderStylesContainer'	=> $this->settings['mapGeocoderStylesContainer'],
 			'instructionsHtml'			=> '<p>Zoom in and click on the map to set the exact location:</p>',
 			'max'						=> 1,		# Max number of features that can be placed on the map
 			'propertiesEditable'		=> true,	# Whether the properties are editable in the popup
@@ -850,7 +854,6 @@ class form
 		# Add geocoder if required; this input element is not related to the form itself but a standalone control
 		$geocoderHtml = '';
 		if ($arguments['geocoder']) {
-			$this->enableJqueryUi ();
 			$this->jsCssAssets['mapCode'] .= '<script src="' . htmlspecialchars ($arguments['geocoder']) . '"></script>';
 			$geocoderHtml .= "\n\t" . '<div class="mapgeocoder">';
 			$geocoderHtml .= "\n\t\t" . '<input id="' . $widgetId . '_geocoder" type="text" name="location" autocomplete="off" placeholder="Search locations and move map" spellcheck="false" />';
@@ -960,7 +963,9 @@ class form
 						var _settings = {
 							geocoderApiBaseUrl: '" . htmlspecialchars ($arguments['geocoderApiBaseUrl']) . "',
 							geocoderApiKey: '" . htmlspecialchars ($arguments['geocoderApiKey']) . "',
-							autocompleteBbox: '" . htmlspecialchars ($arguments['geocoderAutocompleteBbox']) . "',
+							geocoderBbox: '" . htmlspecialchars ($arguments['geocoderBbox']) . "',
+							geocoderCountryCodes: '" . htmlspecialchars ($arguments['geocoderCountryCodes']) . "',
+							geocoderStylesContainer: '" . htmlspecialchars ($arguments['geocoderStylesContainer']) . "'
 						};
 						
 						// Determine if the widget is editable
@@ -988,13 +993,16 @@ class form
 						
 						// Add geocoder
 						var geocoderId = widgetId + '_geocoder';		// e.g. form_location1_geocoder
-						autocomplete.addTo ('input#' + geocoderId, {
-							sourceUrl: _settings.geocoderApiBaseUrl + '?key=' + _settings.geocoderApiKey + '&bounded=1&bbox=' + _settings.autocompleteBbox,
-							select: function (event, ui) {
-								var bbox = ui.item.feature.properties.bbox.split(',');
-								map.fitBounds ([ [bbox[1], bbox[0]], [bbox[3], bbox[2]] ]);
-								event.preventDefault();
-							}
+						var geocoderSettings = {
+							apiBaseUrl: _settings.geocoderApiBaseUrl,
+							apiKey: _settings.geocoderApiKey,
+							bbox: _settings.geocoderBbox,
+							countryCodes: _settings.geocoderCountryCodes,
+							stylesContainer: _settings.geocoderStylesContainer
+						};
+						geocoder ('input#' + geocoderId, geocoderSettings, function (feature) {
+							var [w, s, e, n] = feature.properties.bbox.split (',');
+							map.fitBounds ([[s, w], [n, e]], {maxZoom: 17});		// lat,lon
 						});
 						
 						// Get initial data state

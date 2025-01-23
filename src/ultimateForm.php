@@ -9445,30 +9445,23 @@ class formWidget
 	}
 	
 	
-	# Function to add tags functionality; uses Tag-it: https://github.com/aehlke/tag-it/ and http://aehlke.github.io/tag-it/examples.html
+	# Function to add tags functionality; uses Tagify: https://github.com/yairEO/tagify/ and https://yaireo.github.io/tagify/
 	function tags ()
 	{
 		# End if this functionality is not activated
 		if (!$this->arguments[__FUNCTION__]) {return;}
 		$parameter = $this->arguments[__FUNCTION__];
 		
-		# Enable jQuery UI
-		$this->form->enableJqueryUi ();
-		
 		# Add the main function
-		$this->form->jsCssAssets[__FUNCTION__]  = "\n\t\t\t" . '<script type="text/javascript" src="' . $this->settings['scripts'] . 'tag-it/js/tag-it.js"></script>';	// https://rawgithub.com/aehlke/tag-it/master/js/tag-it.js
+		$path = ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://cdn.jsdelivr.net/npm');
+		$this->form->jsCssAssets[__FUNCTION__]  = "\n\t\t\t" . '<script src="' . $path . '/@yaireo/tagify/dist/tagify.js"></script>';
+		$this->form->jsCssAssets[__FUNCTION__] .= "\n\t\t\t" . '<link href="'  . $path . '/@yaireo/tagify/dist/tagify.css" rel="stylesheet" />';
 		
-		# Add the stylesheets
-		$this->form->jsCssAssets[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://ajax.googleapis.com/ajax/libs') . '/jqueryui/1/themes/flick/jquery-ui.css" type="text/css" />';
-		$this->form->jsCssAssets[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/jquery.tagit.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/jquery.tagit.css
-		$this->form->jsCssAssets[__FUNCTION__] .= "\n\t\t\t" . '<link rel="stylesheet" href="' . $this->settings['scripts'] . 'tag-it/css/tagit.ui-zendesk.css" type="text/css" />';	// https://rawgithub.com/aehlke/tag-it/master/css/tagit.ui-zendesk.css
-		
-		# Options
-		$functionOptions = array ();
-		$functionOptions[] = 'removeConfirmation: true';
-		
-		# If required, add autocomplete functionality; either a string representing an AJAX endpoint, or an array of values
-		if (is_string ($parameter)) {
+		# If required, add autocomplete functionality; either an array of values, or a string representing an AJAX endpoint
+		if (is_array ($parameter)) {
+			$js = 'tagify.addTags (' . json_encode (array_values ($parameter)) . ')';
+			
+		} else if (is_string ($parameter)) {
 			/* 
 				# The data source needs to emit either:
 				- A simple array, json_encode'd:
@@ -9477,36 +9470,39 @@ class formWidget
 						'bar',
 						// ...
 					));
-				- Or an associative value/label array, json_encode'd:
+				- Or an associative array contained 'value' keys, json_encode'd:
 					json_encode (array (
-						array ('value' => 'foovalue', 'label' => 'foolabel'),
-						array ('value' => 'barvalue', 'label' => 'barlabel'),
+						array ('value' => 'foo', ...),
+						array ('value' => 'bar', ...),
 						// ...
 					));
 			*/
-			$functionOptions['autocomplete'] = "tagSource: function(search, showChoices) {
-						$.ajax({
-							url: '{$parameter}',
-							data: search,
-							dataType: 'json',
-							success: function (data) {
-								showChoices (data);
-							}
+			$js = "
+				tagify.on ('input', function (e) {
+					const value = e.detail.value;
+					tagify.whitelist = null;
+					fetch ('{$parameter}' + value)
+						.then (function (result) {return result.json ();})
+						.then (function (json) {
+							tagify.whitelist = json;
 						});
-					}";
-		} else if (is_array ($parameter)) {
-			$functionOptions['autocomplete'] = 'availableTags: ' . json_encode (array_values ($parameter));
-		}
-		if (isSet ($functionOptions['autocomplete'])) {
-			$functionOptions[] = 'autocomplete: {delay: 0, minLength: 2}';
+				});
+			";
 		}
 		
 		# Add a per-widget call
+		#!# DOMContentLoaded not working for some reason, so document.ready used for now
+		#!# Currently this applies the width to all tagify virtual inputs created
 		$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
 		$this->form->jQueryCode[__FUNCTION__ . $id] = "
-			$(document).ready(function() {
-				$('#" . $id . "').tagit({
-					" . implode (",\n\t\t\t\t\t", $functionOptions) . "
+			$(document).ready (function () {
+				const input = document.querySelector ('#" . $id . "');
+				const tagify = new Tagify (input, {
+					dropdown: {placeAbove: false}
+				});
+				{$js}
+				document.querySelectorAll ('.tagify').forEach (function (element) {
+					element.style.width = input.clientWidth + 'px';
 				});
 			});
 		";

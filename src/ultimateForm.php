@@ -4114,10 +4114,6 @@ class form
 		if ($arguments['thumbnail']) {
 			$thumbnailHtmlBySubfield = array ();
 			
-			# Enable jQuery
-			#!# Actually this is currently enabling jQuery as well as jQueryUI
-			$this->enableJqueryUi ();
-			
 			# Define the thumbnailing code; this is done once globally
 			$this->jQueryCode[__FUNCTION__] = "\n" . $this->thumbWrapperJs ();
 			

@@ -4079,7 +4079,7 @@ class form
 					}
 					form div.draganddrop:has(img) {
 						height: auto;
-						border-color: #ddd;
+						border-color: green;
 					}
 					form div.draganddrop input {
 						position: absolute;

@@ -4105,8 +4105,8 @@ class form
 						margin: 0;
 					}
 					form div.draganddrop div.thumbnailpreview img, form div.draganddrop div.thumbnailpreview video {
-						max-width: calc(100% - 20px);
-						max-height: calc(100% - 20px);
+						max-width: calc({$this->settings['uploadThumbnailWidth']}px - 20px);
+						max-height: calc({$this->settings['uploadThumbnailHeight']}px - 20px);
 						margin: 0;
 						padding: 10px;
 						text-align: center;

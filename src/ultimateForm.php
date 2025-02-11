@@ -4099,9 +4099,14 @@ class form
 						text-align: center;
 						color: gray;
 					}
-					form div.draganddrop img {
-						width: calc(100% - 20px);
-						height: calc(100% - 20px);
+					form div.draganddrop div.thumbnailpreview {
+						width: 100%;
+						height: 100%;
+						margin: 0;
+					}
+					form div.draganddrop div.thumbnailpreview img {
+						max-width: calc(100% - 20px);
+						max-height: calc(100% - 20px);
 						margin: 0;
 						padding: 10px;
 						text-align: center;
@@ -4137,7 +4142,7 @@ class form
 				if ($arguments['thumbnail'] === true) {
 					
 					# Open div to contain the thumbnail
-					$thumbnailHtml .= "\n\t\t\t\t<div id=\"{$thumbnailDivId}\" style=\"width: 100%; height: 100%; margin: 0;\">";
+					$thumbnailHtml .= "\n\t\t\t\t<div id=\"{$thumbnailDivId}\" class=\"thumbnailpreview\">";
 					
 					# Determine whether there is a default image, so that this can be set below
 					$createDefaultImage = ($arguments['default'] && isSet ($arguments['default'][$subfield]));

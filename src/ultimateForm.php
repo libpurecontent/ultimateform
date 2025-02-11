@@ -4077,7 +4077,7 @@ class form
 						padding: 0;	/* Must be zero, to ensure whole area is clickable */
 						border: 2px dashed #999;
 					}
-					form div.draganddrop:has(img) {
+					form div.draganddrop:has(img), form div.draganddrop:has(video) {
 						height: auto;
 						border-color: green;
 					}
@@ -4104,7 +4104,7 @@ class form
 						height: 100%;
 						margin: 0;
 					}
-					form div.draganddrop div.thumbnailpreview img {
+					form div.draganddrop div.thumbnailpreview img, form div.draganddrop div.thumbnailpreview video {
 						max-width: calc(100% - 20px);
 						max-height: calc(100% - 20px);
 						margin: 0;
@@ -4415,7 +4415,7 @@ class form
 			}
 			
 			Array.from (files).forEach (function (file) {
-				if (!file.type.match (/image\/.+/)) {return; /* i.e. continue */}
+				if (!file.type.match (/(image|video)\/.+/)) {return; /* i.e. continue */}
 				
 				// See: https://stackoverflow.com/a/61012791
 				const reader = new FileReader ();
@@ -4430,7 +4430,10 @@ class form
 						const url = window.URL.createObjectURL (blob);	// Get temporary virtual URL to file
 						
 						// Create an element containing the image and add it to the page
-						const element = document.createElement ('img');
+						const isVideo = file.type.match (/^video\//);
+						const tag = (!isVideo ? 'img' : 'video');
+						const element = document.createElement (tag);
+						if (isVideo) {element.controls = 'controls';}
 						element.src = url;
 						document.querySelector (selector).innerHTML = '';	// Clear any existing
 						document.querySelector (selector).appendChild (element);

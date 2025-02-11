@@ -4376,87 +4376,6 @@ class form
 	}
 	
 	
-	# Thumbnail wrapper JS
-	private function thumbWrapperJs ()
-	{
-		# Create the JS
-		$js = "
-		function thumbWrapper (files, selector) {
-			
-			thumb (files);
-			
-			function thumb(files) {
-				
-				if (files == null || files == undefined) {
-					$(selector).html( '<p><em>Unable to show a thumbnail, as this web browser is too old to support this.</em></p>' );
-					return false;
-				}
-				
-				for (var i = 0; i < files.length; i++) {
-					var file = files[i];
-					var imageType = /image.*/;
-					
-					if (!file.type.match(imageType)) {
-						continue;
-					}
-					
-					var reader = new FileReader();
-					
-					if (reader != null) {
-						reader.onload = GetThumbnail;
-						reader.readAsDataURL(file);
-					}
-				}
-			}
-			
-			function GetThumbnail(e) {
-				
-				var thumbnailCanvas = document.createElement('canvas');
-				var img = new Image();
-				img.src = e.target.result;
-				
-				img.onload = function () {
-					
-					var originalImageWidth = img.width;
-					var originalImageHeight = img.height;
-					
-					thumbnailCanvas.id = 'myTempCanvas';
-					thumbnailCanvas.width  = $(selector).width();
-					thumbnailCanvas.height = $(selector).height();
-					
-					// Scale the thumbnail to fit the box
-					if (originalImageWidth >= originalImageHeight) {
-						scaledWidth = Math.min(thumbnailCanvas.width, originalImageWidth);	// Ensure width is no greater than the available size
-						scaleFactor = (scaledWidth / originalImageWidth);
-						scaledHeight = Math.round(scaleFactor * originalImageHeight);	// Scale to same proportion, and round
-					} else {
-						scaledHeight = Math.min(thumbnailCanvas.height, originalImageHeight);
-						scaleFactor = (scaledHeight / originalImageHeight);
-						scaledWidth = Math.round(scaleFactor * originalImageWidth);
-					}
-					
-					if (thumbnailCanvas.getContext) {
-						var canvasContext = thumbnailCanvas.getContext('2d');
-						canvasContext.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-						var dataURL = thumbnailCanvas.toDataURL();
-						
-						if (dataURL != null && dataURL != undefined) {
-							var nImg = document.createElement('img');
-							nImg.src = dataURL;
-							$(selector).html(nImg);
-						} else {
-							$(selector).html( '<p><em>Unable to read the image.</em></p>' );
-						}
-					}
-				}
-			}
-		}";
-		
-		# Return the JS
-		return $js;
-	}
-	
-	
 	# AJAX endpoint function to provide progress upload, which calling code can use
 	# See: https://github.com/php/pecl-php-uploadprogress
 	# See: https://www.automatem.co.nz/blog/the-state-of-upload-progress-measurement-on-ubuntu-16-04-php7.html
@@ -4480,6 +4399,48 @@ class form
 		$json = json_encode ($data, JSON_PRETTY_PRINT);
 		header ('Content-Type: application/json');
 		echo $json;
+	}
+	
+	
+	# Thumbnail wrapper JS
+	private function thumbWrapperJs ()
+	{
+		# Create the JS
+		$js = "
+		function thumbWrapper (files, selector) {
+			
+			if (files == null || files == undefined) {
+				$(selector).html ('<p><em>Unable to show a thumbnail, as this web browser is too old to support this.</em></p>');
+				return false;
+			}
+			
+			Array.from (files).forEach (function (file) {
+				if (!file.type.match (/image\/.+/)) {return; /* i.e. continue */}
+				
+				// See: https://stackoverflow.com/a/61012791
+				const reader = new FileReader ();
+				if (reader != null) {
+					
+					reader.readAsArrayBuffer (file);
+					reader.onload = function () {
+						
+						// Get the temporary URL of the image in memory
+						const arrayBuffer = reader.result;
+						const blob = new Blob ([new Uint8Array (arrayBuffer)], {type: file.type});
+						const url = window.URL.createObjectURL (blob);	// Get temporary virtual URL to file
+						
+						// Create an element containing the image and add it to the page
+						const element = document.createElement ('img');
+						element.src = url;
+						document.querySelector (selector).innerHTML = '';	// Clear any existing
+						document.querySelector (selector).appendChild (element);
+					}
+				}
+			});
+		}";
+		
+		# Return the JS
+		return $js;
 	}
 	
 	

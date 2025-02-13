@@ -3904,6 +3904,8 @@ class form
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'progressbar'			=> false,	# Whether to enable a progress bar; if so, give the AJAX endpoint providing the data; requires the PECL uploadprogress module
 			'thumbnail'				=> false,	# Enable HTML5 thumbnail preview; either true (to auto-create a container div), or jQuery-style selector, specifying an existing element
+			'thumbnailWidth'		=> $this->settings['uploadThumbnailWidth'],		# Default upload thumbnail box width
+			'thumbnailHeight'		=> $this->settings['uploadThumbnailHeight'],	# Default upload thumbnail box height
 			'thumbnailExpandable'	=> false,	# Whether the thumbnail preview can be expanded in size; at present this merely opens the image in a new window
 			'draganddrop'			=> false,	# Whether to convert the element to be styled as a drag and drop zone
 		);
@@ -4072,8 +4074,8 @@ class form
 			$widgetHtml .= "
 				<style type=\"text/css\">
 					form div.draganddrop {
-						width: {$this->settings['uploadThumbnailWidth']}px;
-						height: {$this->settings['uploadThumbnailHeight']}px;
+						width: {$arguments['thumbnailWidth']}px;
+						height: {$arguments['thumbnailHeight']}px;
 						padding: 0;	/* Must be zero, to ensure whole area is clickable */
 						border: 2px dashed #999;
 					}
@@ -4083,8 +4085,8 @@ class form
 					}
 					form div.draganddrop input {
 						position: absolute;
-						width: calc({$this->settings['uploadThumbnailWidth']}px - 20px);
-						height: calc({$this->settings['uploadThumbnailHeight']}px - 20px);
+						width: calc({$arguments['thumbnailWidth']}px - 20px);
+						height: calc({$arguments['thumbnailHeight']}px - 20px);
 						margin: 0;
 						padding: 10px;
 						outline: none;
@@ -4105,8 +4107,8 @@ class form
 						margin: 0;
 					}
 					form div.draganddrop div.thumbnailpreview img, form div.draganddrop div.thumbnailpreview video {
-						max-width: calc({$this->settings['uploadThumbnailWidth']}px - 20px);
-						max-height: calc({$this->settings['uploadThumbnailHeight']}px - 20px);
+						max-width: calc({$arguments['thumbnailWidth']}px - 20px);
+						max-height: calc({$arguments['thumbnailHeight']}px - 20px);
 						margin: 0;
 						padding: 10px;
 						text-align: center;

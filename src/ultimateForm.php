@@ -4074,8 +4074,8 @@ class form
 			$widgetHtml .= "
 				<style type=\"text/css\">
 					form div.draganddrop {
-						width: {$arguments['thumbnailWidth']}px;
-						height: {$arguments['thumbnailHeight']}px;
+						width: calc({$arguments['thumbnailWidth']}px + 20px);
+						height: calc({$arguments['thumbnailHeight']}px + 20px);
 						padding: 0;	/* Must be zero, to ensure whole area is clickable */
 						border: 2px dashed #999;
 					}
@@ -4085,8 +4085,8 @@ class form
 					}
 					form div.draganddrop input {
 						position: absolute;
-						width: calc({$arguments['thumbnailWidth']}px - 20px);
-						height: calc({$arguments['thumbnailHeight']}px - 20px);
+						width: {$arguments['thumbnailWidth']}px;
+						height: {$arguments['thumbnailHeight']}px;
 						margin: 0;
 						padding: 10px;
 						outline: none;
@@ -4107,8 +4107,8 @@ class form
 						margin: 0;
 					}
 					form div.draganddrop div.thumbnailpreview img, form div.draganddrop div.thumbnailpreview video {
-						max-width: calc({$arguments['thumbnailWidth']}px - 20px);
-						max-height: calc({$arguments['thumbnailHeight']}px - 20px);
+						max-width: {$arguments['thumbnailWidth']}px;
+						max-height: {$arguments['thumbnailHeight']}px;
 						margin: 0;
 						padding: 10px;
 						text-align: center;

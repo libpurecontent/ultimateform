@@ -9469,6 +9469,7 @@ class formWidget
 			$(document).ready (function () {
 				const input = document.querySelector ('#" . $id . "');
 				const tagify = new Tagify (input, {
+					originalInputValueFormat: function (values) {return values.map (function (item) {return item.value}).join (',')},	// Output comma-separated as per input, not JSON
 					dropdown: {placeAbove: false}
 				});
 				{$js}

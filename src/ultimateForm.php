@@ -4070,7 +4070,7 @@ class form
 		
 		# Convert to drag and drop zone if required; this merely styles the input box and does not use HTML5 Drag and Drop; see: https://codepen.io/TheLukasWeb/pen/qlGDa
 		if ($arguments['draganddrop']) {
-			$thumbnailText = 'Click here to pick photo, or drag and drop into this box.';
+			$thumbnailText = 'Click here to pick image, or drag and drop into this box.';
 			$widgetHtml .= "
 				<style type=\"text/css\">
 					form div.draganddrop {

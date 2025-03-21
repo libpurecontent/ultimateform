@@ -2681,7 +2681,7 @@ class form
 						# Multidimensional version, which adds optgroup labels
 						foreach ($arguments['_valuesMultidimensional'] as $key => $mainValue) {
 							if (is_array ($mainValue)) {
-								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t<optgroup label=\"{$key}\">";
+								$subwidgetHtml[$subwidget] .= "\n\t\t\t\t" . '<optgroup label="' . htmlspecialchars ($key) . '">';
 								foreach ($mainValue as $availableValue => $visible) {
 									$isSelected = $this->select_isSelected ($arguments['expandable'], $elementValue, $subwidget, $availableValue);
 									$attributesHtml = $this->dataAttributes ($arguments['data'], $availableValue);

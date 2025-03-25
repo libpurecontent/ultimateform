@@ -757,14 +757,13 @@ class form
 	 */
 	function color ($suppliedArguments)
 	{
-		# Pass through to the standard input widget, but in password mode
+		# Pass through to the standard input widget, but in color mode
 		$this->input ($suppliedArguments, __FUNCTION__);
 	}
 	
 	
 	/**
 	 * Create a Map widget
-	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
 	public function map ($suppliedArguments)
 	{
@@ -777,7 +776,7 @@ class form
 			'append'					=> '',		# HTML appended to the widget
 			'prepend'					=> '',		# HTML prepended to the widget
 			'output'					=> array (),# Presentation format
-			'required'					=> false,	# Whether required or not
+			'required'					=> false,	# Whether required or not; NB enableNativeRequired will have no effect, as this not a native HTML widget
 			'default'					=> '',		# Default value (optional)
 			'regexp'					=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'					=> '',		# Case-insensitive regular expression against which the submission must validate
@@ -1565,7 +1564,7 @@ class form
 			'append'				=> '',		# HTML appended to the widget
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
-			'required'				=> false,	# Whether required or not
+			'required'				=> false,	# Whether required or not; NB enableNativeRequired will have no effect, as this not a native HTML widget
 			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'disallow'				=> false,		# Regular expression against which the submission must not validate
@@ -2665,7 +2664,7 @@ class form
 					
 					# Create the widget; this has to differentiate between a non- and a multi-dimensional array because converting all to the latter makes it indistinguishable from a single optgroup array
 					$useArrayFormat = ($arguments['multiple']);	// i.e. form[widgetname][] rather than form[widgetname]
-					$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, $useArrayFormat) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($hasAutofocus ? ' autofocus="autofocus"' : '') . ($arguments['onchangeSubmit'] ? ' onchange="this.form.submit();"' : '') . $widget->tabindexHtml () . '>';
+					$subwidgetHtml[$subwidget] = "\n\t\t\t<select" . $this->nameIdHtml ($subwidgetName, $useArrayFormat) . ($subwidgetsAreMultiple ? " multiple=\"multiple\" size=\"{$arguments['size']}\"" : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . ($hasAutofocus ? ' autofocus="autofocus"' : '') . ($arguments['onchangeSubmit'] ? ' onchange="this.form.submit();"' : '') . $widget->tabindexHtml () . '>';
 					if (!isSet ($arguments['_valuesMultidimensional'])) {
 						if ($arguments['required'] && $arguments['default'] && !$arguments['nullRequiredDefault']) {
 							$arguments['valuesWithNull'] = $arguments['values'];	// Do not add a null entry when a required field also has a default
@@ -3098,7 +3097,7 @@ class form
 				#!# Dagger hacked in - fix properly for other such characters; consider a flag somewhere to allow entities and HTML tags to be incorporated into the text (but then cleaned afterwards when printed/e-mailed)
 				$subelementsWidgetHtml[$value]  = '';
 				$subelementsWidgetHtml[$value] .= ($arguments['wrapOption'] ? "<{$arguments['wrapOption']}>" : '');
-				$subelementsWidgetHtml[$value] .= '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . (in_array ($value, $arguments['disabled'], true) ? ' disabled="disabled"' : '') . $titleHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' />';
+				$subelementsWidgetHtml[$value] .= '<input type="radio"' . $this->nameIdHtml ($arguments['name'], false, $value) . ' value="' . htmlspecialchars ($value) . '"' . ($value == $elementValue ? ' checked="checked"' : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . (($arguments['autofocus'] && $firstItem) ? ' autofocus="autofocus"' : '') . (in_array ($value, $arguments['disabled'], true) ? ' disabled="disabled"' : '') . $titleHtml . $widget->tabindexHtml ($subwidgetIndex - 1) . ' />';
 				$subelementsWidgetHtml[$value] .= '<label for="' . $elementId . '"' . $titleHtml . '>' . ($arguments['entities'] ? htmlspecialchars ($visible) : $visible) . '</label>';
 				$subelementsWidgetHtml[$value] .= ($arguments['wrapOption'] ? "</{$arguments['wrapOption']}>" : '');
 				$widgetHtml .= "\n\t\t\t" . $subelementsWidgetHtml[$value];
@@ -3194,7 +3193,7 @@ class form
 			'append'				=> '',		# HTML appended to the widget
 			'prepend'				=> '',		# HTML prepended to the widget
 			'output'				=> array (),# Presentation format
-			'required'				=> 0,		# The minimum number which must be selected (defaults to 0)
+			'required'				=> 0,		# The minimum number which must be selected (defaults to 0); NB HTML has no support for the require attribute on a checkbox set, so enableNativeRequired is irrelevant
 			'maximum'				=> 0,		# The maximum number which must be selected (defaults to 0, i.e. no maximum checking done)
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'			=> array (),	# Pre-selected item(s); if a string is supplied it will be converted to an array of one item
@@ -3718,7 +3717,7 @@ class form
 				$elementValueIso = $elementValue['year'] . '-' . $elementValue['month'] . '-' . $elementValue['day'];
 				
 				# Create the basic widget; NB the submission of a type="date" widget will always be YYYY-MM-DD (ISO 8601 Extended) whatever the input GUI format is - see http://dev.w3.org/html5/spec-author-view/forms.html#input-author-notes
-				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . " value=\"" . htmlspecialchars ($elementValueIso) . '"' . $widget->tabindexHtml () . ($arguments['min'] ? " min=\"{$arguments['min']}\"" : '') . ($arguments['max'] ? " max=\"{$arguments['max']}\"" : '') . ' />';
+				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . " value=\"" . htmlspecialchars ($elementValueIso) . '"' . $widget->tabindexHtml () . ($arguments['min'] ? " min=\"{$arguments['min']}\"" : '') . ($arguments['max'] ? " max=\"{$arguments['max']}\"" : '') . ' />';
 				
 				# Enable autosubmit if required; see: http://stackoverflow.com/questions/11532433 for the HTML5 picker, and https://stackoverflow.com/questions/6471959/ for the jQuery picker
 				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
@@ -3885,7 +3884,7 @@ class form
 			'directory'				=> NULL,	# Path on disk to the file; any format acceptable
 			'previewLocationPrefix'	=> '',		# Path in URL terms to the folder, to be prefixed to the filename, e.g. foo.jpg could become /url/path/for/foo.jpg
 			'subfields'				=> 1,		# The number of widgets within the widget set (i.e. available file slots)
-			'required'				=> 0,		# The minimum number which must be selected (defaults to 0)
+			'required'				=> 0,		# The minimum number which must be selected (defaults to 0)			#!# Currently required=true converts to 1 - should be all
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
 			'disallowedExtensions'	=> array (),# Simple array of disallowed file extensions (Single-item string also acceptable)
 			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required); does not need a dot prefix, though this is tolerated
@@ -4190,7 +4189,8 @@ class form
 				if ($arguments['draganddrop']) {
 					$widgetHtml .= "\n\t\t\t" . '<div class="draganddrop">' . "\n\t\t\t\t";
 				}
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($arguments['allowedExtensions'] ? ' accept=".' . implode (',.', $arguments['allowedExtensions']) . '"' : '') . ' />';
+				$setRequiredAttribute = ($this->settings['enableNativeRequired'] && $arguments['required'] && ($subfield < $arguments['required']));
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . ($setRequiredAttribute ? ' required="required"' : '') . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($arguments['allowedExtensions'] ? ' accept=".' . implode (',.', $arguments['allowedExtensions']) . '"' : '') . ' />';
 				if ($arguments['thumbnail']) {
 					$widgetHtml .= "\n" . $thumbnailHtmlBySubfield[$subfield];
 				}

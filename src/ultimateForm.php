@@ -3979,16 +3979,16 @@ class form
 		}
 		
 		# Determine whether a file extension must be included, represented by '*' as the only value for $arguments['allowedExtensions']; if so, also clear the array
-		$extensionRequired = false;
+		$extensionRequiredAny = false;
 		if (count ($arguments['allowedExtensions']) == 1) {
 			if ($arguments['allowedExtensions'][0] == '*') {
-				$extensionRequired = true;
+				$extensionRequiredAny = true;
 				$arguments['allowedExtensions'] = array ();
 			}
 		}
 		
 		# Do not allow defining of both disallowed and allowed extensions at once, except for the special case of defining disallowed extensions plus requiring an extension
-		if ((!empty ($arguments['disallowedExtensions'])) && (!empty ($arguments['allowedExtensions'])) && (!$extensionRequired)) {
+		if ((!empty ($arguments['disallowedExtensions'])) && (!empty ($arguments['allowedExtensions'])) && (!$extensionRequiredAny)) {
 			$this->formSetupErrors['uploadExtensionsMismatch'] = "You cannot, in the <strong>{$arguments['name']}</strong> upload element, define <em>both</em> disallowed <em>and</em> allowed extensions.";
 		}
 		
@@ -4018,11 +4018,13 @@ class form
 		
 		# Check that, if MIME Type checking is wanted, and the file extension check is in place, that all are supported
 		if ($arguments['mime']) {
-			if (!$arguments['allowedExtensions']) {
-				$this->formSetupErrors['uploadMimeNoExtensions'] = 'MIME Type checking was requested but allowedExtensions has not been set.';
+			if ($extensionRequiredAny) {
+				$this->formSetupErrors['uploadMimeArbitraryExtensions'] = 'MIME Type checking was requested, but this is not possible when allowedExtensions is set to the wildcard value *, as it is not possible to check every arbitrary file extension.';
+			} else if (!$arguments['allowedExtensions']) {
+				$this->formSetupErrors['uploadMimeNoExtensions'] = 'MIME Type checking was requested, but allowedExtensions has not been set.';
 			}
 			if (!function_exists ('mime_content_type')) {
-				$this->formSetupErrors['uploadMimeExtensionsMismatch'] = 'MIME Type checking was requested but is not available on this server platform.';
+				$this->formSetupErrors['uploadMimeExtensionsMismatch'] = 'MIME Type checking was requested, but is not available on this server platform.';
 			} else {
 				$this->mimeTypes = application::mimeTypeExtensions ();
 				if ($arguments['allowedExtensions']) {
@@ -4246,7 +4248,7 @@ class form
 				$apparentlyUploadedFiles[$subfield] = $elementValue[$subfield];
 				
 				# If an extension is required but the submitted item doesn't contain a dot, throw a problem
-				if (($extensionRequired) && (strpos ($elementValue[$subfield]['name'], '.') === false)) {
+				if (($extensionRequiredAny) && (strpos ($elementValue[$subfield]['name'], '.') === false)) {
 					$extensionsMissing[] = $elementValue[$subfield]['name'];
 				} else {
 					
@@ -4303,7 +4305,7 @@ class form
 		if ($arguments['required'] > 1) {$restrictions[] = "Minimum {$arguments['required']} items required";}
 		
 		# Describe extension restrictions on the widget and compile them as a semicolon-separated list
-		if ($extensionRequired) {
+		if ($extensionRequiredAny) {
 			$restrictions[] = 'File extensions are required';
 		} else {
 			if (!empty ($arguments['allowedExtensions'])) {
@@ -8180,7 +8182,7 @@ class form
 					
 					# Do MIME Type checks (and by now we can be sure that the extension supplied is in the MIME Types list), doing a mime_content_type() check as the value of $elementValue[$subfield]['type'] is not trustworthy and easily fiddled (changing the file extension is enough to fake this)
 					if ($arguments['mime']) {
-						$extension = pathinfo ($destination, PATHINFO_EXTENSION);	// Best of methods listed at www.cowburn.info/2008/01/13/get-file-extension-comparison/
+						$extension = pathinfo ($destination, PATHINFO_EXTENSION);
 						$mimeTypeDeclared = $this->mimeTypes[$extension];	// List loaded in upload widget
 						$mimeTypeActual = mime_content_type ($destination);
 						if ($mimeTypeDeclared != $mimeTypeActual) {

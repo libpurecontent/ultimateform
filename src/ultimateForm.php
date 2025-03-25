@@ -3887,7 +3887,7 @@ class form
 			'required'				=> 0,		# The minimum number which must be selected (defaults to 0)
 			'size'					=> 30,		# Visible size (optional; defaults to 30)
 			'disallowedExtensions'	=> array (),# Simple array of disallowed file extensions (Single-item string also acceptable)
-			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required)
+			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required); does not need a dot prefix, though this is tolerated
 			'mime'					=> false,	# Whether to enable the MIME Type check
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
 			'forcedFileName'		=> false,	# Force to a specific filename
@@ -3968,24 +3968,16 @@ class form
 		}
 		
 		# Ensure the initial value(s) is an array, even if only an empty one, converting if necessary, and lowercase (and then unique) the extensions lists, ensuring each starts with .
-		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
-		foreach ($arguments['disallowedExtensions'] as $index => $extension) {
-			$arguments['disallowedExtensions'][$index] = (substr ($extension, 0, 1) != '.' ? '.' : '') . strtolower ($extension);
-		}
-		$arguments['disallowedExtensions'] = application::ensureArray ($arguments['disallowedExtensions']);
-		$arguments['allowedExtensions'] = array_unique ($arguments['allowedExtensions']);
-		foreach ($arguments['allowedExtensions'] as $index => $extension) {
-			$arguments['allowedExtensions'][$index] = (substr ($extension, 0, 1) != '.' ? '.' : '') . strtolower ($extension);
-		}
-		$arguments['allowedExtensions'] = array_unique ($arguments['allowedExtensions']);
+		$arguments['allowedExtensions'] = $this->normaliseFileExtensions ($arguments['allowedExtensions']);
+		$arguments['disallowedExtensions'] = $this->normaliseFileExtensions ($arguments['disallowedExtensions']);
 		
 		# Ensure zip files can be uploaded if unzipping is enabled, by adding it to the list of allowed extensions if such a list is defined
-		#!# Allowing zip files but having a list of allowed extensions means that people can zip up a non-allowed extension
+		#!# Allowing zip files but having a list of allowed extensions means that people can zip up a non-allowed extension; consider whether this is a problem or not
 		if ($arguments['unzip'] && $arguments['allowedExtensions'] && !in_array ('zip', $arguments['allowedExtensions'])) {
 			$arguments['allowedExtensions'][] = 'zip';
 		}
 		
-		# Determine whether a file extension must be included - this is if * is the only value for $arguments['allowedExtensions']; if so, also clear the array
+		# Determine whether a file extension must be included, represented by '*' as the only value for $arguments['allowedExtensions']; if so, also clear the array
 		$extensionRequired = false;
 		if (count ($arguments['allowedExtensions']) == 1) {
 			if ($arguments['allowedExtensions'][0] == '*') {
@@ -4321,11 +4313,11 @@ class form
 			$restrictions[] = 'File extensions are required';
 		} else {
 			if (!empty ($arguments['allowedExtensions'])) {
-				$restrictions[] = 'Allowed file extensions: ' . implode (',', $arguments['allowedExtensions']);
+				$restrictions[] = 'Allowed file extensions: .' . implode (', .', $arguments['allowedExtensions']);
 			}
 		}
 		if (!empty ($arguments['disallowedExtensions'])) {
-			$restrictions[] = 'Disallowed file extensions: ' . implode (',', $arguments['disallowedExtensions']);
+			$restrictions[] = 'Disallowed file extensions: .' . implode (', .', $arguments['disallowedExtensions']);
 		}
 		if ($arguments['unzip']) {
 			$restrictions[] = 'Zip files will be automatically unzipped on arrival.';
@@ -4376,6 +4368,25 @@ class form
 			'default'	=> $arguments['default'],
 			'after' => $arguments['after'],
 		);
+	}
+	
+	
+	# Helper function to normalise a list of file extensions
+	private function normaliseFileExtensions ($extensions)
+	{
+		# Ensure array
+		$extensions = application::ensureArray ($extensions);
+		
+		# Remove initial dot, if any, and trim
+		foreach ($extensions as $index => $extension) {
+			$extensions[$index] = ltrim (strtolower (trim ($extension)), '.');
+		}
+		
+		# Unique the list
+		$extensions = array_unique ($extensions);
+		
+		# Return the list
+		return $extensions;
 	}
 	
 	

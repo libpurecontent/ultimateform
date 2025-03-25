@@ -76,6 +76,7 @@ class form
 	var $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
 	var $prefixedGroups = array ();				// Groups of element names when using prefixing in dataBinding
 	var $attachments = array ();				// Array of attachments
+	var $mimeTypes = array ();					// MIME type list loading
 	var $displayTemplateContents;
 	var $displayTemplateElementReplacements;
 	var $displayTemplateElementReplacementsSpecials;
@@ -4018,18 +4019,15 @@ class form
 		# Check that, if MIME Type checking is wanted, and the file extension check is in place, that all are supported
 		if ($arguments['mime']) {
 			if (!$arguments['allowedExtensions']) {
-				$this->formSetupErrors['uploadMimeNoExtensions'] = "MIME Type checking was requested but allowedExtensions has not been set.";
-				$arguments['mime'] = false;
+				$this->formSetupErrors['uploadMimeNoExtensions'] = 'MIME Type checking was requested but allowedExtensions has not been set.';
 			}
 			if (!function_exists ('mime_content_type')) {
-				$this->formSetupErrors['uploadMimeExtensionsMismatch'] = "MIME Type checking was requested but is not available on this server platform.";
-				$arguments['mime'] = false;
+				$this->formSetupErrors['uploadMimeExtensionsMismatch'] = 'MIME Type checking was requested but is not available on this server platform.';
 			} else {
 				$this->mimeTypes = application::mimeTypeExtensions ();
 				if ($arguments['allowedExtensions']) {
 					$inBoth = array_intersect ($arguments['allowedExtensions'], array_keys ($this->mimeTypes));
 					if (count ($inBoth) != count ($arguments['allowedExtensions'])) {
-						$arguments['mime'] = false;	// Disable execution of the mime block below
 						$this->formSetupErrors['uploadMimeExtensionsMismatch'] = "MIME Type checking was requested for the <strong>{$arguments['name']}</strong> upload element, but not all of the allowedExtensions are supported in the MIME checking list";
 					}
 				}
@@ -8183,7 +8181,7 @@ class form
 					# Do MIME Type checks (and by now we can be sure that the extension supplied is in the MIME Types list), doing a mime_content_type() check as the value of $elementValue[$subfield]['type'] is not trustworthy and easily fiddled (changing the file extension is enough to fake this)
 					if ($arguments['mime']) {
 						$extension = pathinfo ($destination, PATHINFO_EXTENSION);	// Best of methods listed at www.cowburn.info/2008/01/13/get-file-extension-comparison/
-						$mimeTypeDeclared = $this->mimeTypes[$extension];
+						$mimeTypeDeclared = $this->mimeTypes[$extension];	// List loaded in upload widget
 						$mimeTypeActual = mime_content_type ($destination);
 						if ($mimeTypeDeclared != $mimeTypeActual) {
 							$failures[$filename] = $attributes;

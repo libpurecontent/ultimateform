@@ -4016,7 +4016,6 @@ class form
 		}
 		
 		# Check that, if MIME Type checking is wanted, and the file extension check is in place, that all are supported
-		$mimeTypes = array ();
 		if ($arguments['mime']) {
 			if (!$arguments['allowedExtensions']) {
 				$this->formSetupErrors['uploadMimeNoExtensions'] = "MIME Type checking was requested but allowedExtensions has not been set.";
@@ -4033,9 +4032,6 @@ class form
 						$arguments['mime'] = false;	// Disable execution of the mime block below
 						$this->formSetupErrors['uploadMimeExtensionsMismatch'] = "MIME Type checking was requested for the <strong>{$arguments['name']}</strong> upload element, but not all of the allowedExtensions are supported in the MIME checking list";
 					}
-				}
-				foreach ($arguments['allowedExtensions'] as $extension) {
-					$mimeTypes[] = $this->mimeTypes[$extension];
 				}
 			}
 		}
@@ -4194,7 +4190,7 @@ class form
 				if ($arguments['draganddrop']) {
 					$widgetHtml .= "\n\t\t\t" . '<div class="draganddrop">' . "\n\t\t\t\t";
 				}
-				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($mimeTypes ? ' accept="' . implode (', ', $mimeTypes) . '"' : '') . ' />';
+				$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, $subfield, true) . " type=\"file\" size=\"{$arguments['size']}\"" . (($arguments['autofocus'] && $subfield == 0) ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subfield) . ($arguments['allowedExtensions'] ? ' accept=".' . implode (',.', $arguments['allowedExtensions']) . '"' : '') . ' />';
 				if ($arguments['thumbnail']) {
 					$widgetHtml .= "\n" . $thumbnailHtmlBySubfield[$subfield];
 				}

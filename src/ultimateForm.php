@@ -248,7 +248,7 @@ class form
 	 * Constructor
 	 * @param array $arguments Settings
 	 */
-	function __construct ($suppliedArguments = array ())
+	public function __construct ($suppliedArguments = array ())
 	{
 		# Assign constants
 		$this->timestamp = date ('Y-m-d H:i:s');
@@ -297,7 +297,7 @@ class form
 	 * Create a standard input widget
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function input ($suppliedArguments, $functionName = __FUNCTION__, /* internal */ $additionalArgumentDefaults = array ())
+	public function input ($suppliedArguments, $functionName = __FUNCTION__, /* internal */ $additionalArgumentDefaults = array ())
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -649,7 +649,7 @@ class form
 	 * Create a password widget (same as an input widget but using the HTML 'password' type)
 	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
-	function password ($suppliedArguments)
+	public function password ($suppliedArguments)
 	{
 		# Additional argument defaults
 		$additionalArgumentDefaults = array (
@@ -666,7 +666,7 @@ class form
 	 * Create an input field requiring a syntactically valid e-mail address; if a more specific e-mail validation is required, use $form->input and supply an e-mail validation regexp
 	 * @param array $arguments Supplied arguments same as input type, but enforceNumeric and regexp ignored
 	 */
-	function email ($suppliedArguments)
+	public function email ($suppliedArguments)
 	{
 		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
@@ -677,7 +677,7 @@ class form
 	 * Create a URL widget (same as an input widget but using the HTML5 'url' type)
 	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
-	function url ($suppliedArguments)
+	public function url ($suppliedArguments)
 	{
 		# Additional argument defaults
 		$additionalArgumentDefaults = array (
@@ -693,7 +693,7 @@ class form
 	 * Create a Tel widget (same as an input widget but using the HTML5 'tel' type)
 	 * @param array $arguments Supplied arguments same as input type
 	 */
-	function tel ($suppliedArguments)
+	public function tel ($suppliedArguments)
 	{
 		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
@@ -704,7 +704,7 @@ class form
 	 * Create a Search widget (same as an input widget but using the HTML5 'search' type)
 	 * @param array $arguments Supplied arguments same as input type
 	 */
-	function search ($suppliedArguments)
+	public function search ($suppliedArguments)
 	{
 		# Pass through to the standard input widget
 		$this->input ($suppliedArguments, __FUNCTION__);
@@ -715,7 +715,7 @@ class form
 	 * Create a Number widget (same as an input widget but using the HTML5 'number' type)
 	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
-	function number ($suppliedArguments)
+	public function number ($suppliedArguments)
 	{
 		# Additional argument defaults
 		#!# This needs to have min/max/step value validation and restriction text, and make enforceNumeric set numeric
@@ -735,7 +735,7 @@ class form
 	 * Create a Range widget (same as an input widget but using the HTML5 'range' type)
 	 * @param array $arguments Supplied arguments same as input type plus those below
 	 */
-	function range ($suppliedArguments)
+	public function range ($suppliedArguments)
 	{
 		# Additional argument defaults
 		#!# This needs to have min/max/step value validation and restriction text, and make enforceNumeric set numeric
@@ -755,7 +755,7 @@ class form
 	 * Create a Color widget (same as an input widget but using the HTML5 'color' type)
 	 * @param array $arguments Supplied arguments same as input type
 	 */
-	function color ($suppliedArguments)
+	public function color ($suppliedArguments)
 	{
 		# Pass through to the standard input widget, but in color mode
 		$this->input ($suppliedArguments, __FUNCTION__);
@@ -1289,7 +1289,7 @@ class form
 	 * Create a textarea box
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function textarea ($suppliedArguments)
+	public function textarea ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -1553,7 +1553,7 @@ class form
 	 * @param array $arguments Supplied arguments - see template
 	 */
 	# Note: make sure php_value file_uploads is on in the upload location!
-	function richtext ($suppliedArguments)
+	public function richtext ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -2364,7 +2364,7 @@ class form
 	 * Create a select (drop-down) box widget
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function select ($suppliedArguments)
+	public function select ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -2952,7 +2952,7 @@ class form
 	 * Create a radio-button widget set
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function radiobuttons ($suppliedArguments)
+	public function radiobuttons ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -3178,7 +3178,7 @@ class form
 	 * Create a checkbox(es) widget set
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function checkboxes ($suppliedArguments)
+	public function checkboxes ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -3484,7 +3484,7 @@ class form
 	 */
 	#!# Need to add HTML5 equivalents
 	#!# Need to add support for 'current'
-	function datetime ($suppliedArguments)
+	public function datetime ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -3868,7 +3868,7 @@ class form
 	 * Note that, for security reasons, browsers do not support setting an initial value.
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function upload ($suppliedArguments)
+	public function upload ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -4461,7 +4461,7 @@ class form
 	 * Function to pass hidden data over
 	 * @param array $arguments Supplied arguments - see template
 	 */
-	function hidden ($suppliedArguments)
+	public function hidden ($suppliedArguments)
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -4543,7 +4543,7 @@ class form
 	 * @param string $level Name of the element Level, e.g. 1 for <h1></h1>, 2 for <h2></h2>, etc., 'p' for <p></p>, or 'text' for text without any markup added
 	 * @param string $title Text
 	 */
-	function heading ($level, $title)
+	public function heading ($level, $title)
 	{
 		# Add the headings as text
 		switch ($level) {

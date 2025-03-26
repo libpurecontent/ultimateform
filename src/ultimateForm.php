@@ -5015,7 +5015,7 @@ class form
 	 * Output the result as an e-mail
 	 */
 	#!# Needs ability to reply-to directory, rather than via a field
-	function setOutputEmail ($recipient, $administrator = '', $subjectTitle = 'Form submission results', $chosenElementSuffix = NULL, $replyToField = NULL, $displayUnsubmitted = true)
+	public function setOutputEmail ($recipient, $administrator = '', $subjectTitle = 'Form submission results', $chosenElementSuffix = NULL, $replyToField = NULL, $displayUnsubmitted = true)
 	{
 		# Flag that this method is required
 		$this->outputMethods['email'] = true;
@@ -5201,7 +5201,7 @@ class form
 	/**
 	 * Output a confirmation of the submitted results to the submitter
 	 */
-	function setOutputConfirmationEmail ($chosenelementName, $administrator = '', $subjectTitle = 'Form submission results', $includeAbuseNotice = true, $displayUnsubmitted = true)
+	public function setOutputConfirmationEmail ($chosenelementName, $administrator = '', $subjectTitle = 'Form submission results', $includeAbuseNotice = true, $displayUnsubmitted = true)
 	{
 		# Flag that this method is required
 		$this->outputMethods['confirmationEmail'] = true;
@@ -5242,7 +5242,7 @@ class form
 	/**
 	 * Output the results to a CSV file
 	 */
-	function setOutputFile ($filename)
+	public function setOutputFile ($filename)
 	{
 		# Flag that this method is required
 		$this->outputMethods['file'] = true;
@@ -5268,7 +5268,7 @@ class form
 	/**
 	 * Output (display) the results to a database
 	 */
-	function setOutputDatabase ($dsn, $table = false)
+	public function setOutputDatabase ($dsn, $table = false)
 	{
 		# Flag that this method is required
 		#!# Change to ->registerOutputMethod ($type) which then does the following line
@@ -5284,7 +5284,7 @@ class form
 	/**
 	 * Output (display) the results on screen
 	 */
-	function setOutputScreen ($displayUnsubmitted = true)
+	public function setOutputScreen ($displayUnsubmitted = true)
 	{
 		# Flag that this method is required
 		$this->outputMethods['screen'] = true;

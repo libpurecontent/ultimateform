@@ -55,9 +55,9 @@ class form
 	## Prepare variables ##
 	
 	# Principal arrays
-	var $elements = array ();					// Master array of form element setup
+	public $elements = array ();				// Master array of form element setup
 	var $form;									// Master array of posted form data
-	var $settings;								// Settings
+	public $settings;								// Settings
 	var $outputData;							// Master array of arranged data for output
 	var $outputMethods = array ();				// Master array of output methods
 	
@@ -67,7 +67,7 @@ class form
 	var $method;								// GET/POST data method
 	var $collection;							// GET/POST data collection
 	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
-	var $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added; those whose key is prefixed with _ are warnings
+	public $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added; those whose key is prefixed with _ are warnings
 	var $elementProblems = array ();			// Array of submitted element problems
 	var $externalProblems = array ();			// Array of external element problems as inserted by the calling applications
 	var $validationRules = array ();			// Array of validation rules
@@ -83,17 +83,17 @@ class form
 	var $autocompleteJQueryEntries = array ();
 	
 	# State control
-	var $formPosted;							// Flag for whether the form has been posted
+	public $formPosted;							// Flag for whether the form has been posted
 	var $formDisplayed = false;					// Flag for whether the form has been displayed
 	var $formDisabled = false;					// Whether the form has been disabled
 	var $setupOk = false;						// Flag for whether the form has been set up OK
 	var $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
 	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
 	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
-	var $antispamWait = 0;						// Time to wait in the event of spam attempt detection, in seconds
+	public $antispamWait = 0;						// Time to wait in the event of spam attempt detection, in seconds
 	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
-	var $jsCssAssets = array ();				// Array of JS/CSS client library loading HTML tags, if any, which are treated as plain HTML
-	var $jQueryCode = array ();					// Array of jQuery client code, if any, which will get wrapped in a script tag
+	public $jsCssAssets = array ();				// Array of JS/CSS client library loading HTML tags, if any, which are treated as plain HTML
+	public $jQueryCode = array ();				// Array of jQuery client code, if any, which will get wrapped in a script tag
 	var $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
 	var $formSave = false;						// Whether the submission is a save rather than a proper submission
 	

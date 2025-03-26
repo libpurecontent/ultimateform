@@ -56,70 +56,70 @@ class form
 	
 	# Principal arrays
 	public $elements = array ();				// Master array of form element setup
-	var $form;									// Master array of posted form data
+	private $form;									// Master array of posted form data
 	public $settings;								// Settings
-	var $outputData;							// Master array of arranged data for output
-	var $outputMethods = array ();				// Master array of output methods
+	private $outputData;							// Master array of arranged data for output
+	private $outputMethods = array ();				// Master array of output methods
 	
 	# Main variables
-	var $name;									// The name of the form
-	var $location;								// The location where the form is submitted to
-	var $method;								// GET/POST data method
-	var $collection;							// GET/POST data collection
-	var $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
+	private $name;									// The name of the form
+	private $location;								// The location where the form is submitted to
+	private $method;								// GET/POST data method
+	private $collection;							// GET/POST data collection
+	private $duplicatedElementNames = array ();		// The array to hold any duplicated form field names
 	public $formSetupErrors = array ();			// Array of form setup errors, to which any problems can be added; those whose key is prefixed with _ are warnings
-	var $elementProblems = array ();			// Array of submitted element problems
-	var $externalProblems = array ();			// Array of external element problems as inserted by the calling applications
-	var $validationRules = array ();			// Array of validation rules
-	var $validationTypes;			// Array of validation rules
-	var $databaseConnection = NULL;				// Database connection
-	var $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
-	var $prefixedGroups = array ();				// Groups of element names when using prefixing in dataBinding
-	var $attachments = array ();				// Array of attachments
-	var $mimeTypes = array ();					// MIME type list loading
-	var $displayTemplateContents;
-	var $displayTemplateElementReplacements;
-	var $displayTemplateElementReplacementsSpecials;
-	var $autocompleteJQueryEntries = array ();
+	private $elementProblems = array ();			// Array of submitted element problems
+	private $externalProblems = array ();			// Array of external element problems as inserted by the calling applications
+	private $validationRules = array ();			// Array of validation rules
+	private $validationTypes;			// Array of validation rules
+	private $databaseConnection = NULL;				// Database connection
+	private $html = NULL;							// Compiled HTML, obtained by using $html = $form->getHtml () after $form->process ();
+	private $prefixedGroups = array ();				// Groups of element names when using prefixing in dataBinding
+	private $attachments = array ();				// Array of attachments
+	private $mimeTypes = array ();					// MIME type list loading
+	private $displayTemplateContents;
+	private $displayTemplateElementReplacements;
+	private $displayTemplateElementReplacementsSpecials;
+	private $autocompleteJQueryEntries = array ();
 	
 	# State control
 	public $formPosted;							// Flag for whether the form has been posted
-	var $formDisplayed = false;					// Flag for whether the form has been displayed
-	var $formDisabled = false;					// Whether the form has been disabled
-	var $setupOk = false;						// Flag for whether the form has been set up OK
-	var $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
-	var $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
-	var $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
+	private $formDisplayed = false;					// Flag for whether the form has been displayed
+	private $formDisabled = false;					// Whether the form has been disabled
+	private $setupOk = false;						// Flag for whether the form has been set up OK
+	private $headingTextCounter = 1;				// Counter to enable uniquely-named fields for non-form elements (i.e. headings), starting at 1 #!# Get rid of this somehow
+	private $uploadProperties;						// Data store to cache upload properties if the form contains upload fields
+	private $hiddenElementPresent = false;			// Flag for whether the form includes one or more hidden elements
 	public $antispamWait = 0;						// Time to wait in the event of spam attempt detection, in seconds
-	var $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
+	private $dataBinding = false;					// Whether dataBinding is in use; if so, this will become an array containing connection variables
 	public $jsCssAssets = array ();				// Array of JS/CSS client library loading HTML tags, if any, which are treated as plain HTML
 	public $jQueryCode = array ();				// Array of jQuery client code, if any, which will get wrapped in a script tag
-	var $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
-	var $formSave = false;						// Whether the submission is a save rather than a proper submission
+	private $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
+	private $formSave = false;						// Whether the submission is a save rather than a proper submission
 	
 	# Output configuration
-	var $configureResultEmailRecipient;							// The recipient of an e-mail
-	var $configureResultEmailRecipientSuffix;					// The suffix used when a select field is used as the e-mail receipient but the selectable items are only the prefix to the address
-	var $configureResultEmailAdministrator;						// The from field of an e-mail
-	var $configureResultFileFilename;							// The file name where results are written
-	var $configureResultConfirmationEmailRecipient = '';		// The recipient of any confirmation e-mail
-	var $configureResultConfirmationEmailAbuseNotice = true;	// Whether to include an abuse report notice in any confirmation e-mail sent
-	var $configureResultEmailedSubjectTitle = array ();			// An array to hold the e-mail subject title for either e-mail result type
-	var $configureResultScreenShowUnsubmitted;					// Whether, in screen results mode, unsubmitted widgets that are not required will be listed
-	var $configureResultEmailShowUnsubmitted;					// Whether, in e-mail results mode, unsubmitted widgets that are not required will be listed
-	var $configureResultConfirmationEmailShowUnsubmitted;		// Whether, in e-mail confirmation results mode, unsubmitted widgets that are not required will be listed
+	private $configureResultEmailRecipient;							// The recipient of an e-mail
+	private $configureResultEmailRecipientSuffix;					// The suffix used when a select field is used as the e-mail receipient but the selectable items are only the prefix to the address
+	private $configureResultEmailAdministrator;						// The from field of an e-mail
+	private $configureResultFileFilename;							// The file name where results are written
+	private $configureResultConfirmationEmailRecipient = '';		// The recipient of any confirmation e-mail
+	private $configureResultConfirmationEmailAbuseNotice = true;	// Whether to include an abuse report notice in any confirmation e-mail sent
+	private $configureResultEmailedSubjectTitle = array ();			// An array to hold the e-mail subject title for either e-mail result type
+	private $configureResultScreenShowUnsubmitted;					// Whether, in screen results mode, unsubmitted widgets that are not required will be listed
+	private $configureResultEmailShowUnsubmitted;					// Whether, in e-mail results mode, unsubmitted widgets that are not required will be listed
+	private $configureResultConfirmationEmailShowUnsubmitted;		// Whether, in e-mail confirmation results mode, unsubmitted widgets that are not required will be listed
 	
 	# Supported output types
-	var $supportedTypes = array ('file', 'email', 'confirmationEmail', 'screen', 'processing', 'database');
-	var $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
+	private $supportedTypes = array ('file', 'email', 'confirmationEmail', 'screen', 'processing', 'database');
+	private $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
 	# Constants
-	var $timestamp;
-	var $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
-	var $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
+	private $timestamp;
+	private $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
+	private $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
 	
 	# Specify available arguments as defaults or as NULL (to represent a required argument)
-	var $argumentDefaults = array (
+	private $argumentDefaults = array (
 		'get'								=> false,							# Enable GET support instead of (default) POST
 		'name'								=> 'form',							# Name of the form
 		'id'								=> false,							# Id of the form (or none)

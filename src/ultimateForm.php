@@ -4969,7 +4969,7 @@ class form
 	 * Wrapper function to dump data to the screen
 	 * @access public
 	 */
-	function dumpData ($data)
+	public function dumpData ($data)
 	{
 		return application::dumpData ($data);
 	}
@@ -5296,7 +5296,7 @@ class form
 	
 	# Function to return the specification
 	#!# This needs to exclude proxied widgets, e.g. password confirmation
-	function getSpecification ()
+	public function getSpecification ()
 	{
 		# Return the elements array
 		return $this->elements;
@@ -5304,7 +5304,7 @@ class form
 	
 	
 	# Function to get database column specifications
-	function getDatabaseColumnSpecification ($table = false)
+	public function getDatabaseColumnSpecification ($table = false)
 	{
 		# Loop through the elements and extract the specification
 		$columns = array ();
@@ -5543,7 +5543,7 @@ class form
 	/* Result viewing */
 	
 	# Function to assemble results into a chart
-	function resultViewer ($suppliedArguments = array ())
+	public function resultViewer ($suppliedArguments = array ())
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (
@@ -5891,7 +5891,7 @@ class form
 	/**
 	 * Process/display the form (main wrapper function)
 	 */
-	function process (&$html = NULL)	// Note that &$value = defaultValue is not supported in PHP4 - see http://devzone.zend.com/node/view/id/1714#Heading5 point 3; if running PHP4, (a) remove the & and (b) change var $minimumPhpVersion above to 4.3
+	public function process (&$html = NULL)	// Note that &$value = defaultValue is not supported in PHP4 - see http://devzone.zend.com/node/view/id/1714#Heading5 point 3; if running PHP4, (a) remove the & and (b) change var $minimumPhpVersion above to 4.3
 	{
 		# Rearrange the element order if required
 		$this->rearrangeElementOrder ();
@@ -7082,7 +7082,6 @@ class form
 	
 	/**
 	 * Function to check for problems
-	 * @access private
 	 */
 	#!# The whole problems area needs refactoring
 	#!# Replace external access with new function returning bool hasElementProblems ()
@@ -7141,7 +7140,7 @@ class form
 	
 	
 	# Function to register a group validation check
-	function validation ($type, $fields, $parameter = false)
+	public function validation ($type, $fields, $parameter = false)
 	{
 		# Register the (now validated) validation rule
 		$this->validationRules[] = array ('type' => $type, 'fields' => $fields, 'parameter' => $parameter);
@@ -7202,7 +7201,7 @@ class form
 	
 	
 	# Function to register external problems as registered by the calling application
-	function registerProblem ($key, $message, $highlightFieldsWarning = false /* false, or string, or array */)
+	public function registerProblem ($key, $message, $highlightFieldsWarning = false /* false, or string, or array */)
 	{
 		# Convert the optional parameter for highlighting named field(s) into an array (whether empty or otherwise)
 		if ($highlightFieldsWarning) {
@@ -8350,7 +8349,7 @@ class form
 	
 	
 	# Generic function to generate proxy form widgets from an associated field specification and optional data
-	function dataBinding ($suppliedArguments = array ())
+	public function dataBinding ($suppliedArguments = array ())
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
 		$argumentDefaults = array (

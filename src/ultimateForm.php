@@ -4601,7 +4601,7 @@ class form
 	
 	
 	# Function to clean an HTML id attribute
-	function cleanId ($id)
+	public function cleanId ($id)	 /* public, as also accessed by formWidget */
 	{
 		# Replace non-allowed characters
 		# http://htmlhelp.com/reference/html40/attrs.html states:
@@ -4653,7 +4653,7 @@ class form
 	
 	
 	# Function to add jQuery-based autocomplete; see: https://jqueryui.com/autocomplete/#remote - this is the new jQueryUI plugin, not the old one; see also: https://learningjquery.com/2010/06/autocomplete-migration-guide
-	function autocompleteJQuery ($id, $data, $options = array (), $subwidgets = false)
+	function autocompleteJQuery ($id, $data, $options = array (), $subwidgets = false)	 /* public, as also accessed by formWidget */
 	{
 		# Ensure that jQuery UI is loaded
 		$this->enableJqueryUi ();
@@ -4703,7 +4703,7 @@ class form
 	
 	
 	# Function to add jQuery-based autocomplete; see https://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/ which is a bugfixed fork of the loopj version
-	function autocompleteTokenisedJQuery ($id, $jsonUrl, $optionsJsString = '', $singleLine = true)
+	public function autocompleteTokenisedJQuery ($id, $jsonUrl, $optionsJsString = '', $singleLine = true)	 /* public, as also accessed by formWidget */
 	{
 		# Add the main function
 		$this->jsCssAssets[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/') . 'jquery.tokeninput.js"></script>';
@@ -6531,7 +6531,7 @@ class form
 	
 	
 	# Function to register element names
-	function registerElementName ($name)
+	public function registerElementName ($name)	 /* public, as also accessed by formWidget */
 	{
 		# Add the name to the list of duplicated element names if it is already set
 		if (isSet ($this->elements[$name])) {$this->duplicatedElementNames[] = $name;}

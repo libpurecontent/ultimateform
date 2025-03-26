@@ -4623,14 +4623,16 @@ class form
 	
 	
 	# Function to inject a jQuery library loading
-	function addJQueryLibrary ($id, $code)
+	#!# Not clear if still in use externally
+	public function addJQueryLibrary ($id, $code)
 	{
 		$this->jsCssAssets[$id] = $code;
 	}
 	
 	
 	# Function to inject a jQuery code block
-	function addJQueryCode ($id, $code)
+	#!# Not clear if still in use externally
+	public function addJQueryCode ($id, $code)
 	{
 		$this->jQueryCode[$id] = $code;
 	}

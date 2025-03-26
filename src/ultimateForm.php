@@ -9257,7 +9257,7 @@ class formWidget
 	
 	
 	# Constructor
-	function __construct (&$form, $suppliedArguments, $argumentDefaults, $functionName, $arrayType = false)
+	public function __construct (&$form, $suppliedArguments, $argumentDefaults, $functionName, $arrayType = false)
 	{
 		# Inherit the form
 		$this->form =& $form;
@@ -9290,7 +9290,7 @@ class formWidget
 	
 	# Function to add autofocus to the first widget if required
 	#!# If a subsequent widget ends up manually adding autofocus, e.g. due to expandability, that gets ignored because this overrides it; currently clearAnyOtherAutofocus() is a hack to deal with this
-	function addAutofocusToFirstWidget ()
+	private function addAutofocusToFirstWidget ()
 	{
 		# End if not requiring autofocus functionality
 		if (!$this->settings['autofocus']) {return false;}
@@ -9311,7 +9311,7 @@ class formWidget
 	
 	
 	# Function to encode supplied value as supplied through the API; does not affect posted data which should not need charset conversion
-	function encodeApiSupplied ()
+	private function encodeApiSupplied ()
 	{
 		# Fix values list if there is one
 		if (isSet ($this->arguments['values'])) {
@@ -9326,7 +9326,7 @@ class formWidget
 	
 	
 	# Function to set the widget's (submitted) value
-	function setValue ($value)
+	public function setValue ($value)
 	{
 		# If an array type, ensure the value is an array, converting where necessary
 		if ($this->arrayType) {$value = application::ensureArray ($value);}
@@ -9337,21 +9337,21 @@ class formWidget
 	
 	
 	# Function to return the arguments
-	function getArguments ()
+	public function getArguments ()
 	{
 		return $this->arguments;
 	}
 	
 	
 	# Function to return the widget's (submitted but processed) value
-	function getValue ()
+	public function getValue ()
 	{
 		return $this->value;
 	}
 	
 	
 	# Function to determine if a widget is required but empty
-	function requiredButEmpty ()
+	public function requiredButEmpty ()
 	{
 		# Return the value; note that strlen rather than empty() is used because the PHP stupidly allows the string "0" to be empty()
 		return (($this->arguments['required']) && (strlen ($this->value) == 0));
@@ -9359,7 +9359,7 @@ class formWidget
 	
 	
 	# Function to return the widget's problems
-	function getElementProblems ($problems)
+	public function getElementProblems ($problems)
 	{
 		#!# Temporary: merge in any problems from the object
 		if ($problems) {$this->elementProblems += $problems;}
@@ -9370,9 +9370,8 @@ class formWidget
 	
 	/**
 	 * Function to clean whitespace from a field where requested
-	 * @access private
 	 */
-	function handleWhiteSpace ()
+	public function handleWhiteSpace ()
 	{
 		# Trim white space if required
 		if ($this->settings['whiteSpaceTrimSurrounding']) {$this->value = trim ($this->value);}
@@ -9383,7 +9382,7 @@ class formWidget
 	
 	
 	# Function to check the minimum length of what is submitted
-	function checkMinLength ()
+	public function checkMinLength ()
 	{
 		#!# Move the is_numeric check into the argument cleaning stage
 		if (is_numeric ($this->arguments['minlength'])) {
@@ -9395,7 +9394,7 @@ class formWidget
 	
 	
 	# Function to check the maximum length of what is submitted
-	function checkMaxLength ($stripHtml = false)
+	public function checkMaxLength ($stripHtml = false)
 	{
 		# Obtain the value, and strip HTML first if required
 		$value = $this->value;
@@ -9416,7 +9415,7 @@ class formWidget
 	
 	
 	# Function to add autocomplete functionality
-	function autocomplete ($arguments, $subwidgets = false)
+	public function autocomplete ($arguments, $subwidgets = false)
 	{
 		if ($arguments[__FUNCTION__]) {
 			$id = $this->form->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);
@@ -9426,7 +9425,7 @@ class formWidget
 	
 	
 	# Function to add tags functionality; uses Tagify: https://github.com/yairEO/tagify/ and https://yaireo.github.io/tagify/
-	function tags ()
+	public function tags ()
 	{
 		# End if this functionality is not activated
 		if (!$this->arguments[__FUNCTION__]) {return;}
@@ -9491,7 +9490,7 @@ class formWidget
 	
 	
 	# Function to add autocomplete functionality (tokenised version; NB sends q= and requires id,name keys)
-	function autocompleteTokenised ($singleLine = true)
+	public function autocompleteTokenised ($singleLine = true)
 	{
 		# End if this functionality is not activated
 		if (!$this->arguments[__FUNCTION__]) {return;}
@@ -9531,7 +9530,7 @@ class formWidget
 	
 	
 	# Function to prevent multiline submissions in input elements which shouldn't allow line-breaks
-	function preventMultilineSubmissions ()
+	public function preventMultilineSubmissions ()
 	{
 		# Determine the value(s) to be checked; this takes account of expandable widgets
 		#!# This ought to be done on a per-subwidget basis, as currently a subwidget in 'expandable="\n"' mode currently would have a newline allowed through
@@ -9553,9 +9552,8 @@ class formWidget
 	
 	/**
 	 * Function to clean input from a field to being numeric only
-	 * @access private
 	 */
-	function cleanToNumeric ()
+	public function cleanToNumeric ()
 	{
 		# End if not required to enforce numeric
 		if (!$this->arguments['enforceNumeric']) {return;}
@@ -9596,7 +9594,7 @@ class formWidget
 	
 	# Helper function for creating tabindex HTML
 	#!# Add tabindex validation, i.e. accept 0-32767, strip leading zeros and confirm is an integer (without decimal places)
-	function tabindexHtml ($subwidgetIndex = false)
+	public function tabindexHtml ($subwidgetIndex = false)
 	{
 		# If it's a scalar widget type, return a string
 		if (!$subwidgetIndex) {
@@ -9617,7 +9615,7 @@ class formWidget
 	
 	
 	# Perform truncation on the visible part of an array, with support for multidimensionality
-	function truncate ($values)
+	public function truncate ($values)
 	{
 		# End if no truncation
 		if (!$this->arguments['truncate']) {return $values;}
@@ -9646,7 +9644,7 @@ class formWidget
 	# Perform regexp checks
 	#!# Should there be checking for clashes between disallow and regexp, i.e. so that the widget can never submit?
 	#!# Should there be checking of disallow and regexp when editable is false, i.e. so that the widget can never submit?
-	function regexpCheck ()
+	public function regexpCheck ()
 	{
 		# End if the form is empty; strlen is used rather than a boolean check, as a submission of the string '0' will otherwise fail this check incorrectly
 		if (!strlen ($this->value)) {return false;}
@@ -9717,7 +9715,7 @@ class formWidget
 	
 	
 	# Function to check for spam submissions
-	function antispamCheck ()
+	public function antispamCheck ()
 	{
 		# Antispam checks
 		if (!$this->arguments['antispam']) {return;}
@@ -9740,7 +9738,7 @@ class formWidget
 	
 	
 	# Function to check for uniqueness
-	function uniquenessCheck ($caseSensitiveComparison = false, $trim = true)
+	public function uniquenessCheck ($caseSensitiveComparison = false, $trim = true)
 	{
 		# End if no current values supplied
 		if (!$this->arguments['current']) {return NULL;}

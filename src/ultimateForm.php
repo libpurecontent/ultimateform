@@ -9246,14 +9246,14 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 class formWidget
 {
 	# Class variables
-	var $form;
-	var $settings;
-	var $functionName;
-	var $formSetupErrors;
-	var $arguments;
-	var $value;
-	var $elementProblems = array ();
-	var $arrayType;
+	private $form;
+	private $settings;
+	private $functionName;
+	private $formSetupErrors;
+	private $arguments;
+	private $value;
+	private $elementProblems = array ();
+	private $arrayType;
 	
 	
 	# Constructor

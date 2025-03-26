@@ -2169,7 +2169,7 @@ class form
 	
 	
 	# Function to clean the content
-	function richtextClean ($content, &$arguments, $nofixTag = '<!-- nofix -->', $charset = 'utf8', $allowCurlyQuotes = false)
+	private function richtextClean ($content, &$arguments, $nofixTag = '<!-- nofix -->', $charset = 'utf8', $allowCurlyQuotes = false)
 	{
 		# Determine whether the <!-- nofix --> tag is present at the start and therefore whether the content should be cleaned
 		$nofixPresent = ($nofixTag && (substr ($content, 0, strlen ($nofixTag)) == $nofixTag));	// ereg/preg_match are not used as otherwise escaping may be needed
@@ -2909,7 +2909,7 @@ class form
 	
 	
 	# Helper function for select fields to determine whether a value is selected
-	function select_isSelected ($expandable, $elementValue, $subwidget, $availableValue)
+	private function select_isSelected ($expandable, $elementValue, $subwidget, $availableValue)
 	{
 		if ($expandable) {
 			$isSelected = (isSet ($elementValue[$subwidget]) ? ($availableValue == $elementValue[$subwidget]) : false);
@@ -2921,7 +2921,7 @@ class form
 	
 	
 	# Helper function to support the copyTo argument
-	function copyTo ($arguments)
+	private function copyTo ($arguments)
 	{
 		# End if not required
 		if (!$arguments['copyTo'] || (!is_string ($arguments['copyTo']))) {return;}
@@ -3320,14 +3320,14 @@ class form
 					$elementValue[$value] = '';
 				}
 				
-//				# Construct the element ID, which must be unique
+				# Construct the element ID, which must be unique
 				$elementId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}_{$value}]" : "{$arguments['name']}_{$value}");
 				
 				# Determine whether to disable this checkbox
 				$disabled = ((isSet ($arguments['disabled'][$value]) && $arguments['disabled'][$value]) ? ' disabled="disabled"' : '');
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
-//				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' />' . ($arguments['labels'] ? '<label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>' : '');
+				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' />' . ($arguments['labels'] ? '<label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>' : '');
 				$label = ($arguments['entities'] ? htmlspecialchars ($visible) : $visible);
 				$subelementsWidgetHtml[$value] = '<input type="checkbox"' . $this->nameIdHtml ($arguments['name'], false, $value, true) . ' value="true"' . $stickynessHtml . (($arguments['autofocus'] && $subwidgetIndex == 1)  ? ' autofocus="autofocus"' : '') . $widget->tabindexHtml ($subwidgetIndex - 1) . $disabled . ' />' . ($arguments['labels'] && !$arguments['labelsSurround'] ? '<label for="' . $elementId . '">' . $label . '</label>' : '');
 				if ($arguments['labels'] && $arguments['labelsSurround']) {
@@ -4580,7 +4580,7 @@ class form
 	
 	
 	# Function to generate ID and name HTML
-	function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false, $idOnly = false, $idAppend = false)
+	private function nameIdHtml ($widgetName, $multiple = false, $subitem = false, $nameAppend = false, $idOnly = false, $idAppend = false)
 	{
 		# Create the name and ID and compile the HTML
 		# http://htmlhelp.com/reference/html40/attrs.html says that "Also note that while NAME may contain entities, the ID attribute value may not."
@@ -4639,7 +4639,7 @@ class form
 	
 	
 	# Function to load jQuery UI
-	function enableJqueryUi ()
+	private function enableJqueryUi ()
 	{
 		# Add the libraries, ensuring that the loading respects the protocol type (HTTP/HTTPS) of the current page, to avoid mixed content warnings
 		# Need to keep this in sync with a compatible jQuery version
@@ -4745,7 +4745,7 @@ class form
 	
 	# Function to add jQuery-based maxlength checking; see http://stackoverflow.com/questions/1588521/
 	#!# Replace with HTML5 widget attributes where available
-	function maxLengthJQuery ($id, $characters)
+	private function maxLengthJQuery ($id, $characters)
 	{
 		# Add the main function
 		$this->jQueryCode[__FUNCTION__] = "
@@ -4778,7 +4778,7 @@ class form
 	
 	
 	# Function to enable a form with multiple submit buttons to submit the main button, not any others (such as a mid-form refresh)
-	function multipleSubmitReturnHandlerJQuery ()
+	private function multipleSubmitReturnHandlerJQuery ()
 	{
 		# Add the main function; see: http://stackoverflow.com/a/5017423/180733
 		$this->multipleSubmitReturnHandlerClass = 'defaultsubmitbutton';
@@ -4798,7 +4798,7 @@ class form
 	
 	
 	# Function to ensure that all initial values are in the array of values
-	function ensureDefaultsAvailable ($arguments, &$warningHtml = false)
+	private function ensureDefaultsAvailable ($arguments, &$warningHtml = false)
 	{
 		# Convert to an array (for this local function only) if not already
 		if (!is_array ($arguments['default'])) {
@@ -4840,7 +4840,7 @@ class form
 	
 	# Function to ensure that values are associative, even if multidimensional
 	#!# This function should be in the widget class but that won't work until formSetupErrors carry back to the main class
-	function ensureHierarchyAssociative ($originalValues, $forceAssociative, $elementName, $valuesNamesAutomatic)
+	private function ensureHierarchyAssociative ($originalValues, $forceAssociative, $elementName, $valuesNamesAutomatic)
 	{
 		# End if no values
 		if (!$originalValues) {return false;}
@@ -4878,7 +4878,7 @@ class form
 	
 	
 	# Function to determine whether an array of values for a select form is suitable as an e-mail target
-	function _suitableAsEmailTarget ($values, $arguments)
+	private function _suitableAsEmailTarget ($values, $arguments)
 	{
 		# If it's not a required field, it's not suitable
 		if (!$arguments['required']) {return 'the field is not set as a required field';}
@@ -4908,7 +4908,7 @@ class form
 	 * Function to merge the multi-part posting of files to the main form array, effectively emulating the structure of a standard form input type
 	 * @access private
 	 */
-	function mergeFilesIntoPost ()
+	private function mergeFilesIntoPost ()
 	{
 		# In _GET mode, do nothing
 		if ($this->method == 'get') {return;}
@@ -4981,7 +4981,7 @@ class form
 	 * Function to show debugging information (configured form elements and submitted form elements) if required
 	 * @access private
 	 */
-	function showDebuggingInformation ()
+	private function showDebuggingInformation ()
 	{
 		# Start the debugging HTML
 		$html  = "\n\n" . '<div class="debug">';
@@ -5050,7 +5050,7 @@ class form
 	
 	
 	# Helper function to set the title
-	function _setTitle ($title)
+	private function _setTitle ($title)
 	{
 		# Assign the subject title, replacing a match for {fieldname} with the contents of the fieldname, which must be an 'input' widget type
 		if ($this->formPosted) {	// This only needs to be run when the form is posted; otherwise the replacement by output type will give an offset as there will be no output type when initially showing the form
@@ -5081,7 +5081,7 @@ class form
 	
 	
 	# Helper function called by setOutputEmail to set the recipient
-	function _setRecipient ($recipient, $chosenElementSuffix)
+	private function _setRecipient ($recipient, $chosenElementSuffix)
 	{
 		# If the recipient is a valid e-mail address then use that; if not, it should be a field name
 		if (application::validEmail ($recipient)) {
@@ -5134,7 +5134,7 @@ class form
 	
 	
 	# Helper function called by setOutputEmail to set the administrator
-	function _setAdministrator ($administrator)
+	private function _setAdministrator ($administrator)
 	{
 		# Return the server admin if no administrator supplied
 		if (!$administrator) {
@@ -5176,7 +5176,7 @@ class form
 	
 	
 	# Helper function called by setOutputEmail to set the reply-to field
-	function _setReplyTo ($replyToField)
+	private function _setReplyTo ($replyToField)
 	{
 		# Return if not set
 		if (!$replyToField) {
@@ -5334,7 +5334,7 @@ class form
 	
 	# Function to add built-in hidden security fields
 	#!# This and hiddenSecurityFieldSubmissionInvalid () should be refactored into a small class
-	function addHiddenSecurityFields ()
+	private function addHiddenSecurityFields ()
 	{
 		# Firstly (since username may be in use as a key) create a hidden username if required and a username is supplied
 		$userCheckInUse = ($this->settings['user'] && $this->settings['userKey']);
@@ -5510,7 +5510,7 @@ class form
 	
 	
 	# Function to validate built-in hidden security fields
-	function hiddenSecurityFieldSubmissionInvalid ()
+	private function hiddenSecurityFieldSubmissionInvalid ()
 	{
 		# End checking if the form is not posted or there is no username
 		if (!$this->formPosted || !$this->settings['user'] || !$this->settings['userKey']) {return false;}
@@ -6134,7 +6134,7 @@ class form
 	## Form processing support ##
 	
 	# Function to rearrange the element order if required
-	function rearrangeElementOrder ()
+	private function rearrangeElementOrder ()
 	{
 		# Determine if the ordering needs to be changed
 		$afters = array ();
@@ -6179,7 +6179,7 @@ class form
 	
 	
 	# Function to determine whether this facility is open
-	function facilityIsOpen ()
+	private function facilityIsOpen ()
 	{
 		# Check that the opening time has passed, if one is specified, ensuring that the date is correctly specified
 		if ($this->settings['opening']) {
@@ -6203,7 +6203,7 @@ class form
 	
 	
 	# Function to determine if the user is a valid user
-	function validUser ()
+	private function validUser ()
 	{
 		# Return true if no users are specified
 		if (!$this->settings['validUsers']) {return true;}
@@ -6225,7 +6225,7 @@ class form
 	 * @todo Add all sorts of other form setup checks as flags within this function
 	 * @access private
 	 */
-	function _setupOk ()
+	private function _setupOk ()
 	{
 		# Check the PHP environment set up is OK
 		$this->validEnvironment ();
@@ -6336,7 +6336,7 @@ class form
 	
 	
 	# Function to set up a database connection
-	function _setupDatabaseConnection ()
+	private function _setupDatabaseConnection ()
 	{
 		# Nothing to do if no connection supplied
 		if (!$this->settings['databaseConnection']) {return;}
@@ -6382,7 +6382,7 @@ class form
 	
 	
 	# Function to check templating
-	function setupTemplating ()
+	private function setupTemplating ()
 	{
 		# End further checks if not in the display mode
 		if ($this->settings['display'] != 'template') {return;}
@@ -6496,7 +6496,7 @@ class form
 	 * Function to perform validity checks to ensure a correct PHP environment
 	 * @access private
 	 */
-	function validEnvironment ()
+	private function validEnvironment ()
 	{
 		# Check the minimum PHP version, to ensure that all required functions will be available
 		if (version_compare (PHP_VERSION, $this->minimumPhpVersion, '<')) {$this->formSetupErrors['environmentPhpVersion'] = 'The server must be running PHP version <strong>' . $this->minimumPhpVersion . '</strong> or higher.';}
@@ -6543,7 +6543,7 @@ class form
 	 * @access private
 	 */
 	#!# Ideally replace each clashable item with an encoding method somehow or ideally eradicate the restrictions
-	function preventNamespaceClashes ()
+	private function preventNamespaceClashes ()
 	{
 		# Disallow [ or ] in a form name
 		if ((strpos ($this->settings['name'], '[') !== false) || (strpos ($this->settings['name'], ']') !== false)) {
@@ -6574,7 +6574,7 @@ class form
 	
 	
 	# Function to define DHTML for unsaved data protection - see http://stackoverflow.com/questions/140460/client-js-framework-for-unsaved-data-protection/2402725#2402725
-	function unsavedDataProtectionJs ($formId)
+	private function unsavedDataProtectionJs ($formId)
 	{
 		# Determine the text to be used
 		$messageText = ($this->settings['unsavedDataProtection'] === true ? 'Leaving this page will cause edits to be lost. Press the submit button on the page if you wish to save your data.' : $this->settings['unsavedDataProtection']);
@@ -6672,7 +6672,7 @@ class form
 	 * Function actually to display the form
 	 * @access private
 	 */
-	function constructFormHtml ($elements, $problems, $formRefreshed)
+	private function constructFormHtml ($elements, $problems, $formRefreshed)
 	{
 		# Define various HTML snippets
 		$requiredFieldIndicatorHtml = "\n" . '<p class="requiredmessage"><strong>*</strong> Items marked with an asterisk [*] are required fields and must be fully completed.</p>';
@@ -6954,7 +6954,7 @@ class form
 	
 	
 	# Function to add javascript/jQuery code
-	function loadJavascriptCode ()
+	private function loadJavascriptCode ()
 	{
 		# End if no jQuery use
 		if (!$this->jsCssAssets && !$this->jQueryCode && !$this->javascriptCode) {return false;}
@@ -7004,7 +7004,7 @@ class form
 	 * @access private
 	 */
 	#!# Make these types generic rather than hard-coded
-	function problemsList ($problems)
+	private function problemsList ($problems)
 	{
 		# Flatten the multi-level array of problems, starting first with the generic, top-level problems if any exist
 		$problemsList = array ();
@@ -7063,7 +7063,7 @@ class form
 	 * Function to prepare completed form data; the data is assembled into a compiled version (e.g. in the case of checkboxes, separated by commas) and a component version (which is an array); in the case of scalars, the component version is set to be the same as the compiled version
 	 * @access private
 	 */
-	function prepareData ()
+	private function prepareData ()
 	{
 		# Loop through each element, whether submitted or not (otherwise gaps may be left, e.g. in the CSV writing)
 		foreach ($this->elements as $name => $elementAttributes) {
@@ -7150,7 +7150,7 @@ class form
 	
 	
 	# Function to check the group validations are syntactically correct
-	function _checkGroupValidations ()
+	private function _checkGroupValidations ()
 	{
 		# End if no rules
 		if (!$this->validationRules) {return;}
@@ -7223,7 +7223,7 @@ class form
 	
 	# Function to run group validation checks
 	#!# Refactor this so that each check is its own function
-	function _groupValidationChecks ()
+	private function _groupValidationChecks ()
 	{
 		# Don't do any processing if no rules exist
 		if (!$this->validationRules) {return array ();}
@@ -7304,7 +7304,7 @@ class form
 	
 	
 	# Function to construct a field list string
-	function _fieldListString ($fields)
+	private function _fieldListString ($fields)
 	{
 		# Loop through each field name
 		foreach ($fields as $name) {
@@ -7323,7 +7323,7 @@ class form
 	 * Function to output the data
 	 * @access private
 	 */
-	function outputData ($outputType)
+	private function outputData ($outputType)
 	{
 		# Assign the presented data according to the output type
 		foreach ($this->outputData as $name => $data) {
@@ -7345,7 +7345,7 @@ class form
 	 * Set the presentation format for each element
 	 * @access private
 	 */
-	function mergeInPresentationDefaults ()
+	private function mergeInPresentationDefaults ()
 	{
 		# Get the presentation matrix
 		$presentationDefaults = $this->presentationDefaults ($returnFullAvailabilityArray = false, $includeDescriptions = false);
@@ -7380,7 +7380,7 @@ class form
 	 * Define presentation output formats
 	 * @access private
 	 */
-	function presentationDefaults ($returnFullAvailabilityArray = false, $includeDescriptions = false)
+	private function presentationDefaults ($returnFullAvailabilityArray = false, $includeDescriptions = false)
 	{
 		# NOTE: Order is: presented -> compiled takes presented if not defined -> rawcomponents takes compiled if not defined
 		
@@ -7600,7 +7600,7 @@ class form
 	 * Show presentation output formats
 	 * @access public
 	 */
-	function displayPresentationMatrix ()
+	private function displayPresentationMatrix ()
 	{
 		# Get the presentation matrix
 		$presentationMatrix = $this->presentationDefaults ($returnFullAvailabilityArray = true, $includeDescriptions = true);
@@ -7672,7 +7672,7 @@ class form
 	 * Function to return the output data as an array
 	 * @access private
 	 */
-	function outputDataProcessing ($presentedData)
+	private function outputDataProcessing ($presentedData)
 	{
 		# Escape the output if necessary
 		if ($this->settings['escapeOutput']) {
@@ -7692,7 +7692,7 @@ class form
 	
 	
 	# Function to perform escaping iteratively
-	function escapeOutputIterative ($data, $character)
+	private function escapeOutputIterative ($data, $character)
 	{
 		# For a scalar, return the escaped value
 		if (!is_array ($data)) {
@@ -7716,7 +7716,7 @@ class form
 	 * Function to display, in a tabular form, the results to the screen
 	 * @access private
 	 */
-	function outputDataScreen ($presentedData)
+	private function outputDataScreen ($presentedData)
 	{
 		# If nothing has been submitted, return the result directly
 		if (application::allArrayElementsEmpty ($presentedData)) {
@@ -7754,7 +7754,7 @@ class form
 	 * Wrapper function to output the data via e-mail
 	 * @access private
 	 */
-	 function outputDataEmail ($presentedData)
+	private function outputDataEmail ($presentedData)
 	 {
 	 	# Pass through
 	 	$this->outputDataEmailTypes ($presentedData, 'email', $this->configureResultEmailShowUnsubmitted);
@@ -7765,7 +7765,7 @@ class form
 	 * Wrapper function to output the data via e-mail
 	 * @access private
 	 */
-	 function outputDataConfirmationEmail ($presentedData)
+	private function outputDataConfirmationEmail ($presentedData)
 	 {
 	 	# Pass through
 	 	$this->outputDataEmailTypes ($presentedData, 'confirmationEmail', $this->configureResultConfirmationEmailShowUnsubmitted);
@@ -7776,7 +7776,7 @@ class form
 	 * Function to output the data via e-mail for either e-mail type
 	 * @access private
 	 */
-	function outputDataEmailTypes ($presentedData, $outputType, $showUnsubmitted)
+	private function outputDataEmailTypes ($presentedData, $outputType, $showUnsubmitted)
 	{
 		# If, for the confirmation type, a confirmation address has not been assigned, say so and take no further action
 		#!# This should be moved up so that a confirmation e-mail widget is a required field
@@ -7888,7 +7888,7 @@ class form
 	
 	
 	# Function to add attachments; useful articles explaining the background at www.zend.com/zend/spotlight/sendmimeemailpart1.php and www.hollowearth.co.uk/tech/php/email_attachments.php and http://snipplr.com/view/2686/send-multipart-encoded-mail-with-attachments/
-	function attachmentsMessage ($message, $additionalHeaders, $introductoryText, $resultLines)
+	private function attachmentsMessage ($message, $additionalHeaders, $introductoryText, $resultLines)
 	{
 		# Get the maximum total attachment size, per attachment, converting it to bytes, or explicitly false for no limit
 		$attachmentsMaxSize = ($this->settings['attachmentsMaxSize'] ? $this->settings['attachmentsMaxSize'] : ini_get ('upload_max_filesize'));
@@ -7966,7 +7966,7 @@ class form
 	
 	
 	# Function to write additional mailheaders, for when using a mailserver that fails to add key headers
-	function fixMailHeaders ($sender)
+	private function fixMailHeaders ($sender)
 	{
 		# Return an empty string if this functionality is not required
 		if (!$this->settings['fixMailHeaders']) {return '';}
@@ -7999,7 +7999,7 @@ class form
 	 * Function to write the results to a CSV file
 	 * @access private
 	 */
-	function outputDataFile ($presentedData)
+	private function outputDataFile ($presentedData)
 	{
 		# Assemble the data into CSV format
 		list ($headerLine, $dataLine) = application::arrayToCsv ($presentedData);
@@ -8025,7 +8025,7 @@ class form
 	 * @access private
 	 */
 	#!# Error handling in this function is too basic and needs to be moved higher in the class
-	function outputDataDatabase ($presentedData)
+	private function outputDataDatabase ($presentedData)
 	{
 		# Connect to the database
 		#!# Refactor connectivity as it's now obsolete
@@ -8067,7 +8067,7 @@ class form
 	 * Function to perform the file uploading
 	 * @access private
 	 */
-	function doUploads ()
+	private function doUploads ()
 	{
 		# Don't proceed if there are no uploads present
 		if (!$this->uploadProperties) {return;}
@@ -8270,7 +8270,7 @@ class form
 	
 	
 	# Private function to unzip a file on landing
-	function _unzip ($file, $directory, $deleteAfterUnzipping = true, $archiveOverwritableFiles = true)
+	private function _unzip ($file, $directory, $deleteAfterUnzipping = true, $archiveOverwritableFiles = true)
 	{
 		# Open the zip
 		if (!$zip = @zip_open ($directory . $file)) {return false;}

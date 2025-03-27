@@ -9242,7 +9242,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 
 
 
-# Subclass to provide a widget
+# Subclass to implement a widget
 class formWidget
 {
 	# Class variables
@@ -9623,16 +9623,13 @@ class formWidget
 		# Ensure it is numeric
 		if (!is_numeric ($this->arguments['truncate'])) {return $values;}
 		
-		# Define a proper unicode ... character (equivalent of &hellip;)
-		$hellip = chr(0xe2).chr(0x80).chr(0xa6);
-		
 		# Apply truncation if required
 		foreach ($values as $key => $value) {
 			if (is_array ($value)) {	// Recurse if multi-dimensional
 				$values[$key] = $this->truncate ($value);
 			} else {
 				$substrFunction = (function_exists ('mb_substr') ? 'mb_substr' : 'substr');	// Favour mb_string when available
-				$values[$key] = $substrFunction ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ' . $hellip : '');
+				$values[$key] = $substrFunction ($value, 0, $this->arguments['truncate']) . ((strlen ($value) > $this->arguments['truncate']) ? ' ' . "\u{2026}" : '');
 			}
 		}
 		

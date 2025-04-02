@@ -4254,8 +4254,8 @@ class form
 					
 					# If the file is not valid, add it to a list of invalid subfields
 					$allowedExtensions = $arguments['allowedExtensions'];
-					if (in_array ('.jpg', $allowedExtensions) && !in_array ('.jpeg', $allowedExtensions)) {$allowedExtensions[] = '.jpeg';}		// Treat .jpeg as an alias for .jpg, but avoid listing it explicitly
-					if (!application::filenameIsValid ($elementValue[$subfield]['name'], $arguments['disallowedExtensions'], $allowedExtensions)) {
+					if (in_array ('jpg', $allowedExtensions) && !in_array ('jpeg', $allowedExtensions)) {$allowedExtensions[] = 'jpeg';}			// Treat .jpeg as an alias for .jpg, but avoid listing it explicitly
+					if (!application::filenameIsValid ($elementValue[$subfield]['name'], $arguments['disallowedExtensions'], $allowedExtensions, $extensionsListsHaveDot = false)) {
 						$filenameInvalidSubfields[] = $elementValue[$subfield]['name'];
 					}
 				}

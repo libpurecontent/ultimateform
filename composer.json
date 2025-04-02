@@ -10,7 +10,7 @@
         }
     ],
     "require": {
-        "libpurecontent/application": "^1.9",
+        "libpurecontent/application": "^1.9.7",
         "libpurecontent/timedate": "^1.3",
         "libpurecontent/database": "^4.2"
     },

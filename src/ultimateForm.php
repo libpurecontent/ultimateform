@@ -95,7 +95,8 @@ class form
 	public $jsCssAssets = array ();				// Array of JS/CSS client library loading HTML tags, if any, which are treated as plain HTML
 	public $jQueryCode = array ();				// Array of jQuery client code, if any, which will get wrapped in a script tag
 	private $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
-	private $formSave = false;						// Whether the submission is a save rather than a proper submission
+	#!# This needs a proper accessor
+	public $formSave = false;						// Whether the submission is a save rather than a proper submission
 	
 	# Output configuration
 	private $configureResultEmailRecipient;							// The recipient of an e-mail

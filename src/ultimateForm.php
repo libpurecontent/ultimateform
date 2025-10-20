@@ -1326,7 +1326,6 @@ class form
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'autocomplete'			=> false,	# URL of data provider
 			'autocompleteOptions'	=> false,	# Autocomplete options; see: https://jqueryui.com/autocomplete/#remote (this is the new plugin)
-			'autocompleteTokenised'	=> false,	# URL of data provider
 			'entities'				=> true,	# Convert HTML in value (useful only for editable=false)
 			'displayedValue'		=> false,	# When using editable=false, optional text that should be displayed instead of the value; can be made into HTML using entities=false
 		);
@@ -1372,7 +1371,6 @@ class form
 		
 		# Add autocomplete functionality if required
 		$widget->autocomplete ($arguments);
-		$widget->autocompleteTokenised ($singleLine = false);
 		
 		# Check whether the field satisfies any requirement for a field to be required
 		$requiredButEmpty = $widget->requiredButEmpty ();
@@ -4702,47 +4700,6 @@ class form
 		$this->jQueryCode[__FUNCTION__]  = "\n\t$(document).ready(function(){";
 		$this->jQueryCode[__FUNCTION__] .= "\n\t\t" . implode ("\n\t\t", $this->autocompleteJQueryEntries);
 		$this->jQueryCode[__FUNCTION__] .= "\n\t});";
-	}
-	
-	
-	# Function to add jQuery-based autocomplete; see https://github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/ which is a bugfixed fork of the loopj version
-	public function autocompleteTokenisedJQuery ($id, $jsonUrl, $optionsJsString = '', $singleLine = true)	 /* public, as also accessed by formWidget */
-	{
-		# Add the main function
-		$this->jsCssAssets[__FUNCTION__] = "\n\t\t\t" . '<script type="text/javascript" src="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/') . 'jquery.tokeninput.js"></script>';
-		
-		# Add the stylesheet
-		$uniqueFunctionId = __FUNCTION__ . ($singleLine ? '_singleline' : '_multiline');
-		$this->jsCssAssets[$uniqueFunctionId] = "\n\t\t\t" . '<link rel="stylesheet" href="' . ($this->settings['scripts'] ? $this->settings['scripts'] : 'https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/styles/') . ($singleLine ? 'token-input-facebook' : 'token-input') . '.css" type="text/css" />';
-		
-		# Compile the options; they are listed at https://raw.github.com/chadisfaction/jQuery-Tokenizing-Autocomplete-Plugin/master/src/jquery.tokeninput.js ; note that the final item in a list must not have a comma at the end
-		$functionOptions = array ();
-		if ($singleLine) {
-			$functionOptions[] = 'classes: {
-						tokenList: "token-input-list-facebook",
-						token: "token-input-token-facebook",
-						tokenDelete: "token-input-delete-token-facebook",
-						selectedToken: "token-input-selected-token-facebook",
-						highlightedToken: "token-input-highlighted-token-facebook",
-						dropdown: "token-input-dropdown-facebook",
-						dropdownItem: "token-input-dropdown-item-facebook",
-						dropdownItem2: "token-input-dropdown-item2-facebook",
-						selectedDropdownItem: "token-input-selected-dropdown-item-facebook",
-						inputToken: "token-input-input-token-facebook"
-					}';
-		}
-		if (strlen ($optionsJsString)) {
-			$functionOptions[] = $optionsJsString;
-		}
-		
-		# Add a per-widget call
-		$this->jQueryCode[__FUNCTION__ . $id] = "
-			$(document).ready(function() {
-				$('#" . $id . "').tokenInput('" . $jsonUrl . "', {
-					" . implode (",\n\t\t\t\t\t", $functionOptions) . "
-				});
-			});
-		";
 	}
 	
 	
@@ -9489,46 +9446,6 @@ class formWidget
 				});
 			});
 		";
-	}
-	
-	
-	# Function to add autocomplete functionality (tokenised version; NB sends q= and requires id,name keys)
-	public function autocompleteTokenised ($singleLine = true)
-	{
-		# End if this functionality is not activated
-		if (!$this->arguments[__FUNCTION__]) {return;}
-		
-		# Use the default value if not posted
-		$value = ($this->form->formPosted ? $this->value : $this->arguments['default']);
-		
-		# If a value has been submitted, process it
-		$options = array ();
-		if (strlen ($value)) {
-			
-			# Strip the trailing comma that the tokenised jQuery library being used creates when posting
-			if ($this->form->formPosted) {
-				if (substr ($value, -1) == ',') {
-					$value = substr ($value, 0, -1);
-					$this->value = $value;	// #!# Not sure if this is necessary
-				}
-			}
-			
-			# Pre-populate this list if data has been submitted
-			$data = explode (',', $value);
-			$values = array ();
-			$i = 0;
-			foreach ($data as $value) {
-				$values[$i]['id'] = $value;
-				$values[$i]['name'] = $value;	// Ideally this would have the label, but this data is not available to ultimateForm
-				$i++;
-			}
-			$options[] = 'prePopulate: ' . json_encode ($values);
-		}
-		
-		# Create the widget
-		$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
-		$options = implode (',', $options);
-		$this->form->autocompleteTokenisedJQuery ($id, $this->arguments[__FUNCTION__], $options, $singleLine);
 	}
 	
 	

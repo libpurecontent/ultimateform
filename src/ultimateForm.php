@@ -401,6 +401,9 @@ class form
 				#!# Need to deny this as a valid name elsewhere
 				$arguments['name'] .= '__confirmation';
 				$arguments['title'] .= ' (confirmation)';
+				if ($arguments['placeholder']) {
+					$arguments['placeholder'] .= ' (confirmation)';
+				}
 				$arguments['description'] = 'Please retype to confirm.';
 				$arguments['discard'] = true;
 				$arguments['autofocus'] = false;

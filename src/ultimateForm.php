@@ -114,6 +114,12 @@ class form
 	private $supportedTypes = array ('file', 'email', 'confirmationEmail', 'screen', 'processing', 'database');
 	private $displayTypes = array ('tables', 'css', 'paragraphs', 'templatefile');
 	
+	# File extension aliases in upload
+	private $fileExtensionAliases = array (
+		'jpeg' => 'jpg',
+		'tiff' => 'tif',
+	);
+	
 	# Constants
 	private $timestamp;
 	private $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
@@ -4256,9 +4262,7 @@ class form
 					
 					# If the file is not valid, add it to a list of invalid subfields
 					$allowedExtensions = $arguments['allowedExtensions'];
-					if (in_array ('jpg', $allowedExtensions) && !in_array ('jpeg', $allowedExtensions)) {$allowedExtensions[] = 'jpeg';}			// Treat .jpeg as an alias for .jpg, but avoid listing it explicitly
 					$disallowedExtensions = $arguments['disallowedExtensions'];
-					if (in_array ('jpg', $disallowedExtensions) && !in_array ('jpeg', $disallowedExtensions)) {$disallowedExtensions[] = 'jpeg';}	// Treat .jpeg as an alias for .jpg, but avoid listing it explicitly
 					if (!application::filenameIsValid ($elementValue[$subfield]['name'], $disallowedExtensions, $allowedExtensions, $extensionsListsHaveDot = false)) {
 						$filenameInvalidSubfields[] = $elementValue[$subfield]['name'];
 					}
@@ -4313,11 +4317,11 @@ class form
 			$restrictions[] = 'File extensions are required';
 		} else {
 			if (!empty ($arguments['allowedExtensions'])) {
-				$restrictions[] = 'Allowed file extensions: .' . implode (', .', $arguments['allowedExtensions']);
+				$restrictions[] = 'Allowed file extensions: .' . implode (', .', array_diff ($arguments['allowedExtensions'], array_keys ($this->fileExtensionAliases)));		// Aliases like .jpeg not explicitly written, as implied and avoids page clutter
 			}
 		}
 		if (!empty ($arguments['disallowedExtensions'])) {
-			$restrictions[] = 'Disallowed file extensions: .' . implode (', .', $arguments['disallowedExtensions']);
+			$restrictions[] = 'Disallowed file extensions: .' . implode (', .', array_diff ($arguments['disallowedExtensions'], array_keys ($this->fileExtensionAliases)));
 		}
 		if ($arguments['unzip']) {
 			$restrictions[] = 'Zip files will be automatically unzipped on arrival.';
@@ -4333,6 +4337,7 @@ class form
 		#!# Ideally unzipping should be done after a zip file is e-mailed, but this would require much refactoring of the output processing, i.e. (i) upload, (ii) attach attachments, (iii) unzip
 		if ($arguments['attachments']) {
 			$this->attachments = array_merge ($this->attachments, $apparentlyUploadedFiles);
+			#!# Does this get overwritten below by the full $arguments array write?
 			$this->uploadProperties[$arguments['name']]['unzip'] = false;
 			$arguments['unzip'] = false;
 		}
@@ -4384,6 +4389,13 @@ class form
 		
 		# Unique the list
 		$extensions = array_unique ($extensions);
+		
+		# Deal with extension aliases (e.g. .jpeg for .jpg), inserting the variant (if not already present)
+		foreach ($this->fileExtensionAliases as $aliasExtension => $forExtension) {
+			if (in_array ($forExtension, $extensions) && !in_array ($aliasExtension, $extensions)) {
+				array_splice ($extensions, array_search ($forExtension, $extensions) + 1, 0, $aliasExtension);
+			}
+		}
 		
 		# Return the list
 		return $extensions;

@@ -8084,19 +8084,25 @@ class form
 				# Get the attributes for this sub-element
 				$attributes = $this->form[$name][$subfield];
 				
+				# Split into file extension and name main part
+				$fileExtension = pathinfo ($attributes['name'], PATHINFO_EXTENSION);
+				$fileName = pathinfo ($attributes['name'], PATHINFO_FILENAME);
+				
+				# Lowercase the extension if necessary
+				if ($arguments['lowercaseExtension']) {
+					$fileExtension = strtolower ($fileExtension);
+				}
+				
+				# Preceed with a dot
+				if (!empty ($fileExtension)) {
+					$fileExtension = '.' . $fileExtension;
+				}
+				
+				# Substitute the file name following potential file extension changes
+				$attributes['name'] = $fileName . $fileExtension;
+				
 				# Handle forced filenames; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
-					
-					# Get the file extension, preceeded by a dot
-					$fileExtension = pathinfo ($attributes['name'], PATHINFO_EXTENSION);
-					if (!empty ($fileExtension)) {
-						$fileExtension = '.' . $fileExtension;
-					}
-					
-					# Lowercase the extension if necessary
-					if ($arguments['lowercaseExtension']) {
-						$fileExtension = strtolower ($fileExtension);
-					}
 					
 					# Overwrite the filename
 					$forcedFilename = $arguments['forcedFileName'];

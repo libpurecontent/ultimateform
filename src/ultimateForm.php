@@ -3898,7 +3898,7 @@ class form
 			'allowedExtensions'		=> array (),# Simple array of allowed file extensions (Single-item string also acceptable; '*' means extension required); does not need a dot prefix, though this is tolerated
 			'mime'					=> false,	# Whether to enable the MIME Type check
 			'enableVersionControl'	=> true,	# Whether uploading a file of the same name should result in the earlier file being renamed
-			'forcedFileName'		=> false,	# Force to a specific filename
+			'forcedFileName'		=> false,	# Force to a specific filename; must not include the file extension
 			'appendExtension'		=> false,	# An additional extension which gets added to the filename upon upload; the starting dot is not assumed automatically
 			'lowercaseExtension'	=> false,	# Make the eventual file extension lowercased
 			'discard'				=> false,	# Whether to process the input but then discard it in the results; note that the file will still be uploaded
@@ -8103,32 +8103,30 @@ class form
 					$fileExtension = '.' . $fileExtension;
 				}
 				
-				# Substitute the file name following potential file extension changes
-				$attributes['name'] = $fileName . $fileExtension;
-				
 				# Handle forced filenames; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
 					
 					# Overwrite the filename
-					$forcedFilename = $arguments['forcedFileName'];
+					$fileName = $arguments['forcedFileName'];
 					if (is_array ($arguments['forcedFileName'])) {
-						$forcedFilename = $arguments['forcedFileName'][$subfield];
+						$fileName = $arguments['forcedFileName'][$subfield];
 					}
 					
 					# If the forced filename is prefixed with a %, look for a field of that name, and use its value (e.g. '%id' will use a forcedFileName that is the value of the submitted 'id' element)
 					#!# Currently this doesn't check whether %id is sensible, in terms of a missing/non-required/array-type field (and ideally with a suitable regexp)
-					if (preg_match ('/^%(.+)$/', $forcedFilename, $matches)) {
+					if (preg_match ('/^%(.+)$/', $fileName, $matches)) {
 						$matchField = $matches[1];
 						if (isSet ($this->elements[$matchField])) {
 							if (is_string ($this->form[$matchField])) {		// #!# Support only at present for string types; there needs to be a standard way for elements to give a serialised string representation of their output
-								$forcedFilename = $this->form[$matchField];
-								$forcedFilename = str_replace (array ('/', '\\'), '_', $forcedFilename);	// Prevent any kind of directory traversal attacks
+								$fileName = $this->form[$matchField];
+								$fileName = str_replace (array ('/', '\\'), '_', $fileName);	// Prevent any kind of directory traversal attacks
 							}
 						}
 					}
-					
-					$attributes['name'] = $forcedFilename . $fileExtension;
 				}
+				
+				# Substitute the file name following potential file extension changes
+				$attributes['name'] = $fileName . $fileExtension;
 				
 				# If appendExtension is set, add that on to the filename
 				if (strlen ($arguments['appendExtension'])) {
@@ -8239,6 +8237,7 @@ class form
 				}
 				
 				# For the compiled version, give the number of files uploaded and their names
+				#!# This is showing forcedFilename rather than the originally-uploaded filename; it may not be desirable to state the eventual name
 				$totalSuccesses = count ($successes);
 				$data['presented'] .= $totalSuccesses . ($totalSuccesses > 1 ? ' files' : ' file') . ' (' . implode ('; ', $presentedFilenames) . ') ' . ($totalSuccesses > 1 ? 'were' : 'was') . ' successfully copied over.';
 			}

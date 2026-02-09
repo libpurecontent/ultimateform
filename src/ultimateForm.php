@@ -8084,19 +8084,21 @@ class form
 				# Get the attributes for this sub-element
 				$attributes = $this->form[$name][$subfield];
 				
-				# Get the file extension preceeded by a dot
-				$fileExtension = pathinfo ($attributes['name'], PATHINFO_EXTENSION);
-				if (!empty ($fileExtension)) {
-					$fileExtension = '.' . $fileExtension;
-				}
-				
-				# Lowercase the extension if necessary
-				if ($arguments['lowercaseExtension']) {
-					$fileExtension = strtolower ($fileExtension);
-				}
-				
-				# Overwrite the filename if being forced; this always maintains the file extension
+				# Handle forced filenames; this always maintains the file extension
 				if ($arguments['forcedFileName']) {
+					
+					# Get the file extension, preceeded by a dot
+					$fileExtension = pathinfo ($attributes['name'], PATHINFO_EXTENSION);
+					if (!empty ($fileExtension)) {
+						$fileExtension = '.' . $fileExtension;
+					}
+					
+					# Lowercase the extension if necessary
+					if ($arguments['lowercaseExtension']) {
+						$fileExtension = strtolower ($fileExtension);
+					}
+					
+					# Overwrite the filename
 					$forcedFilename = $arguments['forcedFileName'];
 					if (is_array ($arguments['forcedFileName'])) {
 						$forcedFilename = $arguments['forcedFileName'][$subfield];

@@ -8088,14 +8088,14 @@ class form
 				$fileExtension = pathinfo ($attributes['name'], PATHINFO_EXTENSION);
 				$fileName = pathinfo ($attributes['name'], PATHINFO_FILENAME);
 				
-				# Substitute the file extension if an alias, e.g. .jpeg becomes .jpg, for ease of client code processing
-				if (isSet ($this->fileExtensionAliases[$fileExtension])) {
-					$fileExtension = $this->fileExtensionAliases[$fileExtension];
-				}
-				
 				# Lowercase the extension if necessary
 				if ($arguments['lowercaseExtension']) {
 					$fileExtension = strtolower ($fileExtension);
+				}
+				
+				# Substitute the file extension if an alias, e.g. .jpeg becomes .jpg, for ease of client code processing
+				if (isSet ($this->fileExtensionAliases[$fileExtension])) {
+					$fileExtension = $this->fileExtensionAliases[$fileExtension];
 				}
 				
 				# Preceed with a dot

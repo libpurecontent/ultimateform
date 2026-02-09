@@ -4428,6 +4428,12 @@ class form
 				return false;
 			}
 			
+			// If no files, then the onchange event has been that the selection has been cancelled, so any existing should be cleared
+			if (!files.length) {
+				document.querySelector (selector).innerHTML = '';
+			}
+			
+			// Add each file
 			Array.from (files).forEach (function (file) {
 				if (!file.type.match (/(image|video)\/.+/)) {return; /* i.e. continue */}
 				

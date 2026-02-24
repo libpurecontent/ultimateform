@@ -8946,16 +8946,18 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 			}
 			
 			# If the field is unique, add a constraint
-			#!# Convert to prepared statements
 			if (strtolower ($fieldAttributes['Key']) == 'uni') {
 				if ($unfinalisedData = $this->getUnfinalisedData ()) {
 					if ($unfinalisedData[$fieldName]) {
 						$whereNotCurrent = false;
+						$preparedStatementValues = array ();
 						if ($editingUniquenessUniChecking && $data && isSet ($data[$fieldName]) && strlen ($data[$fieldName])) {		// If there is existing data (i.e. the user is doing an UPDATE, not an INSERT), exclude this from the lookup
-							$whereNotCurrent .= " AND `{$fieldName}` != " . $this->databaseConnection->quote ($data[$fieldName]);
+							$preparedStatementValues['notValue'] = $data[$fieldName];
+							$whereNotCurrent .= " AND `{$fieldName}` != :notValue";
 						}
-						$query = "SELECT * FROM `{$database}`.`{$table}` WHERE `{$fieldName}` = " . $this->databaseConnection->quote ($unfinalisedData[$fieldName]) . $whereNotCurrent . ' LIMIT 1;';
-						if ($existingData = $this->databaseConnection->getData ($query)) {
+						$preparedStatementValues['value'] = $unfinalisedData[$fieldName];
+						$query = "SELECT * FROM `{$database}`.`{$table}` WHERE `{$fieldName}` = :value {$whereNotCurrent} LIMIT 1;";
+						if ($existingData = $this->databaseConnection->getData ($query, false, true, $preparedStatementValues)) {
 							$this->registerProblem ($fieldName . 'notunique', "In the <strong>{$fieldName}</strong> element, that value already exists.", $fieldName);
 						}
 					}

@@ -1372,10 +1372,10 @@ class form
 			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters, inc. spaces';
 		}
 		
-		# Add jQuery-based checking of maxlength
-		if ($arguments['maxlength']) {
+		# Add jQuery-based dynamic label for maxlength and minlength
+		if ($arguments['maxlength'] || $arguments['minlength']) {
 			$id = $this->cleanId ("{$this->settings['name']}[{$arguments['name']}]");
-			$this->maxLengthJQuery ($id, $arguments['maxlength']);
+			$this->maxMinLengthJQuery ($id, ($arguments['maxlength'] ? $arguments['maxlength'] : 0), ($arguments['minlength'] ? $arguments['minlength'] : 0));
 		}
 		
 		# Add autocomplete functionality if required
@@ -1489,10 +1489,10 @@ class form
 		# Define the widget's core HTML
 		if ($arguments['editable']) {
 			$widgetHtml  = '';
-			if ($arguments['maxlength']) {
-				$widgetHtml .= '<div' . $this->nameIdHtml ($arguments['name'], false, false, false, $idOnly = true, '__info') . ' class="charactersremaininginfo"></div>';
-			}
 			$widgetHtml .= '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['maxlength'] ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ($arguments['autogrow'] ? " style=\"field-sizing: content; min-block-size: {$arguments['rows']}rlh; max-inline-size: {$arguments['cols']}ch; min-inline-size: {$arguments['cols']}ch;\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
+			if ($arguments['maxlength'] || $arguments['minlength']) {
+				$widgetHtml .= '<p' . $this->nameIdHtml ($arguments['name'], false, false, false, $idOnly = true, '__info') . ' class="charactersremaininginfo"></p>';
+			}
 		} else {
 			if ($arguments['displayedValue']) {
 				$widgetHtml  = ($arguments['entities'] ? htmlspecialchars ($arguments['displayedValue']) : $arguments['displayedValue']);
@@ -4724,34 +4724,44 @@ class form
 	}
 	
 	
-	# Function to add jQuery-based maxlength checking; see http://stackoverflow.com/questions/1588521/
+	# Function to add jQuery-based maxlength/minlength checking; see http://stackoverflow.com/questions/1588521/
 	#!# Replace with HTML5 widget attributes where available
-	private function maxLengthJQuery ($id, $characters)
+	private function maxMinLengthJQuery ($id, $maxlengthCharacters, $minlengthCharacters)
 	{
 		# Add the main function
 		$this->jQueryCode[__FUNCTION__] = "
-			function limitChars(textid, limit, infodiv)
+			function characterLimits (textid, limit, atLeast, infodiv)
 			{
-				var text = $('#'+textid).val(); 
-				var textlength = text.length;
-				var remaining = limit - textlength;
-				if(textlength > limit) {
-					$('#' + infodiv).html('You cannot write more then ' + limit + ' characters!');
-					$('#'+textid).val(text.substr(0,limit));
-					return false;
-				} else {
-					$('#' + infodiv).html('You have ' + remaining + (remaining == 1 ? ' character' : ' characters') + ' left.');
-					return true;
+				const text = $('#' + textid).val ();
+				let messages = [];
+				if (text.length) {	// Do nothing if no text present
+				if (limit) {
+						if (text.length > limit) {
+							messages.push ('You cannot write more then ' + Intl.NumberFormat().format (limit) + ' characters!');
+							$('#' + textid).val (text.substr (0, limit));
+						} else {
+							const remaining = limit - text.length;
+							messages.push ('You have ' + Intl.NumberFormat().format (remaining) + (remaining == 1 ? ' character' : ' characters') + ' left.');
+						}
+					}
+					if (atLeast) {
+						if (text.length < atLeast) {
+							messages.push ('You need to write at least ' + Intl.NumberFormat().format (atLeast) + ' characters (currently: ' + Intl.NumberFormat().format (text.length) + ').');
+						}
+					}
+				}
+				if (messages) {
+					$('#' + infodiv).html (messages.join (' '));
 				}
 			}
 		";
 		
 		# Add a per-widget call
 		$this->jQueryCode[__FUNCTION__ . $id] = "
-			$(function(){
-				$('#" . $id . "').keyup(function()
+			$(function () {
+				$('#" . $id . "').keyup (function ()
 				{
-					limitChars('" . $id . "', " . $characters . ", '" . $id . "__info');
+					characterLimits ('" . $id . "', " . $maxlengthCharacters . ", " . $minlengthCharacters . ", '" . $id . "__info');
 				})
 			});
 		";

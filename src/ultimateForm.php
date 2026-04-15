@@ -4733,20 +4733,21 @@ class form
 			function characterLimits (textid, limit, atLeast, infodiv)
 			{
 				const text = $('#' + textid).val ();
+				const textLength = text.trim ().length;		// Trim, to avoid space being used to pad out a value
 				let messages = [];
-				if (text.length) {	// Do nothing if no text present
+				if (textLength) {	// Do nothing if no text present
 				if (limit) {
-						if (text.length > limit) {
+						if (textLength > limit) {
 							messages.push ('You cannot write more then ' + Intl.NumberFormat().format (limit) + ' characters!');
 							$('#' + textid).val (text.substr (0, limit));
 						} else {
-							const remaining = limit - text.length;
+							const remaining = limit - textLength;
 							messages.push ('You have ' + Intl.NumberFormat().format (remaining) + (remaining == 1 ? ' character' : ' characters') + ' left.');
 						}
 					}
 					if (atLeast) {
-						if (text.length < atLeast) {
-							messages.push ('You need to write at least ' + Intl.NumberFormat().format (atLeast) + ' characters (currently: ' + Intl.NumberFormat().format (text.length) + ').');
+						if (textLength < atLeast) {
+							messages.push ('You need to write at least ' + Intl.NumberFormat().format (atLeast) + ' characters (currently: ' + Intl.NumberFormat().format (textLength) + ').');
 						}
 					}
 				}

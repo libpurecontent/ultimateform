@@ -9618,6 +9618,7 @@ class formWidget
 	
 	
 	# Perform regexp checks
+	# If an expandable field, the checks are done for each subvalue
 	#!# Should there be checking for clashes between disallow and regexp, i.e. so that the widget can never submit?
 	#!# Should there be checking of disallow and regexp when editable is false, i.e. so that the widget can never submit?
 	public function regexpCheck ()
@@ -9625,18 +9626,28 @@ class formWidget
 		# End if the form is empty; strlen is used rather than a boolean check, as a submission of the string '0' will otherwise fail this check incorrectly
 		if (!strlen ($this->value)) {return false;}
 		
+		# Deal with single vs expandable values, by treating a scalar as an array of one value, and the checks below then always looping through the value list
+		$values = array ($this->value);
+		if (isSet ($this->arguments['expandable']) && $this->arguments['expandable']) {
+			$values = explode ($this->arguments['expandable'], $this->value);	// Known to have length, so no need to handle the empty string case
+		}
+		
 		# Regexp checks (for non-e-mail types)
 		#!# Allow flexible array ($regexp => $errorMessage) syntax, as with disallow
 		if (strlen ($this->arguments['regexp'])) {
-			if (!application::pereg ($this->arguments['regexp'], $this->value)) {
-				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
-				return false;
+			foreach ($values as $value) {
+				if (!application::pereg ($this->arguments['regexp'], $value)) {
+					$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section" . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+					return false;
+				}
 			}
 		}
 		if (strlen ($this->arguments['regexpi'])) {
-			if (!application::peregi ($this->arguments['regexpi'], $this->value)) {
-				$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section.";
-				return false;
+			foreach ($values as $value) {
+				if (!application::peregi ($this->arguments['regexpi'], $value)) {
+					$this->elementProblems['failsRegexp'] = "The submitted information did not match a specific pattern required for this section" . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+					return false;
+				}
 			}
 		}
 		
@@ -9655,9 +9666,11 @@ class formWidget
 			}
 			
 			# Perform the check
-			if (application::pereg ($disallowRegexp, $this->value)) {
-				$this->elementProblems['failsDisallow'] = $disallowErrorMessage;
-				return false;
+			foreach ($values as $value) {
+				if (application::pereg ($disallowRegexp, $value)) {
+					$this->elementProblems['failsDisallow'] = $disallowErrorMessage;
+					return false;
+				}
 			}
 		}
 		

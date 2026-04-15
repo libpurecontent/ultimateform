@@ -319,8 +319,8 @@ class form
 			'expandable'			=> false,	# Whether the widget can be expanded into subwidgets (whose value is imploded in the result), whose number can be incremented by pressing a + button; either false / true (separator=\n) / separator string
 			'enforceNumeric'		=> false,	# Whether to enforce numeric input or not (optional; defaults to false) [ignored for e-mail type]
 			'size'					=> $this->settings['size'],		# Visible size (optional; defaults to 60)
-			'minlength'				=> '',		# Minimum length (optional; defaults to no limit)
-			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit)
+			'minlength'				=> '',		# Minimum length (optional; defaults to no limit); check will only be done if characters entered
+			'maxlength'				=> '',		# Maximum length (optional; defaults to no limit); check will only be done if characters entered
 			// 'min'	 	- implemented below
 			// 'max'	 	- implemented below
 			// 'step'	 	- implemented below
@@ -1329,8 +1329,8 @@ class form
 			'mode'					=> 'normal',	# Special mode: normal/lines/coordinates
 			'editable'				=> true,	# Whether the widget is editable (if not, a hidden element will be substituted but the value displayed)
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
-			'minlength'				=> false,	# Minimum number of characters allowed
-			'maxlength'				=> false,	# Maximum number of characters allowed
+			'minlength'				=> false,	# Minimum number of characters allowed; check will only be done if characters entered
+			'maxlength'				=> false,	# Maximum number of characters allowed; check will only be done if characters entered
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'autocomplete'			=> false,	# URL of data provider
@@ -1576,7 +1576,7 @@ class form
 			'regexp'				=> '',		# Case-sensitive regular expression against which the submission must validate
 			'regexpi'				=> '',		# Case-insensitive regular expression against which the submission must validate
 			'disallow'				=> false,		# Regular expression against which the submission must not validate
-			'maxlength'				=> false,	# Maximum number of characters allowed, after HTML markup stripped
+			'maxlength'				=> false,	# Maximum number of characters allowed, after HTML markup stripped; check will only be done if characters entered
 			'current'				=> false,	# List of current values which the submitted value must not match
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
@@ -9390,10 +9390,19 @@ class formWidget
 	# Function to check the minimum length of what is submitted
 	public function checkMinLength ()
 	{
+		# Obtain the value
+		$value = $this->value;
+		
+		# Determine the string length, trimming first
+		$length = strlen (trim ($value));
+		
+		# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
+		if (!$length) {return;}
+		
 		#!# Move the is_numeric check into the argument cleaning stage
 		if (is_numeric ($this->arguments['minlength'])) {
-			if (strlen ($this->value) < $this->arguments['minlength']) {
-				$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . strlen ($this->value) . '</strong>) than are allowed (<strong>' . $this->arguments['minlength'] . '</strong>).';
+			if ($length < $this->arguments['minlength']) {
+				$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['minlength']) . '</strong>).';
 			}
 		}
 	}
@@ -9408,13 +9417,16 @@ class formWidget
 			$value = strip_tags ($value);
 		}
 		
-		# Determine the string length
-		$length = strlen ($value);
+		# Determine the string length, trimming first
+		$length = strlen (trim ($value));
+		
+		# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
+		if (!$length) {return;}
 		
 		#!# Move the is_numeric check into the argument cleaning stage
 		if (is_numeric ($this->arguments['maxlength'])) {
 			if ($length > $this->arguments['maxlength']) {
-				$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . $length . '</strong>) than are allowed (<strong>' . $this->arguments['maxlength'] . '</strong>).';
+				$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxlength']) . '</strong>).';
 			}
 		}
 	}

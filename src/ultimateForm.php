@@ -9389,45 +9389,65 @@ class formWidget
 	
 	
 	# Function to check the minimum length of what is submitted
+	# If an expandable field, the checks are done for each subvalue
 	public function checkMinLength ()
 	{
-		# Obtain the value
-		$value = $this->value;
+		# Deal with single vs expandable values, by treating a scalar as an array of one value, and the checks below then always looping through the value list
+		$values = array ($this->value);
+		if (isSet ($this->arguments['expandable']) && $this->arguments['expandable']) {
+			$values = explode ($this->arguments['expandable'], $this->value);	// Known to have length, so no need to handle the empty string case
+		}
 		
-		# Determine the string length, trimming first
-		$length = strlen (trim ($value));
-		
-		# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
-		if (!$length) {return;}
-		
-		#!# Move the is_numeric check into the argument cleaning stage
-		if (is_numeric ($this->arguments['minlength'])) {
-			if ($length < $this->arguments['minlength']) {
-				$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['minlength']) . '</strong>).';
+		# Check each value (single value if originally scalar)
+		foreach ($values as $value) {
+			
+			# Determine the string length, trimming first
+			$length = strlen (trim ($value));
+			
+			# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
+			if (!$length) {continue;}
+			
+			#!# Move the is_numeric check into the argument cleaning stage
+			if (is_numeric ($this->arguments['minlength'])) {
+				if ($length < $this->arguments['minlength']) {
+					$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['minlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+					return;
+				}
 			}
 		}
 	}
 	
 	
 	# Function to check the maximum length of what is submitted
+	# If an expandable field, the checks are done for each subvalue
 	public function checkMaxLength ($stripHtml = false)
 	{
-		# Obtain the value, and strip HTML first if required
-		$value = $this->value;
-		if ($stripHtml) {
-			$value = strip_tags ($value);
+		# Deal with single vs expandable values, by treating a scalar as an array of one value, and the checks below then always looping through the value list
+		$values = array ($this->value);
+		if (isSet ($this->arguments['expandable']) && $this->arguments['expandable']) {
+			$values = explode ($this->arguments['expandable'], $this->value);	// Known to have length, so no need to handle the empty string case
 		}
 		
-		# Determine the string length, trimming first
-		$length = strlen (trim ($value));
-		
-		# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
-		if (!$length) {return;}
-		
-		#!# Move the is_numeric check into the argument cleaning stage
-		if (is_numeric ($this->arguments['maxlength'])) {
-			if ($length > $this->arguments['maxlength']) {
-				$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxlength']) . '</strong>).';
+		# Check each value (single value if originally scalar)
+		foreach ($values as $value) {
+			
+			# Obtain the value, and strip HTML first if required
+			if ($stripHtml) {
+				$value = strip_tags ($value);
+			}
+			
+			# Determine the string length, trimming first
+			$length = strlen (trim ($value));
+			
+			# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
+			if (!$length) {continue;}	// Go to next (if any)
+			
+			#!# Move the is_numeric check into the argument cleaning stage
+			if (is_numeric ($this->arguments['maxlength'])) {
+				if ($length > $this->arguments['maxlength']) {
+					$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+					return;
+				}
 			}
 		}
 	}

@@ -4564,8 +4564,9 @@ class form
 	 * Function to allow text headings or paragraphs
 	 * @param string $level Name of the element Level, e.g. 1 for <h1></h1>, 2 for <h2></h2>, etc., 'p' for <p></p>, or 'text' for text without any markup added
 	 * @param string $title Text
+	 * @param string $fieldName Fieldname, to use as a prefix
 	 */
-	public function heading ($level, $title)
+	public function heading ($level, $title, $fieldName = false)
 	{
 		# Add the headings as text
 		switch ($level) {
@@ -4583,7 +4584,7 @@ class form
 		}
 		
 		# Add the widget to the master array for eventual processing
-		$this->elements['_heading' . $this->headingTextCounter++] = array (
+		$this->elements[$fieldName . '_heading' . $this->headingTextCounter++] = array (
 			'type' => __FUNCTION__,
 			'html' => $widgetHtml,
 			'title' => '',
@@ -8731,7 +8732,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				# Add any headings (which will appear before creating the widget); In the unlikely event that multiple of the same level are needed, '' => "<h2>Foo</h2>\n<h2>Bar</h2>" would have to be used, or the dataBinding will have to split into multiple dataBinding calls
 				if (isSet ($attributes[$fieldName]['heading']) && is_array ($attributes[$fieldName]['heading'])) {
 					foreach ($attributes[$fieldName]['heading'] as $level => $title) {
-						$this->heading ($level, $title);
+						$this->heading ($level, $title, $fieldName);
 					}
 				}
 				

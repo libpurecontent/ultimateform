@@ -1329,6 +1329,7 @@ class form
 			'datatype'				=> false,	# Datatype used for database writing emulation (or caching an actual value)
 			'minlength'				=> false,	# Minimum number of characters allowed; check will only be done if characters entered
 			'maxlength'				=> false,	# Maximum number of characters allowed; check will only be done if characters entered
+			'maxwords'				=> false,	# Maximum number of words allowed; check will only be done if characters entered
 			'tabindex'				=> false,	# Tabindex if required; replace with integer between 0 and 32767 to create
 			'after'					=> false,	# Placing the widget after a specific other widget
 			'autocomplete'			=> false,	# URL of data provider
@@ -1363,14 +1364,17 @@ class form
 		if (is_numeric ($arguments['maxlength'])) {
 			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters, inc. spaces';
 		}
+		if (is_numeric ($arguments['maxwords'])) {
+			$restrictions[] = 'Maximum ' . number_format ($arguments['maxwords']) . ' words';
+		}
 		if (is_numeric ($arguments['minlength'])) {
 			$restrictions[] = 'At least ' . number_format ($arguments['minlength']) . ' characters';
 		}
 		
 		# Add jQuery-based dynamic label for maxlength and minlength
-		if ($arguments['maxlength'] || $arguments['minlength']) {
+		if ($arguments['maxlength'] || $arguments['minlength'] || $arguments['maxwords']) {
 			$id = $this->cleanId ("{$this->settings['name']}[{$arguments['name']}]");
-			$this->maxMinLengthJQuery ($id, ($arguments['maxlength'] ? $arguments['maxlength'] : 0), ($arguments['minlength'] ? $arguments['minlength'] : 0));
+			$this->maxMinLengthJQuery ($id, ($arguments['maxlength'] ? $arguments['maxlength'] : 0), ($arguments['maxwords'] ? $arguments['maxwords'] : 0), ($arguments['minlength'] ? $arguments['minlength'] : 0));
 		}
 		
 		# Add autocomplete functionality if required
@@ -1485,7 +1489,7 @@ class form
 		if ($arguments['editable']) {
 			$widgetHtml  = '';
 			$widgetHtml .= '<textarea' . $this->nameIdHtml ($arguments['name']) . " cols=\"{$arguments['cols']}\" rows=\"{$arguments['rows']}\"" . ($arguments['maxlength'] ? " maxlength=\"{$arguments['maxlength']}\"" : '') . ($arguments['wrap'] ? " wrap=\"{$arguments['wrap']}\"" : '') . ($arguments['autogrow'] ? " style=\"field-sizing: content; min-block-size: {$arguments['rows']}rlh; max-inline-size: {$arguments['cols']}ch; min-inline-size: {$arguments['cols']}ch;\"" : '') . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . ($arguments['placeholder'] != '' ? " placeholder=\"{$arguments['placeholder']}\"" : '') . $widget->tabindexHtml () . '>' . htmlspecialchars ($this->form[$arguments['name']]) . '</textarea>';
-			if ($arguments['maxlength'] || $arguments['minlength']) {
+			if ($arguments['maxlength'] || $arguments['maxwords'] || $arguments['minlength']) {
 				$widgetHtml .= '<p' . $this->nameIdHtml ($arguments['name'], false, false, false, $idOnly = true, '__info') . ' class="charactersremaininginfo"></p>';
 			}
 		} else {
@@ -4720,13 +4724,13 @@ class form
 	}
 	
 	
-	# Function to add jQuery-based maxlength/minlength checking; see https://stackoverflow.com/questions/1588521/
+	# Function to add jQuery-based maxlength/maxwords/minlength checking; see https://stackoverflow.com/questions/1588521/
 	#!# Replace with HTML5 widget attributes where available
-	private function maxMinLengthJQuery ($id, $maxlengthCharacters, $minlengthCharacters)
+	private function maxMinLengthJQuery ($id, $maxlengthCharacters, $maxlengthWords, $minlengthCharacters)
 	{
 		# Add the main function
 		$this->jQueryCode[__FUNCTION__] = "
-			function characterLimits (textid, maxlengthCharacters, minlengthCharacters, infodiv)
+			function characterLimits (textid, maxlengthCharacters, maxlengthWords, minlengthCharacters, infodiv)
 			{
 				// Check text length
 				const text = $('#' + textid).val ();
@@ -4749,6 +4753,16 @@ class form
 						messages.push ('You have max. ' + Intl.NumberFormat ().format (charactersRemaining) + (charactersRemaining == 1 ? ' character' : ' characters') + ' left.');
 					}
 				}
+				if (maxlengthWords) {
+					const wordsLength = text.trim ().match (/(\w+)/g).length;
+					if (wordsLength > maxlengthWords) {
+						messages.push ('You cannot write more then ' + Intl.NumberFormat ().format (maxlengthWords) + ' words!');
+						$('#' + textid).val (text.substr (0, maxlengthWords));
+					} else {
+						const wordsRemaining = maxlengthWords - wordsLength;
+						messages.push ('You have max. ' + Intl.NumberFormat ().format (wordsRemaining) + (wordsRemaining == 1 ? ' word' : ' words') + ' left.');
+					}
+				}
 				if (minlengthCharacters) {
 					if (textLength < minlengthCharacters) {
 						messages.push ('You need to write at least ' + Intl.NumberFormat ().format (minlengthCharacters) + ' characters (currently: ' + Intl.NumberFormat ().format (textLength) + ').');
@@ -4767,7 +4781,7 @@ class form
 			$(function () {
 				$('#" . $id . "').keyup (function ()
 				{
-					characterLimits ('" . $id . "', " . $maxlengthCharacters . ", " . $minlengthCharacters . ", '" . $id . "__info');
+					characterLimits ('" . $id . "', " . $maxlengthCharacters . ', ' . $maxlengthWords . ', ' . $minlengthCharacters . ", '" . $id . "__info');
 				})
 			});
 		";
@@ -9420,7 +9434,16 @@ class formWidget
 			if (array_key_exists ('maxlength', $this->arguments)) {
 				if (is_numeric ($this->arguments['maxlength'])) {
 					if ($length > $this->arguments['maxlength']) {
-						$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+						$this->elementProblems['exceedsMaximumCharacters'] = 'You submitted more characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+						return;
+					}
+				}
+			}
+			if (array_key_exists ('maxwords', $this->arguments)) {
+				if (is_numeric ($this->arguments['maxwords'])) {
+					$wordsLength = str_word_count (trim ($value));
+					if ($wordsLength > $this->arguments['maxwords']) {
+						$this->elementProblems['exceedsMaximumWords'] = 'You submitted more words (<strong>' . number_format ($wordsLength) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxwords']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
 						return;
 					}
 				}
@@ -9428,7 +9451,7 @@ class formWidget
 			if (array_key_exists ('minlength', $this->arguments)) {
 				if (is_numeric ($this->arguments['minlength'])) {
 					if ($length < $this->arguments['minlength']) {
-						$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['minlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+						$this->elementProblems['belowMinimumCharacters'] = 'You submitted fewer characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['minlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
 						return;
 					}
 				}

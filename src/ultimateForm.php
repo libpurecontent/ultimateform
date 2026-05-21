@@ -4728,25 +4728,34 @@ class form
 		$this->jQueryCode[__FUNCTION__] = "
 			function characterLimits (textid, maxlengthCharacters, minlengthCharacters, infodiv)
 			{
+				// Check text length
 				const text = $('#' + textid).val ();
 				const textLength = text.trim ().length;		// Trim, to avoid space being used to pad out a value
+				
+				// If no text present, enter warning is set to zero and do not bother performing checks
+				if (!textLength) {
+					$('#' + infodiv).html ('');
+					return;
+				}
+				
+				// Check text against length limit(s)
 				let messages = [];
-				if (textLength) {	// Do nothing if no text present
-					if (maxlengthCharacters) {
-						if (textLength > maxlengthCharacters) {
-							messages.push ('You cannot write more then ' + Intl.NumberFormat ().format (maxlengthCharacters) + ' characters!');
-							$('#' + textid).val (text.substr (0, maxlengthCharacters));
-						} else {
-							const charactersRemaining = maxlengthCharacters - textLength;
-							messages.push ('You have max. ' + Intl.NumberFormat ().format (charactersRemaining) + (charactersRemaining == 1 ? ' character' : ' characters') + ' left.');
-						}
-					}
-					if (minlengthCharacters) {
-						if (textLength < minlengthCharacters) {
-							messages.push ('You need to write at least ' + Intl.NumberFormat ().format (minlengthCharacters) + ' characters (currently: ' + Intl.NumberFormat ().format (textLength) + ').');
-						}
+				if (maxlengthCharacters) {
+					if (textLength > maxlengthCharacters) {
+						messages.push ('You cannot write more then ' + Intl.NumberFormat ().format (maxlengthCharacters) + ' characters!');
+						$('#' + textid).val (text.substr (0, maxlengthCharacters));
+					} else {
+						const charactersRemaining = maxlengthCharacters - textLength;
+						messages.push ('You have max. ' + Intl.NumberFormat ().format (charactersRemaining) + (charactersRemaining == 1 ? ' character' : ' characters') + ' left.');
 					}
 				}
+				if (minlengthCharacters) {
+					if (textLength < minlengthCharacters) {
+						messages.push ('You need to write at least ' + Intl.NumberFormat ().format (minlengthCharacters) + ' characters (currently: ' + Intl.NumberFormat ().format (textLength) + ').');
+					}
+				}
+				
+				// Show message if present
 				if (messages) {
 					$('#' + infodiv).html (messages.join (' '));
 				}

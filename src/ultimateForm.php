@@ -461,11 +461,8 @@ class form
 		# Prevent multi-line submissions
 		$widget->preventMultilineSubmissions ();
 		
-		# Run minlength checking
-		$widget->checkMinLength ();
-		
-		# Run maxlength checking
-		$widget->checkMaxLength ();
+		# Run maxlength/minlength checking
+		$widget->checkMaxMinLength ();
 		
 		# Perform pattern checks
 		$regexpCheck = $widget->regexpCheck ();
@@ -1361,16 +1358,13 @@ class form
 		# Clean to numeric if required
 		$widget->cleanToNumeric ();
 		
-		# Enable minlength checking
-		$widget->checkMinLength ();
-		if (is_numeric ($arguments['minlength'])) {
-			$restrictions[] = 'At least ' . number_format ($arguments['minlength']) . ' characters';
-		}
-		
-		# Enable maxlength checking
-		$widget->checkMaxLength ();
+		# Enable maxlength/maxwords/minlength checking
+		$widget->checkMaxMinLength ();
 		if (is_numeric ($arguments['maxlength'])) {
 			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters, inc. spaces';
+		}
+		if (is_numeric ($arguments['minlength'])) {
+			$restrictions[] = 'At least ' . number_format ($arguments['minlength']) . ' characters';
 		}
 		
 		# Add jQuery-based dynamic label for maxlength and minlength
@@ -1651,7 +1645,7 @@ class form
 		$widget->uniquenessCheck ();
 		
 		# Enable maxlength checking
-		$widget->checkMaxLength ($stripHtml = true);
+		$widget->checkMaxMinLength ($stripHtml = true);
 		if (is_numeric ($arguments['maxlength'])) {
 			$restrictions[] = 'Maximum ' . number_format ($arguments['maxlength']) . ' characters';
 		}
@@ -9389,39 +9383,9 @@ class formWidget
 	}
 	
 	
-	# Function to check the minimum length of what is submitted
+	# Function to do length checks of what is submitted
 	# If an expandable field, the checks are done for each subvalue
-	public function checkMinLength ()
-	{
-		# Deal with single vs expandable values, by treating a scalar as an array of one value, and the checks below then always looping through the value list
-		$values = array ($this->value);
-		if (isSet ($this->arguments['expandable']) && $this->arguments['expandable']) {
-			$values = explode ($this->arguments['expandable'], $this->value);	// Known to have length, so no need to handle the empty string case
-		}
-		
-		# Check each value (single value if originally scalar)
-		foreach ($values as $value) {
-			
-			# Determine the string length, trimming first
-			$length = strlen (trim ($value));
-			
-			# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
-			if (!$length) {continue;}
-			
-			#!# Move the is_numeric check into the argument cleaning stage
-			if (is_numeric ($this->arguments['minlength'])) {
-				if ($length < $this->arguments['minlength']) {
-					$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['minlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
-					return;
-				}
-			}
-		}
-	}
-	
-	
-	# Function to check the maximum length of what is submitted
-	# If an expandable field, the checks are done for each subvalue
-	public function checkMaxLength ($stripHtml = false)
+	public function checkMaxMinLength ($stripHtml = false)
 	{
 		# Deal with single vs expandable values, by treating a scalar as an array of one value, and the checks below then always looping through the value list
 		$values = array ($this->value);
@@ -9443,11 +9407,21 @@ class formWidget
 			# Apply the constraint only when text entered; client code can set required=true if needing to enforce an empty field
 			if (!$length) {continue;}	// Go to next (if any)
 			
-			#!# Move the is_numeric check into the argument cleaning stage
-			if (is_numeric ($this->arguments['maxlength'])) {
-				if ($length > $this->arguments['maxlength']) {
-					$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
-					return;
+			#!# Move the is_numeric checks into the argument cleaning stage
+			if (array_key_exists ('maxlength', $this->arguments)) {
+				if (is_numeric ($this->arguments['maxlength'])) {
+					if ($length > $this->arguments['maxlength']) {
+						$this->elementProblems['exceedsMaximum'] = 'You submitted more characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['maxlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+						return;
+					}
+				}
+			}
+			if (array_key_exists ('minlength', $this->arguments)) {
+				if (is_numeric ($this->arguments['minlength'])) {
+					if ($length < $this->arguments['minlength']) {
+						$this->elementProblems['belowMinimum'] = 'You submitted fewer characters (<strong>' . number_format ($length) . '</strong>) than are allowed (<strong>' . number_format ($this->arguments['minlength']) . '</strong>)' . (count ($values) > 1 ? ', for one or more of the values' : '') . '.';
+						return;
+					}
 				}
 			}
 		}

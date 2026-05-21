@@ -4720,30 +4720,30 @@ class form
 	}
 	
 	
-	# Function to add jQuery-based maxlength/minlength checking; see http://stackoverflow.com/questions/1588521/
+	# Function to add jQuery-based maxlength/minlength checking; see https://stackoverflow.com/questions/1588521/
 	#!# Replace with HTML5 widget attributes where available
 	private function maxMinLengthJQuery ($id, $maxlengthCharacters, $minlengthCharacters)
 	{
 		# Add the main function
 		$this->jQueryCode[__FUNCTION__] = "
-			function characterLimits (textid, limit, atLeast, infodiv)
+			function characterLimits (textid, maxlengthCharacters, minlengthCharacters, infodiv)
 			{
 				const text = $('#' + textid).val ();
 				const textLength = text.trim ().length;		// Trim, to avoid space being used to pad out a value
 				let messages = [];
 				if (textLength) {	// Do nothing if no text present
-					if (limit) {
-						if (textLength > limit) {
-							messages.push ('You cannot write more then ' + Intl.NumberFormat ().format (limit) + ' characters!');
-							$('#' + textid).val (text.substr (0, limit));
+					if (maxlengthCharacters) {
+						if (textLength > maxlengthCharacters) {
+							messages.push ('You cannot write more then ' + Intl.NumberFormat ().format (maxlengthCharacters) + ' characters!');
+							$('#' + textid).val (text.substr (0, maxlengthCharacters));
 						} else {
-							const remaining = limit - textLength;
-							messages.push ('You have max. ' + Intl.NumberFormat ().format (remaining) + (remaining == 1 ? ' character' : ' characters') + ' left.');
+							const charactersRemaining = maxlengthCharacters - textLength;
+							messages.push ('You have max. ' + Intl.NumberFormat ().format (charactersRemaining) + (charactersRemaining == 1 ? ' character' : ' characters') + ' left.');
 						}
 					}
-					if (atLeast) {
-						if (textLength < atLeast) {
-							messages.push ('You need to write at least ' + Intl.NumberFormat ().format (atLeast) + ' characters (currently: ' + Intl.NumberFormat ().format (textLength) + ').');
+					if (minlengthCharacters) {
+						if (textLength < minlengthCharacters) {
+							messages.push ('You need to write at least ' + Intl.NumberFormat ().format (minlengthCharacters) + ' characters (currently: ' + Intl.NumberFormat ().format (textLength) + ').');
 						}
 					}
 				}

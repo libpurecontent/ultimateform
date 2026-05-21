@@ -4739,16 +4739,16 @@ class form
 				if (textLength) {	// Do nothing if no text present
 				if (limit) {
 						if (textLength > limit) {
-							messages.push ('You cannot write more then ' + Intl.NumberFormat().format (limit) + ' characters!');
+							messages.push ('You cannot write more then ' + Intl.NumberFormat ().format (limit) + ' characters!');
 							$('#' + textid).val (text.substr (0, limit));
 						} else {
 							const remaining = limit - textLength;
-							messages.push ('You have ' + Intl.NumberFormat().format (remaining) + (remaining == 1 ? ' character' : ' characters') + ' left.');
+							messages.push ('You have max. ' + Intl.NumberFormat ().format (remaining) + (remaining == 1 ? ' character' : ' characters') + ' left.');
 						}
 					}
 					if (atLeast) {
 						if (textLength < atLeast) {
-							messages.push ('You need to write at least ' + Intl.NumberFormat().format (atLeast) + ' characters (currently: ' + Intl.NumberFormat().format (textLength) + ').');
+							messages.push ('You need to write at least ' + Intl.NumberFormat ().format (atLeast) + ' characters (currently: ' + Intl.NumberFormat ().format (textLength) + ').');
 						}
 					}
 				}

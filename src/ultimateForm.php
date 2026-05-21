@@ -4732,7 +4732,7 @@ class form
 				const textLength = text.trim ().length;		// Trim, to avoid space being used to pad out a value
 				let messages = [];
 				if (textLength) {	// Do nothing if no text present
-				if (limit) {
+					if (limit) {
 						if (textLength > limit) {
 							messages.push ('You cannot write more then ' + Intl.NumberFormat ().format (limit) + ' characters!');
 							$('#' + textid).val (text.substr (0, limit));

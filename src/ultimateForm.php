@@ -223,6 +223,7 @@ class form
 		'akismetApiKey'						=> false,							# Akismet developer API key, available from https://akismet.com/development/api/
 		'applicationName'					=> false,							# Application name
 		'picker'							=> false,							# Whether to use the date picker by default when creating date widgets
+		'autogrow'							=> false,							# Whether to use autogrow on textarea fields
 		'directoryPermissions'				=> 0775,							# Permission setting used for creating new directories
 		'prefixedGroupsFilterEmpty'			=> false,							# Whether to filter out empty groups when using group prefixing in dataBinding; currently limited to detecting scalar types only
 		'unsavedDataProtection'				=> false,							# Add DHTML to give a warning about unsaved form data if navigating away from the page (false/true/text)
@@ -1315,7 +1316,7 @@ class form
 			'cols'					=> $this->settings['cols'],		# Number of columns (optional; defaults to 30)
 			'rows'					=> $this->settings['rows'],		# Number of rows (optional; defaults to 5)
 			'wrap'					=> false,	# Value for non-standard 'wrap' attribute
-			'autogrow'				=> false,	# Whether to auto-grow the content if the user enters long content
+			'autogrow'				=> $this->settings['autogrow'],	# Whether to auto-grow the content if the user enters long content
 			'placeholder'			=> '',		# HTML5 placeholder text
 			'autofocus'				=> false,	# HTML5 autofocus (true/false)
 			'default'				=> '',		# Default value (optional)

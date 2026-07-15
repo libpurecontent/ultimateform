@@ -2942,14 +2942,12 @@ class form
 		
 		# Add the jQuery code
 		$this->jQueryCode[__FUNCTION__ . $arguments['name']] = "
-			$(document).ready(function(){
-				var autosetValue = '';
-				$('#{$idThis}').change(function() {
-					if($('#{$idTarget}').val() == '' || $('#{$idTarget}').val() == autosetValue) {
-						autosetValue = $('#{$idThis} option:selected').text();
-						$('#{$idTarget}').val(autosetValue);
-					}
-				});
+			var autosetValue = '';
+			$('#{$idThis}').change(function() {
+				if($('#{$idTarget}').val() == '' || $('#{$idTarget}').val() == autosetValue) {
+					autosetValue = $('#{$idThis} option:selected').text();
+					$('#{$idTarget}').val(autosetValue);
+				}
 			});
 		";
 	}
@@ -3731,12 +3729,10 @@ class form
 				if ($arguments['pickerAutosubmit']) {
 					$this->jQueryCode[__FUNCTION__ . $widgetId] = "\n
 				// Date picker autosubmit
-				$(function() {
-					var el = document.getElementById('{$widgetId}');
-					el.addEventListener('input', function(e) {	// i.e. oninput
-						$('form[name={$this->settings['name']}]').submit();
-					}, false);
-				});
+				var el = document.getElementById('{$widgetId}');
+				el.addEventListener('input', function(e) {	// i.e. oninput
+					$('form[name={$this->settings['name']}]').submit();
+				}, false);
 				";
 				}
 				
@@ -4166,11 +4162,9 @@ class form
 				
 				# Add JS handler to set the thumbnail on file selection
 				$this->jQueryCode[__FUNCTION__  . $arguments['name']] .= "\n" . "
-				$(document).ready (function () {
 					$('#{$elementId}').change (function () {
 						thumbWrapper (this.files, '{$selector}');
 					});
-				});
 				";
 				
 				# Register the thumbnail HTML for this subfield
@@ -4219,24 +4213,22 @@ class form
 			$widgetHtml .= "\n\t\t\t<style type=\"text/css\">#{$progressbarId} {display: none;}</style>";		// Hidden by default; shown using show() below on submit
 			$widgetHtml .= "\n\t\t\t";
 			$this->jQueryCode[__FUNCTION__] = "\n" . "
-				$(function () {		// document ready
-					$('#{$progressbarId}').closest ('form').submit (function (e) {
-						var updateProgressbar = function () {
-							$.get ('{$arguments['progressbar']}/{$uploadProgressIdentifier}', function (data) {
-								if (data != null) {
-									var progress = (data.bytes_uploaded / data.bytes_total) * 100;
-									progress = progress.toFixed (0);
-									$('#{$progressbarId} progress').val (progress);
-									$('#{$progressbarId} span').text (progress + '%');
-									if (progress < 100) {
-										setTimeout (updateProgressbar, 1000);	// Iterate
-									}
+				$('#{$progressbarId}').closest ('form').submit (function (e) {
+					var updateProgressbar = function () {
+						$.get ('{$arguments['progressbar']}/{$uploadProgressIdentifier}', function (data) {
+							if (data != null) {
+								var progress = (data.bytes_uploaded / data.bytes_total) * 100;
+								progress = progress.toFixed (0);
+								$('#{$progressbarId} progress').val (progress);
+								$('#{$progressbarId} span').text (progress + '%');
+								if (progress < 100) {
+									setTimeout (updateProgressbar, 1000);	// Iterate
 								}
-							});
-						};
-						$('#{$progressbarId}').show ();
-						setTimeout (updateProgressbar, 1000);
-					});
+							}
+						});
+					};
+					$('#{$progressbarId}').show ();
+					setTimeout (updateProgressbar, 1000);
 				});
 			";
 		}
@@ -4718,9 +4710,7 @@ class form
 		}
 		
 		# Add/overwrite a per-widget call
-		$this->jQueryCode[__FUNCTION__]  = "\n\t$(document).ready(function(){";
 		$this->jQueryCode[__FUNCTION__] .= "\n\t\t" . implode ("\n\t\t", $this->autocompleteJQueryEntries);
-		$this->jQueryCode[__FUNCTION__] .= "\n\t});";
 	}
 	
 	
@@ -4778,11 +4768,9 @@ class form
 		
 		# Add a per-widget call
 		$this->jQueryCode[__FUNCTION__ . $id] = "
-			$(function () {
-				$('#" . $id . "').keyup (function ()
-				{
-					characterLimits ('" . $id . "', " . $maxlengthCharacters . ', ' . $maxlengthWords . ', ' . $minlengthCharacters . ", '" . $id . "__info');
-				})
+			$('#" . $id . "').keyup (function ()
+			{
+				characterLimits ('" . $id . "', " . $maxlengthCharacters . ', ' . $maxlengthWords . ', ' . $minlengthCharacters . ", '" . $id . "__info');
 			});
 		";
 	}
@@ -4794,16 +4782,14 @@ class form
 		# Add the main function; see: http://stackoverflow.com/a/5017423/180733
 		$this->multipleSubmitReturnHandlerClass = 'defaultsubmitbutton';
 		$this->jQueryCode[__FUNCTION__] = "
-			$(function() {
-				$('form" . ($this->settings['id'] ? "#{$this->settings['id']}" : '') . " input').keypress(function (e) {
-					if ((e.which && e.which == 13) || (e.keyCode && e.keyCode == 13)) {
-						$('input[type=submit].{$this->multipleSubmitReturnHandlerClass}').click();
-						return false;
-					} else {
-						return true;
-					}
-				});
-			})
+			$('form" . ($this->settings['id'] ? "#{$this->settings['id']}" : '') . " input').keypress(function (e) {
+				if ((e.which && e.which == 13) || (e.keyCode && e.keyCode == 13)) {
+					$('input[type=submit].{$this->multipleSubmitReturnHandlerClass}').click();
+					return false;
+				} else {
+					return true;
+				}
+			});
 		";
 	}
 	
@@ -6596,14 +6582,12 @@ class form
 			
 			// Navigate-away protection for general widgets
 			function removeCheck () { window.onbeforeunload = null; }
-			$(document).ready (function () {
-			    $('#{$formId} :input').one ('change', function () {
-			        window.onbeforeunload = function () {
-			            return '{$messageText}';
-			        }
-			    });
-			    $('#{$formId} input[type=submit]').click (function () { removeCheck () });
+			$('#{$formId} :input').one ('change', function () {
+				window.onbeforeunload = function () {
+					return '{$messageText}';
+				}
 			});
+			$('#{$formId} input[type=submit]').click (function () { removeCheck () });
 			
 			// Navigate-away protection for Richtext widgets; see: https://stackoverflow.com/a/25050155
 			if (typeof CKEDITOR !== 'undefined') {
@@ -6640,41 +6624,38 @@ class form
 	{
 		# Create the jQuery code
 		$this->jQueryCode[__FUNCTION__] = "
-			\$(document).ready(function() {
-
-				// Helper function to keep table row from collapsing when being sorted
-				var fixHelperModified = function(e, tr) {
-					var \$originals = tr.children();
-					var \$helper = tr.clone();
-					\$helper.children().each(function(index)
-					{
-						\$(this).width(\$originals.eq(index).width())
-					});
-					return \$helper;
-				};
-					
-				// Make table sortable
-				\$('#{$formId} table tbody').sortable({
-					helper: fixHelperModified,
-					stop: function(event,ui) {renumber_table('#{$formId}} table')}
+			// Helper function to keep table row from collapsing when being sorted
+			var fixHelperModified = function(e, tr) {
+				var \$originals = tr.children();
+				var \$helper = tr.clone();
+				\$helper.children().each(function(index)
+				{
+					\$(this).width(\$originals.eq(index).width())
 				});
+				return \$helper;
+			};
 				
-				// Set pointer style
-				\$('#{$formId} table tr').css({'cursor':'move'});
-				\$('#{$formId} table tr:hover').css({'background-color':'#f7f7f7'});
-				
-				/*
-				// Delete button in table rows
-				\$('table').on('click','.btn-delete',function() {
-					tableID = '#' + \$(this).closest('table').attr('id');
-					r = confirm('Delete this item?');
-					if(r) {
-						\$(this).closest('tr').remove();
-						renumber_table(tableID);
-					}
-				});
-				*/
+			// Make table sortable
+			\$('#{$formId} table tbody').sortable({
+				helper: fixHelperModified,
+				stop: function(event,ui) {renumber_table('#{$formId}} table')}
 			});
+			
+			// Set pointer style
+			\$('#{$formId} table tr').css({'cursor':'move'});
+			\$('#{$formId} table tr:hover').css({'background-color':'#f7f7f7'});
+			
+			/*
+			// Delete button in table rows
+			\$('table').on('click','.btn-delete',function() {
+				tableID = '#' + \$(this).closest('table').attr('id');
+				r = confirm('Delete this item?');
+				if(r) {
+					\$(this).closest('tr').remove();
+					renumber_table(tableID);
+				}
+			});
+			*/
 		";
 	}
 	
@@ -6994,7 +6975,7 @@ class form
 		# Add each client function
 		if ($this->jQueryCode || $this->javascriptCode) {
 			$html .= "\n<script type=\"text/javascript\">";
-			$html .= "\n\t" . '$(function() {';
+			$html .= "\n\t" . '$(function() {';		// On document ready
 			foreach ($this->jQueryCode as $key => $jsCode) {
 				$html .= "\n" . $jsCode;
 			}
@@ -9520,16 +9501,14 @@ class formWidget
 		#!# Currently this applies the width to all tagify virtual inputs created
 		$id = $this->form->cleanId ("{$this->settings['name']}[{$this->arguments['name']}]");
 		$this->form->jQueryCode[__FUNCTION__ . $id] = "
-			$(document).ready (function () {
-				const input = document.querySelector ('#" . $id . "');
-				const tagify = new Tagify (input, {
-					originalInputValueFormat: function (values) {return values.map (function (item) {return item.value}).join (',')},	// Output comma-separated as per input, not JSON
-					dropdown: {placeAbove: false}
-				});
-				{$js}
-				document.querySelectorAll ('.tagify').forEach (function (element) {
-					element.style.width = input.clientWidth + 'px';
-				});
+			const input = document.querySelector ('#" . $id . "');
+			const tagify = new Tagify (input, {
+				originalInputValueFormat: function (values) {return values.map (function (item) {return item.value}).join (',')},	// Output comma-separated as per input, not JSON
+				dropdown: {placeAbove: false}
+			});
+			{$js}
+			document.querySelectorAll ('.tagify').forEach (function (element) {
+				element.style.width = input.clientWidth + 'px';
 			});
 		";
 	}

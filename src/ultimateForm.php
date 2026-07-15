@@ -4710,7 +4710,7 @@ class form
 		}
 		
 		# Add/overwrite a per-widget call
-		$this->jQueryCode[__FUNCTION__] .= "\n\t\t" . implode ("\n\t\t", $this->autocompleteJQueryEntries);
+		$this->jQueryCode[__FUNCTION__] = "\n\t\t" . implode ("\n\t\t", $this->autocompleteJQueryEntries);
 	}
 	
 	

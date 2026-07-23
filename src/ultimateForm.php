@@ -6139,7 +6139,7 @@ class form
 			if ($elementAttributes['after']) {
 				$goesAfter = $elementAttributes['after'];
 				if (!isSet ($this->elements[$goesAfter])) {
-					$this->formSetupErrors['formEmpty'] = 'There is no element' . htmlspecialchars ($goesAfter) . ' to place an element after.';
+					$this->formSetupErrors['formEmpty'] = 'There is no element ' . htmlspecialchars ($goesAfter) . ' to place an element after.';
 					return false;
 				}
 				$afters[$name] = $goesAfter;

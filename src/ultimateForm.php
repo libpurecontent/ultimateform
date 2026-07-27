@@ -6975,7 +6975,7 @@ class form
 		# Add each client function
 		if ($this->jQueryCode || $this->javascriptCode) {
 			$html .= "\n<script type=\"text/javascript\">";
-			$html .= "\n\t" . '$(function() {';		// On document ready
+			$html .= "\n\t" . '$(function ($) {';		// On document ready
 			foreach ($this->jQueryCode as $key => $jsCode) {
 				$html .= "\n" . $jsCode;
 			}

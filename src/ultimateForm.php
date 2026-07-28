@@ -2071,11 +2071,11 @@ class form
 			";
 			
 			# Add px to width/height if not specified and not a percentage
-			if (ctype_digit ($arguments['config.width'])) {
+			if (is_int ($arguments['config.width']) || ctype_digit ($arguments['config.width'])) {
 				$arguments['config.width'] .= 'px';
 			}
 			$arguments['config.height'] = str_replace ('px', '', $arguments['config.height']);	// Revert to pixels
-			if (ctype_digit ($arguments['config.height'])) {
+			if (is_int ($arguments['config.height']) || ctype_digit ($arguments['config.height'])) {
 				$arguments['config.height'] = $arguments['config.height'] + 71;		// By trial and error
 				$arguments['config.height'] .= 'px';
 			}

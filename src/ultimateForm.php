@@ -1463,7 +1463,7 @@ class form
 				}
 			}
 			if ($notFound) {
-				$elementProblems['mustContain'] = 'The ' . (count ($notFound) == 1 ? 'string' : 'strings') . ' <em>' . implode ("</em>, <em>", $notFound) . '</em> must be contained in the text but ' . (count ($mustContain) == 1 ? 'was' : 'were') . ' not found.';
+				$elementProblems['mustContain'] = 'The ' . (count ($notFound) == 1 ? 'string' : 'strings') . ' <em>' . implode ("</em>, <em>", $notFound) . '</em> must be contained in the text but ' . (count ($notFound) == 1 ? 'was' : 'were') . ' not found.';
 			}
 		}
 		

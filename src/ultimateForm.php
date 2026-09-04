@@ -2149,11 +2149,6 @@ class form
 		# Set restrictions
 		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
 		
-		# Send header to avoid ERR_BLOCKED_BY_XSS_AUDITOR warnings / blank screens; requires output buffering
-		if (ini_get ('output_buffering')) {
-			header ('X-XSS-Protection: 0');
-		}
-		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
 			'type' => __FUNCTION__,

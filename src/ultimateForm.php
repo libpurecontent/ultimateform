@@ -258,6 +258,9 @@ class form
 	 */
 	public function __construct ($suppliedArguments = array ())
 	{
+		# Clean server globals, to add support for $_SERVER['_PAGE_URL'] and $_SERVER['_SITE_URL']
+		application::cleanServerGlobals ();
+		
 		# Assign constants
 		$this->timestamp = date ('Y-m-d H:i:s');
 		

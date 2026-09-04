@@ -3207,6 +3207,7 @@ class form
 			'forceAssociative'		=> false,	# Force the supplied array of values to be associative
 			'labels'				=> true,	# Whether to generate labels
 			'labelsSurround'			=> $this->settings['labelsSurround'],	# Whether to use the surround method of label HTML formatting
+			'subheadings'			=> array (),	# Headings to be added, as array (value1 => text/html1, value2 => text/html2, ...); if the string contains < it will be treated as HTML, otherwise as string
 			'linebreaks'			=> $this->settings['linebreaks'],	# Whether to put line-breaks after each widget: true = yes (default) / false = none / array (1,2,5) = line breaks after the 1st, 2nd, 5th items
 			'columns'				=> false,	# Split into columns
 			'discard'				=> false,	# Whether to process the input but then discard it in the results
@@ -3328,6 +3329,12 @@ class form
 				
 				# Determine whether to disable this checkbox
 				$disabled = ((isSet ($arguments['disabled'][$value]) && $arguments['disabled'][$value]) ? ' disabled="disabled"' : '');
+				
+				# Add subheading if required
+				if ($arguments['subheadings'] && array_key_exists ($value, $arguments['subheadings'])) {
+					$subheading = (substr_count ($arguments['subheadings'][$value], '<') ? $arguments['subheadings'][$value] : '<p>' . htmlspecialchars ($arguments['subheadings'][$value]) . '</p>');	// HTML or string
+					$widgetHtml .= "\n\t\t\t" . $subheading;
+				}
 				
 				# Create the HTML; note that spaces (used to enable the 'label' attribute for accessibility reasons) in the ID will be replaced by an underscore (in order to remain valid XHTML)
 				//$widgetHtml .= "\n\t\t\t" . '<input type="checkbox" name="' . ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']) . "[{$value}]" . '" id="' . $elementId . '" value="true"' . $stickynessHtml . ' />' . ($arguments['labels'] ? '<label for="' . $elementId . '">' . htmlspecialchars ($visible) . '</label>' : '');

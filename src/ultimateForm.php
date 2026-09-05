@@ -7159,6 +7159,7 @@ class form
 			'either'	=> 'One of the sections %fields must be completed.',
 			'all'		=> 'The values for all of the sections %fields must be completed if one of them is.',
 			'master'	=> 'The value for the field %fields must be completed if any of the other %parameter fields are completed.',
+			'enabler'	=> 'The values for the fields in the group must be completed if %fields is completed.',
 			'total'		=> 'In the sections %fields, the total number of items selected must be exactly %parameter.',
 			'details'	=> 'In the sections %fields, no details were submitted.',
 		);
@@ -7254,8 +7255,8 @@ class form
 				}
 			}
 			
-			# For the 'master' check, we are going to need the name of the master field which will be checked against
-			if ($rule['type'] == 'master') {
+			# For the 'master'/'enabler' check, we are going to need the name of the master field which will be checked against
+			if (in_array ($rule['type'], array ('master', 'enabler'))) {
 				foreach ($rule['fields'] as $field) {
 					$firstField = $field;
 					break;
@@ -7272,8 +7273,9 @@ class form
 				|| ( ($rule['type'] == 'same')      && ((count ($values) > 1) && count (array_unique ($values)) != 1) )
 				|| ( ($rule['type'] == 'either')    && (application::allArrayElementsEmpty ($values)) )
 				|| ( ($rule['type'] == 'all')       && $nonEmptyValues && $emptyValues )
-				|| ( ($rule['type'] == 'total')     && ($total != $rule['parameter']) )
 				|| ( ($rule['type'] == 'master')    && $nonEmptyValues && array_key_exists ($firstField, $emptyValues) )
+				|| ( ($rule['type'] == 'enabler')   && $values[$firstField] && $emptyValues )
+				|| ( ($rule['type'] == 'total')     && ($total != $rule['parameter']) )
 				|| ( ($rule['type'] == 'details')   && $nonEmptyValues && $this->elements[$rule['fields'][0]]['data']['presented'] == 'Yes' && !strlen ($this->elements[$rule['fields'][1]]['data']['presented']) )
 			) {
 				$problems['validationFailed' . ucfirst ($rule['type']) . $index] = str_replace (array ('%fields', '%parameter'), array ($this->_fieldListString ($rule['fields']), $rule['parameter']), $this->validationTypes[$rule['type']]);

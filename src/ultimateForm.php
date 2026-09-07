@@ -102,6 +102,8 @@ class form
 	private $configureResultEmailRecipient;							// The recipient of an e-mail
 	private $configureResultEmailRecipientSuffix;					// The suffix used when a select field is used as the e-mail receipient but the selectable items are only the prefix to the address
 	private $configureResultEmailAdministrator;						// The from field of an e-mail
+	private $configureResultEmailCc;
+	private $configureResultEmailReplyTo;
 	private $configureResultFileFilename;							// The file name where results are written
 	private $configureResultConfirmationEmailRecipient = '';		// The recipient of any confirmation e-mail
 	private $configureResultConfirmationEmailAbuseNotice = true;	// Whether to include an abuse report notice in any confirmation e-mail sent

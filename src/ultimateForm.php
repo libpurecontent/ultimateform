@@ -8934,6 +8934,10 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				case (strtolower ($type) == 'date'):
 				case (strtolower ($type) == 'datetime'):
 				case (strtolower ($type) == 'timestamp'):
+				case (strtolower ($type) == 'timestamp with time zone'):	// PostgreSQL
+					if (strtolower ($type) == 'timestamp with time zone') {		// Normalise to timestamp
+						$type = 'timestamp';
+					}
 					if (strtolower ($type) == 'timestamp') {
 						$type = 'datetime';
 						$standardAttributes['default'] = 'timestamp';

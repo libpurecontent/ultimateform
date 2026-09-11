@@ -8828,7 +8828,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 				case (preg_match ('/(float|decimal|double|double precision)\(([0-9]+),([0-9]+)\)/i', $type, $matches)):
 				case (preg_match ('/(float|decimal|double|double precision)$/i', $type, $matches)):
 					if ($floatChopTrailingZeros) {
-						if (substr_count ($standardAttributes['default'], '.')) {
+						if (!is_null ($standardAttributes['default']) && substr_count ($standardAttributes['default'], '.')) {
 							$standardAttributes['default'] = preg_replace ('/0+$/', '', $standardAttributes['default']);
 							$standardAttributes['default'] = preg_replace ('/\.$/', '', $standardAttributes['default']);
 						}

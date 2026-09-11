@@ -8850,6 +8850,15 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					$this->number ($standardAttributes + $floatAttributes);
 					break;
 				
+				# PostgreSQL MONEY type; effectively NUMERIC(19,2) but with a currency symbol at the start
+				case ($type == 'money'):
+					$this->input ($standardAttributes + array (
+						'regexp' => '^(£|\$|€)([0-9]{1,17}).([0-9]{2})$',
+						'maxlength' => 19,
+						'size' => 19 + 1,
+					));
+					break;
+				
 				# CHAR/VARCHAR (character) field
 				case (preg_match ('/(char|varchar)\(([0-9]+)\)/i', $type, $matches)):
 					$this->input ($standardAttributes + array (

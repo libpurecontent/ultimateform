@@ -8868,6 +8868,23 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					));
 					break;
 				
+				# PostgreSQL BOOLEAN type
+				case ($this->databaseConnection->getVendor () == 'pgsql' && $type == 'tinyint(1)'):
+					$synonymsByValue = array (
+						't' => array (TRUE,  't', 'true',  'y', 'yes', 'on',  '1', 1),
+						'f' => array (FALSE, 'f', 'false', 'n', 'no',  'off', '0', 0),
+					);
+					foreach ($synonymsByValue as $value => $synonyms) {
+						if (in_array ($standardAttributes['default'], $synonyms, true)) {	// Strict comparison
+							$standardAttributes['default'] = $value;
+							break;
+						}
+					}
+					$this->select ($standardAttributes + array (
+						'values' => array ('t' => 'Yes (true)', 'f' => 'No (false)'),
+					));
+					break;
+					
 				# INT (numeric) field
 				case (preg_match ('/(integer)/i', $type, $matches)):
 					$matches[2] = 11;

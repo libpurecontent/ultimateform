@@ -97,6 +97,7 @@ class form
 	private $javascriptCode = array ();				// Array of javascript client code, if any, which will get wrapped in a script tag
 	#!# This needs a proper accessor
 	public $formSave = false;						// Whether the submission is a save rather than a proper submission
+	private $multipleSubmitReturnHandlerClass;
 	
 	# Output configuration
 	private $configureResultEmailRecipient;							// The recipient of an e-mail
@@ -6870,7 +6871,7 @@ class form
 		#!# Accesskey string needs to detect the user's platform and browser type, as Shift+Alt is not always correct, and on a Mac does not exist
 		if (!$this->formDisabled) {
 			$submitButtonText = $this->settings['submitButtonText'] . ((!empty ($this->settings['submitButtonAccesskey']) && $this->settings['submitButtonAccesskeyString']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['submitButtonAccesskey'] . ']' : '');
-			$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="' . ($this->settings['submitButtonClass']) . (isSet ($this->multipleSubmitReturnHandlerClass) ? " {$this->multipleSubmitReturnHandlerClass}" : '') . '" />';
+			$formButtonHtml = '<input type="' . (!$this->settings['submitButtonImage'] ? 'submit' : "image\" src=\"{$this->settings['submitButtonImage']}\" name=\"submit\" alt=\"{$submitButtonText}") . '" value="' . $submitButtonText . '"' . (!empty ($this->settings['submitButtonAccesskey']) ? " accesskey=\"{$this->settings['submitButtonAccesskey']}\""  : '') . (is_numeric ($this->settings['submitButtonTabindex']) ? " tabindex=\"{$this->settings['submitButtonTabindex']}\"" : '') . ' class="' . ($this->settings['submitButtonClass']) . ($this->multipleSubmitReturnHandlerClass ? " {$this->multipleSubmitReturnHandlerClass}" : '') . '" />';
 			if ($this->settings['refreshButton']) {
 				$refreshButtonText = $this->settings['refreshButtonText'] . (!empty ($this->settings['refreshButtonAccesskey']) ? '&nbsp; &nbsp;[Shift+Alt+' . $this->settings['refreshButtonAccesskey'] . ']' : '');
 				#!# Need to deny __refresh as a reserved form name

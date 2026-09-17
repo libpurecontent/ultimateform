@@ -6709,7 +6709,7 @@ class form
 		$html .= $this->loadJavascriptCode ();
 		
 		# Start the constructed form HTML
-		$html .= "\n" . '<form' . ($this->settings['id'] ? " id=\"{$this->settings['id']}\"" : '') . ' method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . htmlspecialchars ($this->settings['submitTo']) . '" enctype="' . ($this->uploadProperties ? 'multipart/form-data' : 'application/x-www-form-urlencoded') . '" accept-charset="UTF-8">';
+		$html .= "\n" . '<form' . ($this->settings['id'] ? " id=\"{$this->settings['id']}\"" : '') . ' method="' . $this->method . '" name="' . ($this->settings['name'] ? $this->settings['name'] : 'form') . '" action="' . htmlspecialchars ($this->settings['submitTo']) . '"' . ($this->uploadProperties ? ' enctype="multipart/form-data"' : '') . ' accept-charset="UTF-8">';
 		
 		# Start the HTML
 		$formHtml = '';

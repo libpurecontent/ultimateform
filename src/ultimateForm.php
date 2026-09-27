@@ -3759,7 +3759,7 @@ class form
 				
 				# Add the date and month input boxes; if the day or year are 0 then nothing will be displayed
 				if (substr_count ($arguments['level'], 'date')) {	// datetime or date
-					$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'date' ? $widget->tabindexHtml () : '') . ' />&nbsp;';
+					$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">d:&nbsp;</span><input' . $this->nameIdHtml ($arguments['name'], false, 'day', true) . ' type="number" min="1" max="31" size="2" maxlength="2" value="' . (($elementValue['day'] != '00') ? $elementValue['day'] : '') . '"' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'date' ? $widget->tabindexHtml () : '') . ' />&nbsp;';
 					$firstSubwidget = false;
 					$widgetHtml .= "\n\t\t\t\t" . '<span class="comment">m:</span>';
 					$widgetHtml .= "\n\t\t\t\t" . '<select' . $this->nameIdHtml ($arguments['name'], false, 'month', true) . '>';
@@ -3774,7 +3774,7 @@ class form
 				# Add the year box
 				if ($arguments['level'] != 'time') {
 					$widgetHtml .= "\n\t\t\t\t" . ($arguments['level'] != 'year' ? '<span class="comment">y:&nbsp;</span>' : '');
-					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" ' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'year' ? $widget->tabindexHtml () : '') . '/>' . "\n\t\t";
+					$widgetHtml .= '<input' . $this->nameIdHtml ($arguments['name'], false, 'year', true) . ' type="number" size="4" maxlength="4" value="' . (($elementValue['year'] != '0000') ? $elementValue['year'] : '') . '" ' . (($arguments['autofocus'] && $firstSubwidget) ? ' autofocus="autofocus"' : '') . ($arguments['level'] == 'year' ? $widget->tabindexHtml () : '') . '/>' . "\n\t\t";
 					$firstSubwidget = false;
 				}
 				

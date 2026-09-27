@@ -8967,8 +8967,10 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 					}
 					if (strtolower ($type) == 'timestamp') {
 						$type = 'datetime';
-						$standardAttributes['default'] = 'timestamp';
-						$standardAttributes['editable'] = false;
+						if ($fieldAttributes['Default'] == 'CURRENT_TIMESTAMP') {
+							$standardAttributes['default'] = 'timestamp';
+							$standardAttributes['editable'] = false;
+						}
 					}
 					$this->datetime ($standardAttributes + array (
 						'level' => strtolower ($type),

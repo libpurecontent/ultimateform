@@ -8456,6 +8456,7 @@ class form
 		}
 		
 		# If simple join mode is enabled, proxy in the values for lookupFunction
+		$simpleJoinParameters = false;
 		if ($simpleJoin) {
 			$lookupFunction = array ('database', 'lookup');
 /*
@@ -8469,6 +8470,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 /*
 			}
 */
+			$simpleJoinParameters = array ($database, $table, $tables);
 		}
 		
 		# Ensure any lookup function has been defined
@@ -8544,7 +8546,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 			$targetDatabase = false;
 			$targetTable = false;
 			if ($lookupFunction) {
-				$parameters = array ($this->databaseConnection, $title, $fieldAttributes['Type'], $simpleJoin = ($simpleJoin ? array ($database, $table, $tables) : false));
+				$parameters = array ($this->databaseConnection, $title, $fieldAttributes['Type'], $simpleJoinParameters);
 				if ($lookupFunctionParameters) {$parameters = array_merge ($parameters, application::ensureArray ($lookupFunctionParameters));}
 				$userFunctionResult = call_user_func_array ($lookupFunction, $parameters);
 				if (count ($userFunctionResult) != 4) {	// Should be returning an array of four values as per the list() call below

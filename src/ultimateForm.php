@@ -8385,6 +8385,7 @@ class form
 			'inputAsSearch' => false,	// Set input widgets to be search boxes instead; this is recommended for a multisearch-style interface
 			'lookupFunction' => false,
 			'simpleJoin' => false,	// Overrides lookupFunction, uses targetId as a join to <database>.target; lookupFunctionParameters can still be used
+			'foreignKeys' => false,	// Overrides lookupFunction, detects native foreign keys using the database/table parameters; lookupFunctionParameters can still be used
 			'lookupFunctionParameters' => array (),
 			'lookupFunctionAppendTemplate' => false,
 			'truncate' => 40,
@@ -8471,6 +8472,11 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 			}
 */
 			$joinParameters = array ($database, $table, $tables);
+		}
+		
+		# If foreign key support is enabled, supply the current database/table parameters, omit (provide an empty array) the tables list, and enable the foreign keys flag instead
+		if ($foreignKeys) {
+			$joinParameters = array ($database, $table, array (), $enableForeignKeys = true);
 		}
 		
 		# Ensure any lookup function has been defined

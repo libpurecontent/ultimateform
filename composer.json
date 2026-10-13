@@ -12,7 +12,7 @@
     "require": {
         "libpurecontent/application": "^1.10",
         "libpurecontent/timedate": "^1.4",
-        "libpurecontent/database": "^4.5"
+        "libpurecontent/database": "^4.6"
     },
     "autoload": {
         "classmap": ["src/ultimateForm.php"]

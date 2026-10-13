@@ -8458,7 +8458,7 @@ class form
 		# If simple join mode is enabled, proxy in the values for lookupFunction
 		$simpleJoinParameters = false;
 		if ($simpleJoin) {
-			$lookupFunction = array ('database', 'lookup');
+			$lookupFunction = array ($this->databaseConnection, 'lookup');
 /*
 Work-in-progress implementation for callback; need to complete: (i) form setup checks to determine whether databaseConnection is needed, and (ii) implementing callback mode for uses of the database connection below
 			if ($callback) {

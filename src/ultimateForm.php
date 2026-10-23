@@ -8955,7 +8955,7 @@ Work-in-progress implementation for callback; need to complete: (i) form setup c
 							'output' => array ('processing' => 'special-setdatatype'),
 							'default' => ($value ? $value : array ()),	// Value from getData will just be item1,item2,item3
 						);
-						if (strlen ($checkboxesAttributes['default'])) {	// Don't explode an empty string into array('');
+						if ($checkboxesAttributes['default'] && strlen ($checkboxesAttributes['default'])) {	// Don't explode an empty string into array('');
 							$checkboxesAttributes['default'] = (is_array ($checkboxesAttributes['default']) ? $checkboxesAttributes['default'] : explode (',', $checkboxesAttributes['default']));
 						}
 						$this->checkboxes ($checkboxesAttributes);

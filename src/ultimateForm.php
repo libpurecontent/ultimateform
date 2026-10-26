@@ -108,6 +108,7 @@ class form
 	private $configureResultFileFilename;							// The file name where results are written
 	private $configureResultConfirmationEmailRecipient = '';		// The recipient of any confirmation e-mail
 	private $configureResultConfirmationEmailAbuseNotice = true;	// Whether to include an abuse report notice in any confirmation e-mail sent
+	private $configureResultConfirmationEmailAdministrator;
 	private $configureResultEmailedSubjectTitle = array ();			// An array to hold the e-mail subject title for either e-mail result type
 	private $configureResultScreenShowUnsubmitted;					// Whether, in screen results mode, unsubmitted widgets that are not required will be listed
 	private $configureResultEmailShowUnsubmitted;					// Whether, in e-mail results mode, unsubmitted widgets that are not required will be listed

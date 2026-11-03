@@ -31,7 +31,7 @@
  * - HTML5 widget support (partial)
  * 
  * REQUIREMENTS:
- * - PHP5 or above (PHP4.3 will run with slight modification)
+ * - PHP5 or above
  * - Runs in register_globals OFF mode for security
  * - Requires libraries application.php and pureContent.php
  * 
@@ -524,7 +524,6 @@ class form
 						$this->formSetupErrors['urlHandlingDirectoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> input URL-retrieval element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
 						$arguments['retrieval'] = false;
 					} else {
-						#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
 						umask (0);
 						mkdir ($arguments['retrieval'], $this->settings['directoryPermissions'], $recursive = true);
 					}
@@ -2211,7 +2210,7 @@ class form
 			$content = str_replace (array_keys ($cache), array_values ($cache), $content);
 		}
 		
-		# If the tidy extension is not available (e.g. PHP4), perform cleaning with the Tidy API
+		# If the tidy extension is not available, perform cleaning with the Tidy API
 		if ($cleanHtml && function_exists ('tidy_parse_string')) {
 			
 			# Set options, as at http://tidy.sourceforge.net/docs/quickref.html
@@ -4020,7 +4019,6 @@ class form
 				if (!application::directoryIsWritable ($arguments['directory'])) {
 					$this->formSetupErrors['directoryNotWritable'] = "The directory specified for the <strong>{$arguments['name']}</strong> upload element is not writable. Please check that the file permissions to ensure that the webserver 'user' can write to the directory.";
 				} else {
-					#!# Third parameter doesn't exist in PHP4 - will this cause a crash?
 					umask (0);
 					mkdir ($arguments['directory'], $this->settings['directoryPermissions'], $recursive = true);
 				}
@@ -5899,7 +5897,7 @@ class form
 	/**
 	 * Process/display the form (main wrapper function)
 	 */
-	public function process (&$html = NULL)	// Note that &$value = defaultValue is not supported in PHP4 - see http://devzone.zend.com/node/view/id/1714#Heading5 point 3; if running PHP4, (a) remove the & and (b) change var $minimumPhpVersion above to 4.3
+	public function process (&$html = NULL)
 	{
 		# Rearrange the element order if required
 		$this->rearrangeElementOrder ();

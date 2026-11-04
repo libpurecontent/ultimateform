@@ -127,7 +127,6 @@ class form
 	# Constants
 	private $timestamp;
 	private $minimumPhpVersion = 5;	// md5_file requires 4.2+; file_get_contents and is 4.3+; function process (&$html = NULL) requires 5.0
-	private $escapeCharacter = "'";		// Character used for escaping of output	#!# Currently ignored in derived code
 	
 	# Specify available arguments as defaults or as NULL (to represent a required argument)
 	private $argumentDefaults = array (
@@ -188,7 +187,6 @@ class form
 		'loggedUserUnique'					=> false,							# Run in user-uniqueness mode, making the key of any CSV the username and checking for resubmissions
 		'timestamping'						=> false,							# Add a timestamp to any CSV entry
 		'ipLogging'							=> false,							# Add the user IP address to any CSV entry
-		'escapeOutput'						=> false,							# Whether to escape output in the processing output ONLY (will not affect other types)
 		'emailName'							=> 'Website feedback',				# Name string for emitted e-mails
 		'emailIntroductoryText'				=> '',								# Introductory text for e-mail output type
 		'emailShowFieldnames'				=> true,							# Whether to show the underlying fieldnames in the e-mail output type
@@ -7675,41 +7673,8 @@ class form
 	 */
 	private function outputDataProcessing ($presentedData)
 	{
-		# Escape the output if necessary
-		if ($this->settings['escapeOutput']) {
-			
-			# Set the default escaping type to '
-			if ($this->settings['escapeOutput'] === true) {
-				$this->settings['escapeOutput'] = $this->escapeCharacter;
-			}
-			
-			# Loop through the data, whether scalar or one-level array
-			$presentedData = $this->escapeOutputIterative ($presentedData, $this->settings['escapeOutput']);
-		}
-		
 		# Return the raw, uncompiled data
 		return $presentedData;
-	}
-	
-	
-	# Function to perform escaping iteratively
-	private function escapeOutputIterative ($data, $character)
-	{
-		# For a scalar, return the escaped value
-		if (!is_array ($data)) {
-			$data = addslashes ($data);
-			#!# Consider adding $data = str_replace ('"', '\\"' . $character, $data); when character is a " - needs further research
-			
-		} else {
-			
-			# For an array value, iterate instead
-			foreach ($data as $key => $value) {
-				$data[$key] = $this->escapeOutputIterative ($value, $character);
-			}
-		}
-		
-		# Finally, return the escaped data structure
-		return $data;
 	}
 	
 	

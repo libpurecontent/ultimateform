@@ -7442,7 +7442,7 @@ class form
 				'confirmationEmail'	=> array ('presented', 'rawcomponents'),
 				'screen'			=> array ('presented', 'rawcomponents'),
 				'processing'		=> array ('rawcomponents', 'presented'),
-				'database'			=> array ('rawcomponents'),
+				'database'			=> array ('compiled', 'presented'),
 			),
 			
 			'input' => array (

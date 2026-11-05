@@ -1552,7 +1552,7 @@ class form
 			'discard' => $arguments['discard'],
 			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
-			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'BLOB') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'TEXT') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'after' => $arguments['after'],
 		);
 	}
@@ -2813,7 +2813,7 @@ class form
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
 			'multiple' => $arguments['multiple'],
-			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM ('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . "ENUM('" . implode ("', '", $datatype) . "')") . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'groupValidation' => 'compiled',
 			'after' => $arguments['after'],
 		);

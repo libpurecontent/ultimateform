@@ -4323,9 +4323,11 @@ class form
 		if (isSet ($restrictions)) {$restrictions = implode (";\n", $restrictions);}
 		
 		# Assign half-validated data, for the purposes of the groupValidation check; note that this could be tricked, but should be good enough in most cases, and certainly better than nothing
+		# This is then written to properly in doUploads
 		$data['presented'] = $totalApparentlyUploadedFiles;
 		#!# This is a workaround for when using getUnfinalisedData, to prevent offsets
 		$data['rawcomponents'] = $totalApparentlyUploadedFiles;
+		$data['special-uploaddatatype'] = $totalApparentlyUploadedFiles;
 		
 		# Register the attachments, and disable unzipping
 		#!# Ideally unzipping should be done after a zip file is e-mailed, but this would require much refactoring of the output processing, i.e. (i) upload, (ii) attach attachments, (iii) unzip
@@ -4358,8 +4360,7 @@ class form
 			'discard' => $arguments['discard'],
 			'editable' => $arguments['editable'],
 			'data' => $data,	// Because the uploading can only be processed later, this is set to NULL
-			#!# Not finished
-#			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 			'unzip'	=> $arguments['unzip'],
 			'progressbar' => $arguments['progressbar'],
 			'mime' => $arguments['mime'],
@@ -7554,13 +7555,14 @@ class form
 					'rawcomponents'	=> 'An array with every defined element being assigned as autonumber => filename; this will not show files unzipped but only list the main file with a string description of unzipped files for each main file',
 					'compiled'		=> 'An array with every successful element being assigned as filename => attributes; this will include any files automatically unzipped if that was requested',
 					'presented'		=> 'Submitted files (and failed uploads) as a human-readable string with the original filenames in brackets',
+					'special-uploaddatatype'		=> 'Chosen items only, listed comma-separated with no quote marks',
 				),
 				'file'				=> array ('rawcomponents', 'presented'),
 				'email'				=> array ('presented', 'compiled'),
 				'confirmationEmail'	=> array ('presented'),
 				'screen'			=> array ('presented'),
 				'processing'		=> array ('rawcomponents', 'compiled', 'presented'),
-				'database'			=> array ('presented'),
+				'database'			=> array ('special-uploaddatatype'),
 			),
 		);
 		
@@ -8242,6 +8244,10 @@ class form
 			if ($this->elements[$name]['flatten'] && ($this->elements[$name]['subfields'] == 1)) {	// subfields check should not be necessary because it should have been switched off already, but this acts as a safety blanket against offsets
 				$data['rawcomponents'] = (isSet ($data['rawcomponents'][0]) ? $data['rawcomponents'][0] : false);
 			}
+			
+			# Assemble the special-uploaddatatype output, as a simple comma-separated list of filenames
+			#!# Assumes no commas in filenames
+			$data['special-uploaddatatype'] = implode (',', $filenames);
 			
 			# Assign the output data
 			$this->elements[$name]['data'] = $data;

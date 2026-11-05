@@ -3456,8 +3456,8 @@ class form
 		
 		# Compile the datatype
 		$valuesQuoted = array ();
-		foreach ($arguments['values'] as $value) {
-			$valuesQuoted[] = "'" . addslashes ($value) . "'";
+		foreach ($arguments['values'] as $key => $value) {
+			$valuesQuoted[] = "'" . addslashes ($key) . "'";
 		}
 		$datatype = "`{$arguments['name']}` " . 'SET(' . implode (', ', $valuesQuoted) . ')' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'";
 		

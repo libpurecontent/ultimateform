@@ -4552,8 +4552,7 @@ class form
 			'editable' => false,
 			'data' => (isSet ($data) ? $data : NULL),
 			'after' => false,
-			#!# Not finished
-			#!# 'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
+			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : "`{$arguments['name']}` " . 'VARCHAR (255)') . " COMMENT '" . (addslashes ($arguments['title'])) . "'",
 		);
 	}
 	

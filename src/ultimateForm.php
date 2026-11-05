@@ -5273,14 +5273,24 @@ class form
 	/**
 	 * Output (display) the results to a database
 	 */
-	public function setOutputDatabase ($dsn, $table = false)
+	public function setOutputDatabase ($database, $table = false)
 	{
 		# Flag that this method is required
 		#!# Change to ->registerOutputMethod ($type) which then does the following line
 		$this->outputMethods['database'] = true;
 		
-		# Set the DSN and table name
-		$this->configureResultDatabaseDsn = $dsn;
+		# Create the table, if it does not exist
+		$fields = array ();
+		foreach ($this->elements as $name => $attributes) {
+			if (!isSet ($attributes['datatype'])) {continue;}
+			if ($attributes['discard']) {continue;}		// E.g. confirmation widgets
+			list ($fieldnameQuoted_ignored, $datatype) = explode (' ', $attributes['datatype'], 2);
+			$fields[$name] = $datatype;
+		}
+		$this->databaseConnection->createTable ($database, $table, $fields, $ifNotExists = true);
+		
+		# Set the database and table name
+		$this->configureResultDatabaseDatabase = $database;
 		$this->configureResultDatabaseTable = ($table ? $table : $this->settings['name']);
 	}
 	
@@ -7996,38 +8006,9 @@ class form
 	#!# Error handling in this function is too basic and needs to be moved higher in the class
 	private function outputDataDatabase ($presentedData)
 	{
-		# Connect to the database
-		#!# Refactor connectivity as it's now obsolete
-		if (! ($this->connection = @mysql_connect ($this->configureResultDatabaseDsn['hostname'], $this->configureResultDatabaseDsn['username'], $this->configureResultDatabaseDsn['password']) && @mysql_select_db ($this->configureResultDatabaseDsn['database']))) {die ('Could not connect: ' . mysql_error());}
-#!#		if (!$link = mysql_connect ($this->configureResultDatabaseDsn['hostname'], $this->configureResultDatabaseDsn['username'], $this->configureResultDatabaseDsn['password'])) {die ('Could not connect: ' . mysql_error());}
-		mysql_select_db ($this->configureResultDatabaseDsn['database']);
-		
-		# Design the table schema
-		#!# Replace with the output of getDatabaseColumnSpecification()
-		$query  = "CREATE TABLE IF NOT EXISTS {$this->configureResultDatabaseTable} (" . "\n";
-		$columns[] = '`id` INT AUTO_INCREMENT PRIMARY KEY';
-		foreach ($this->elements as $name => $attributes) {
-			if (!isSet ($attributes['datatype'])) {continue;}
-			$columns[] = "`{$name}` {$attributes['datatype']}" . ($attributes['required'] ? ' NOT NULL' : '') . " COMMENT '{$attributes['title']}'";
-		}
-		$query .= implode (",\n", $columns);
-		$query .= ')';
-		
-		# Create the table if it doesn't exist
-		if (!$result = mysql_query ($query, $link)) {die ('Error creating table: ' . mysql_error ());}
-		
-		# Compile the result
-		$data = array ();
-		foreach ($this->elements as $name => $attributes) {
-			if (!isSet ($attributes['datatype'])) {continue;}
-			$data[$name] = addslashes ((is_array ($this->form[$name]) ? implode ('', $this->form[$name]) : $this->form[$name]));
-		}
-		#!# Does no data ever arise?
-		if ($data) {
-			$query  = "INSERT INTO {$this->configureResultDatabaseTable} (" . implode (',', array_keys ($data)) . ") VALUES ('" . implode ("','", array_values ($data)) . "');";
-			
-			# Add the data
-			if (!$result = mysql_query ($query, $link)) {die ('Error inserting data: ' . mysql_error ());}
+		# Insert the data
+		if (!$this->databaseConnection->insert ($this->configureResultDatabaseDatabase, $this->configureResultDatabaseTable, $presentedData)) {
+			echo "\n" . '<p class="warning">Error inserting data.</p>';
 		}
 	}
 	

@@ -3455,12 +3455,11 @@ class form
 		}
 		
 		# Compile the datatype
-		$checkboxDatatypes = array ();
-		foreach ($arguments['values'] as $key => $value) {
-			#!# NOT NULL handling needs to be inserted
-			$checkboxDatatypes[] = "`" . /* $arguments['name'] . '-' . */ str_replace ("'", "\'", $key) . "` " . "ENUM ('true', 'false')" . " COMMENT '" . (addslashes ($arguments['title'])) . "'";
+		$valuesQuoted = array ();
+		foreach ($arguments['values'] as $value) {
+			$valuesQuoted[] = "'" . addslashes ($value) . "'";
 		}
-		$datatype = implode (",\n", $checkboxDatatypes);
+		$datatype = "`{$arguments['name']}` " . 'SET(' . implode (', ', $valuesQuoted) . ')' . ($arguments['required'] ? ' NOT NULL' : '') . " COMMENT '" . (addslashes ($arguments['title'])) . "'";
 		
 		# Add the widget to the master array for eventual processing
 		$this->elements[$arguments['name']] = array (
@@ -3480,7 +3479,6 @@ class form
 			'editable' => $arguments['editable'],
 			'data' => (isSet ($data) ? $data : NULL),
 			'values' => $arguments['values'],
-			#!# Not correct - needs multisplit into boolean
 			'datatype' => ($arguments['datatype'] ? $arguments['datatype'] : $datatype),
 			'groupValidation' => 'compiled',
 			'total' => $checkedTally,

@@ -7392,14 +7392,14 @@ class form
 					'rawcomponents'	=> 'An array with every defined element being assigned as itemName => boolean true/false',
 					'compiled'		=> 'String of checked items only as selectedItemName1\n,selectedItemName2\n,selectedItemName3',
 					'presented'		=> 'As compiled, but in the case of an associative array of values being supplied as selectable items, the visible text version used instead of the actual value',
-					'special-setdatatype'		=> 'Chosen items only, listed comma separated with no quote marks',
+					'special-setdatatype'		=> 'Chosen items only, listed comma-separated with no quote marks',
 				),
 				'file'				=> array ('rawcomponents', 'compiled', 'presented'),
 				'email'				=> array ('compiled', 'rawcomponents', 'presented'),
 				'confirmationEmail'	=> array ('presented', 'compiled'),
 				'screen'			=> array ('presented', 'compiled'),
 				'processing'		=> array ('rawcomponents', 'compiled', 'presented', 'special-setdatatype'),
-				'database'			=> array ('compiled'),
+				'database'			=> array ('special-setdatatype'),
 			),
 			
 			'datetime' => array (

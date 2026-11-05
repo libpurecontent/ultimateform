@@ -4527,6 +4527,9 @@ class form
 			# Map the components onto the array directly and assign the compiled version; no attempt is made to combine the data
 			$data['rawcomponents'] = ($arguments['security'] ? $arguments['values'] : $this->form[$arguments['name']]);
 			
+			# The compiled version is comma-separated values
+			$data['compiled'] = implode (',', $data['rawcomponents']);
+			
 			# The presented version is just an empty string
 			$data['presented'] = '';
 		}
@@ -7431,6 +7434,7 @@ class form
 			'hidden' => array (
 				'_descriptions' => array (
 					'rawcomponents'	=> 'The raw array',
+					'compiled'		=> 'String, comma-separated with no quote marks',
 					'presented'		=> 'An empty string',
 				),
 				'file'				=> array ('rawcomponents', 'presented'),

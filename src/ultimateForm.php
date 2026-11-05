@@ -113,6 +113,8 @@ class form
 	private $configureResultScreenShowUnsubmitted;					// Whether, in screen results mode, unsubmitted widgets that are not required will be listed
 	private $configureResultEmailShowUnsubmitted;					// Whether, in e-mail results mode, unsubmitted widgets that are not required will be listed
 	private $configureResultConfirmationEmailShowUnsubmitted;		// Whether, in e-mail confirmation results mode, unsubmitted widgets that are not required will be listed
+	private $configureResultDatabaseDatabase;
+	private $configureResultDatabaseTable;
 	
 	# Supported output types
 	private $supportedTypes = array ('file', 'email', 'confirmationEmail', 'screen', 'processing', 'database');

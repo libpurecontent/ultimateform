@@ -4792,6 +4792,7 @@ class form
 	{
 		# Add the main function; see: http://stackoverflow.com/a/5017423/180733
 		$this->multipleSubmitReturnHandlerClass = 'defaultsubmitbutton';
+		#!# The JS code for input[type=submit] needs to be scoped to the closest <form> (i.e. parent) to the input field when there are multiple forms on the page and they have no ID; workaround is to add an ID
 		$this->jQueryCode[__FUNCTION__] = "
 			$('form" . ($this->settings['id'] ? "#{$this->settings['id']}" : '') . " input').keypress(function (e) {
 				if ((e.which && e.which == 13) || (e.keyCode && e.keyCode == 13)) {

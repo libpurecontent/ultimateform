@@ -932,7 +932,7 @@ class form
 		
 		# Define the CSS
 		$css = "
-			<style type=\"text/css\">
+			<style>
 				.{$div} .mapinput {display: none;}
 				.{$div} .mapcontainer {position: relative;}	/* Width/height is set on the element itself */
 				.{$div} .mapcontainer .mapdiv {display: block; width: 100%; height: 100%;}
@@ -4071,7 +4071,7 @@ class form
 		if ($arguments['draganddrop']) {
 			$thumbnailText = 'Click here to pick image, or drag and drop into this box.';
 			$widgetHtml .= "
-				<style type=\"text/css\">
+				<style>
 					form div.draganddrop {
 						width: calc({$arguments['thumbnailWidth']}px + 20px);
 						height: calc({$arguments['thumbnailHeight']}px + 20px);
@@ -4218,7 +4218,7 @@ class form
 		if ($arguments['progressbar']) {
 			$progressbarId = $this->cleanId ($arguments['name'] . '__progressbar');
 			$widgetHtml .= "\n\t\t\t<br />\n\t\t\t" . '<div id="' . $progressbarId . '"><progress max="100" value="0"></progress> <span></span></div>';
-			$widgetHtml .= "\n\t\t\t<style type=\"text/css\">#{$progressbarId} {display: none;}</style>";		// Hidden by default; shown using show() below on submit
+			$widgetHtml .= "\n\t\t\t<style>#{$progressbarId} {display: none;}</style>";		// Hidden by default; shown using show() below on submit
 			$widgetHtml .= "\n\t\t\t";
 			$this->jQueryCode[__FUNCTION__] = "\n" . "
 				$('#{$progressbarId}').closest ('form').submit (function (e) {
@@ -4671,7 +4671,7 @@ class form
 		if ($this->settings['jQueryUi']) {
 			$this->jsCssAssets['jQueryUI'] = '
 				<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js" integrity="sha256-xLD7nhI62fcsEZK2/v8LsBcb4lG7dgULkuXoXB/j91c=" crossorigin="anonymous"></script>
-				<link href="https://code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css" rel="stylesheet" type="text/css"/>
+				<link href="https://code.jquery.com/ui/1.13.2/themes/smoothness/jquery-ui.css" rel="stylesheet" />
 			';
 		}
 	}
@@ -5428,7 +5428,7 @@ class form
 		}
 		
 		# Register CSS to hide the HTML
-		$this->html .= "\n" . '<style type="text/css">form .__token {display: none;}</style>';
+		$this->html .= "\n" . '<style>form .__token {display: none;}</style>';
 	}
 	
 	
@@ -6983,7 +6983,7 @@ class form
 					$this->settings['jQuery'] = 'https://code.jquery.com/jquery-3.6.1.min.js';
 				}
 				if ($this->settings['jQuery']) {
-					$html .= "\n<script type=\"text/javascript\" src=\"{$this->settings['jQuery']}\"></script>";
+					$html .= "\n<script src=\"{$this->settings['jQuery']}\"></script>";
 				}
 			}
 		}
@@ -6995,7 +6995,7 @@ class form
 		
 		# Add each client function
 		if ($this->jQueryCode || $this->javascriptCode) {
-			$html .= "\n<script type=\"text/javascript\">";
+			$html .= "\n<script>";
 			$html .= "\n\t" . '$(function ($) {';		// On document ready
 			foreach ($this->jQueryCode as $key => $jsCode) {
 				$html .= "\n" . $jsCode;

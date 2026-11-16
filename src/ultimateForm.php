@@ -3724,11 +3724,14 @@ class form
 			# For the picker version, create an HTML5 date widget, to which we will then attach fallback Javascript
 			if ($arguments['picker']) {
 				
-				# Compile an YYYY-MM-DD (ISO 8601 Extended) version of the element value
-				$elementValueIso = $elementValue['year'] . '-' . $elementValue['month'] . '-' . $elementValue['day'];
+				# Compile an YYYY-MM-DD (ISO 8601 Extended) version of the element value, if a value is posted
+				$elementValueIso = false;
+				if ($this->formPosted && !$allFieldsIncomplete) {
+					$elementValueIso = $elementValue['year'] . '-' . $elementValue['month'] . '-' . $elementValue['day'];
+				}
 				
 				# Create the basic widget; NB the submission of a type="date" widget will always be YYYY-MM-DD (ISO 8601 Extended) whatever the input GUI format is - see http://dev.w3.org/html5/spec-author-view/forms.html#input-author-notes
-				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . " value=\"" . htmlspecialchars ($elementValueIso) . '"' . $widget->tabindexHtml () . ($arguments['min'] ? " min=\"{$arguments['min']}\"" : '') . ($arguments['max'] ? " max=\"{$arguments['max']}\"" : '') . ' />';
+				$widgetHtml  = "\n\t\t\t" . '<input' . $this->nameIdHtml ($arguments['name']) . ' type="date" size="20"' . ($arguments['autofocus'] ? ' autofocus="autofocus"' : '') . ($this->settings['enableNativeRequired'] && $arguments['required'] ? ' required="required"' : '') . ($elementValueIso ? ' value="' . htmlspecialchars ($elementValueIso) . '"' : '') . $widget->tabindexHtml () . ($arguments['min'] ? " min=\"{$arguments['min']}\"" : '') . ($arguments['max'] ? " max=\"{$arguments['max']}\"" : '') . ' />';
 				
 				# Enable autosubmit if required; see: http://stackoverflow.com/questions/11532433 for the HTML5 picker, and https://stackoverflow.com/questions/6471959/ for the jQuery picker
 				$widgetId = $this->cleanId ($this->settings['name'] ? "{$this->settings['name']}[{$arguments['name']}]" : $arguments['name']);

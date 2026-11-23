@@ -312,6 +312,7 @@ class form
 	 * Create a standard input widget
 	 * @param array $arguments Supplied arguments - see template
 	 */
+	#!# Function should be renamed to text
 	public function input ($suppliedArguments, $functionName = __FUNCTION__, /* internal */ $additionalArgumentDefaults = array ())
 	{
 		# Specify available arguments as defaults or as NULL (to represent a required argument)
@@ -3726,7 +3727,7 @@ class form
 				
 				# Compile an YYYY-MM-DD (ISO 8601 Extended) version of the element value, if a value is posted
 				$elementValueIso = false;
-				if ($this->formPosted && !$allFieldsIncomplete) {
+				if ($elementValue['year'] && $elementValue['month'] && $elementValue['day']) {
 					$elementValueIso = $elementValue['year'] . '-' . $elementValue['month'] . '-' . $elementValue['day'];
 				}
 				
